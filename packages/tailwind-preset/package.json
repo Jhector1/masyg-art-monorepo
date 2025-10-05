@@ -1,0 +1,9 @@
+{
+  "name": "@acme/tailwind-preset",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "peerDependencies": {
+    "tailwindcss": ">=3.4" 
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@acme/core",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./hooks/*": "./src/hooks/*.ts",
+    "./contexts/*": "./src/contexts/*.tsx",
+    "./data/*": "./src/data/*.ts",
+    "./lib/*": "./src/lib/*.ts",
+    "./utils/*": "./src/utils/*.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "zod": "^4.0.17",
+    "axios": "^1.10.0",
+    "uuid": "^11.1.0",
+    "slugify": "^1.6.6"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}

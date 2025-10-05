@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kiltiya-hatian-art.onrender.com/sitemap.xml

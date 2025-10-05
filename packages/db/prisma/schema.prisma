@@ -1,0 +1,603 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  title       String
+  description String
+  price       Float
+
+  publicId String
+  sizes    String[]
+
+  thumbnails String[]
+  formats    String[]
+  svgFormat  String?
+  svgPreview String?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  favorites         Favorite[]
+  reviews           Review[]
+  orderItems        OrderItem[]
+  cartItems         CartItem[]
+  variants          ProductVariant[]
+  assets            ProductAsset[]
+  designs           UserDesign[] // keep one
+  purchasedDesigns  PurchasedDesign[]   @relation("Product_PurchasedDesigns")
+  DesignEntitlement DesignEntitlement[]
+  DesignUsage       DesignUsage[]
+
+  // --- Simple sale fields ---
+  salePercent  Int? // 1..100 (ignored if salePrice is set)
+  salePrice    Float? // final unit price while sale is active
+  saleStartsAt DateTime? // null = effective immediately
+  saleEndsAt   DateTime? // null = open-ended
+
+  @@index([saleStartsAt, saleEndsAt])
+  @@index([saleEndsAt])
+}
+
+model User {
+  id       String  @id @default(cuid())
+  email    String  @unique
+  name     String?
+  // ↓ make optional for OAuth users
+  password String
+
+  // NextAuth common fields
+  emailVerified DateTime?
+  image         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Your fields
+  cart              Cart?
+  favorites         Favorite[]
+  orders            Order[]
+  addresses         Address[]
+  downloadTokens    DownloadToken[]
+  reviews           Review[]
+  avatarUrl         String?             @db.VarChar(255)
+  avatarPublicId    String?             @db.VarChar(191)
+  downloadCount     Int                 @default(0)
+  designs           UserDesign[]
+  purchasedDesigns  PurchasedDesign[]   @relation("User_PurchasedDesigns")
+  DesignEntitlement DesignEntitlement[]
+
+  // Adapter relations
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// Categorization
+model Category {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  products Product[]
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+
+  type VariantType?
+
+  uploadType VariantType?
+
+  // Existing optional fields (kept):
+  format   String?
+  license  String?
+  size     String?
+  material String?
+  frame    String?
+
+  // NEW — generic commerce fields (work for ORIGINAL and can also be used for PRINT if you want)
+  sku       String?          @unique
+  inventory Int?             @default(1) // ORIGINAL usually 1; PRINT can be null (on-demand) or a number
+  status    InventoryStatus? @default(ACTIVE)
+  listPrice Float? // if you ever want per-variant pricing; optional for now
+
+  // NEW — painting / physical metadata (all optional so schema stays flexible)
+  widthIn        Float?
+  heightIn       Float?
+  depthIn        Float?
+  weightLb       Float?
+  year           Int?
+  medium         String? // e.g. "Oil", "Acrylic", "Mixed media"
+  surface        String? // e.g. "Canvas", "Wood panel", "Paper"
+  framed         Boolean?  @default(false)
+  originalSerial String?   @unique // internal serial or COA number
+  soldAt         DateTime? // when the ORIGINAL sold (if applicable)
+
+  // Existing back-relations:
+  CartItemsAsDigital  CartItem[]  @relation("CartItemDigital")
+  CartItemsAsPrint    CartItem[]  @relation("CartItemPrint")
+  OrderItemsAsDigital OrderItem[] @relation("OrderItemDigital")
+  OrderItemsAsPrint   OrderItem[] @relation("OrderItemPrint")
+
+  // NEW — back-relations for originals
+  CartItemsAsOriginal  CartItem[]  @relation("CartItemOriginal")
+  OrderItemsAsOriginal OrderItem[] @relation("OrderItemOriginal")
+}
+
+/// Shopping Cart
+model Cart {
+  id      String  @id @default(cuid())
+  user    User?   @relation(fields: [userId], references: [id])
+  userId  String? @unique
+  guestId String? @unique // ✅ ADD THIS LINE
+
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([guestId]) // ✅ optional but helpful
+}
+
+model CartItem {
+  id     String @id @default(cuid())
+  cart     Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId String
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  // existing variant pointers
+  digitalVariantId String?
+  digitalVariant ProductVariant? @relation("CartItemDigital", fields: [digitalVariantId], references: [id], onDelete: SetNull)
+
+  printVariantId String?
+  printVariant   ProductVariant? @relation("CartItemPrint",   fields: [printVariantId],   references: [id], onDelete: SetNull)
+
+  // NEW — original painting variant pointer
+  originalVariantId String?
+  originalVariant ProductVariant? @relation("CartItemOriginal", fields: [originalVariantId], references: [id], onDelete: SetNull)
+
+  price         Float
+  originalPrice Float
+  quantity      Int      @default(1)
+  addedAt       DateTime @default(now())
+
+  designId String?
+  design   UserDesign? @relation(fields: [designId], references: [id], onDelete: SetNull)
+
+  previewUrlSnapshot String? @db.VarChar(2000)
+  styleSnapshot      Json?
+
+  @@index([designId])
+  @@index([cartId])
+  @@index([originalVariantId])
+}
+
+enum InventoryStatus {
+  ACTIVE
+  RESERVED
+  SOLD
+}
+
+enum VariantType {
+  DIGITAL
+  PRINT
+  ORIGINAL
+}
+
+/// Favorites / Wishlist
+model Favorite {
+  id      String  @id @default(cuid())
+  user    User?   @relation(fields: [userId], references: [id])
+  userId  String? // ✅ make nullable for guests
+  guestId String? // ✅ track anonymous customer session
+
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@unique([guestId, productId])
+}
+
+/// Product Reviews
+model Review {
+  id        String   @id @default(cuid())
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+  guestId   String?
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  rating    Int      @default(5)
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@index([userId])
+  @@index([guestId])
+}
+
+/// Orders & Payments
+model Order {
+  id      String  @id @default(cuid())
+  user    User?   @relation(fields: [userId], references: [id])
+  userId  String?
+  guestId String?
+
+  items          OrderItem[]
+  downloadTokens DownloadToken[]
+
+  total               Float
+  status              String    @default("PENDING")
+  placedAt            DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  payment             Payment?
+  shipping            Address?  @relation("Order_shipping", fields: [shippingId], references: [id])
+  shippingId          String?
+  stripeSessionId     String?   @unique
+  claimTokenHash      String?   @unique
+  claimTokenExpiresAt DateTime?
+
+  // Back-relation to purchased design snapshots
+  purchasedDesigns PurchasedDesign[] @relation("Order_PurchasedDesigns")
+
+  @@index([guestId])
+  @@index([claimTokenExpiresAt])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  digitalVariantId String?
+  digitalVariant ProductVariant? @relation("OrderItemDigital", fields: [digitalVariantId], references: [id], onDelete: SetNull)
+
+  printVariantId String?
+  printVariant   ProductVariant? @relation("OrderItemPrint",   fields: [printVariantId],   references: [id], onDelete: SetNull)
+
+  // NEW — original painting variant pointer
+  originalVariantId String?
+  originalVariant ProductVariant? @relation("OrderItemOriginal", fields: [originalVariantId], references: [id], onDelete: SetNull)
+
+  type               VariantType
+  price              Float
+  quantity           Int              @default(1)
+  listPrice          Float?
+  previewUrlSnapshot String?
+  purchasedDesign    PurchasedDesign? @relation("OrderItem_PurchasedDesign")
+  downloadTokens     DownloadToken[]
+
+  @@index([orderId])
+  @@index([originalVariantId])
+}
+
+/// Addresses (User & Shipping)
+model Address {
+  id      String  @id @default(cuid())
+  user    User?   @relation(fields: [userId], references: [id])
+  userId  String? // ✅ make nullable for guests
+  guestId String? // ✅ track anonymous customer session
+
+  label      String?
+  street     String
+  city       String
+  state      String
+  postalCode String
+  country    String
+  createdAt  DateTime @default(now())
+
+  orders Order[] @relation("Order_shipping")
+
+  @@index([guestId]) // ✅ optional but helpful
+}
+
+/// Payment Records
+model Payment {
+  id            String   @id @default(cuid())
+  order         Order    @relation(fields: [orderId], references: [id])
+  orderId       String   @unique
+  amount        Float
+  provider      String
+  transactionId String
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+enum CldResourceType {
+  image
+  raw
+  video
+}
+
+enum CldDeliveryType {
+  upload
+  authenticated
+  private
+}
+
+model ProductAsset {
+  id        String  @id @default(cuid())
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  storageKey String? @unique
+  url        String
+  previewUrl String?
+
+  mimeType String
+  ext      String
+  isVector Boolean @default(false)
+
+  width        Int?
+  height       Int?
+  dpi          Int?
+  colorProfile String?
+  sizeBytes    Int?
+  checksum     String?
+
+  pdfPageCount Int?
+  pdfPageWIn   Float?
+  pdfPageHIn   Float?
+  svgViewBox   String?
+  hasAlpha     Boolean?
+  isAnimated   Boolean?
+
+  // NEW — make nullable so deploy is zero-downtime, then backfill:
+  resourceType CldResourceType?
+  deliveryType CldDeliveryType?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  downloadTokens DownloadToken[]
+
+  @@unique([productId, url], name: "productId_url")
+  @@index([productId])
+  @@index([url])
+}
+
+model DownloadToken {
+  id String @id @default(cuid())
+
+  // who & what
+  order   Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+  asset   ProductAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  assetId String
+
+  // optional: link which line item produced it (audit)
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  orderItemId String?
+
+  // buyer identity
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId  String?
+  guestId String?
+
+  // delivery controls
+  signedUrl        String
+  expiresAt        DateTime
+  remainingUses    Int?
+  downloadCount    Int       @default(0)
+  lastDownloadedAt DateTime?
+
+  // snapshot terms
+  licenseSnapshot String?
+
+  createdAt DateTime @default(now())
+
+  // ✅ model-level indexes
+  @@index([orderId])
+  @@index([assetId])
+  @@index([guestId])
+  @@index([orderId, assetId]) // composite (keep if you use it)
+}
+
+/// Per-user, per-product editable design + quotas
+model UserDesign {
+  id String @id @default(cuid())
+
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String?
+  guestId String?
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  // saved state only
+  style Json
+  defs  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  previewPublicId   String?             @db.VarChar(255)
+  previewUrl        String?             @db.VarChar(2000)
+  previewUpdatedAt  DateTime?
+  CartItem          CartItem[]
+  DesignEntitlement DesignEntitlement[]
+  DesignUsage       DesignUsage[]
+
+  @@unique([userId, productId])
+  @@unique([guestId, productId])
+  @@index([userId])
+  @@index([guestId])
+  @@index([productId])
+}
+
+model WebhookEvent {
+  id        String   @id // Stripe event.id
+  createdAt DateTime @default(now())
+}
+
+model PurchasedDesign {
+  id String @id @default(cuid())
+
+  // who / linkage
+  user    User?   @relation("User_PurchasedDesigns", fields: [userId], references: [id], onDelete: SetNull)
+  userId  String?
+  guestId String?
+
+  order   Order  @relation("Order_PurchasedDesigns", fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+
+  orderItem   OrderItem @relation("OrderItem_PurchasedDesign", fields: [orderItemId], references: [id], onDelete: Cascade)
+  orderItemId String    @unique // 1:1 with an order line
+
+  product   Product @relation("Product_PurchasedDesigns", fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  // snapshots
+  style      Json
+  defs       Json?
+  svg        Json?
+  previewUrl String?
+
+  createdAt         DateTime            @default(now())
+  DesignEntitlement DesignEntitlement[]
+
+  @@index([userId])
+  @@index([productId])
+  @@index([orderId])
+}
+
+enum EntitlementSource {
+  PURCHASE
+  TOPUP
+  GRANT
+}
+
+model DesignEntitlement {
+  id String @id @default(cuid())
+
+  // who
+  userId  String?
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  guestId String?
+
+  // what (bind as you prefer)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // optional: bind to a specific design instance (lock credits to that draft/snapshot)
+  userDesignId      String?
+  userDesign        UserDesign?      @relation(fields: [userDesignId], references: [id], onDelete: SetNull)
+  purchasedDesignId String? // if credits should follow the purchased snapshot
+  purchasedDesign   PurchasedDesign? @relation(fields: [purchasedDesignId], references: [id], onDelete: SetNull)
+
+  // provenance
+  source      EntitlementSource
+  orderId     String?
+  orderItemId String?
+
+  // quotas (grant)
+  exportQuota Int @default(0)
+  editQuota   Int @default(0)
+
+  // usage (aggregated; individual uses tracked in DesignUsage for audit)
+  exportsUsed Int @default(0)
+  editsUsed   Int @default(0)
+
+  // lifecycle
+  expiresAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  DesignUsage DesignUsage[]
+
+  @@index([userId])
+  @@index([guestId])
+  @@index([productId])
+  @@index([userDesignId])
+  @@index([purchasedDesignId])
+  @@index([orderItemId])
+}
+
+enum UsageKind {
+  EXPORT
+  EDIT
+}
+
+model DesignUsage {
+  id String @id @default(cuid())
+
+  kind UsageKind
+
+  // who / what
+  userId  String?
+  guestId String?
+
+  productId         String
+  product           Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userDesignId      String?
+  userDesign        UserDesign? @relation(fields: [userDesignId], references: [id], onDelete: SetNull)
+  purchasedDesignId String?
+
+  entitlementId String
+  entitlement   DesignEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+
+  // execution details
+  format         String? // e.g., "PNG"
+  width          Int?
+  height         Int?
+  meta           Json?
+  // prevent double-charge on retries
+  idempotencyKey String? @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([entitlementId])
+  @@index([userId])
+  @@index([guestId])
+  @@index([productId])
+}

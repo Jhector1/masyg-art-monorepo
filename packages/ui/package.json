@@ -1,0 +1,32 @@
+{
+  "name": "@acme/ui",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./components/*": "./src/components/*"
+        
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "tailwindcss": ">=4"
+  },
+  "dependencies": {
+    "framer-motion": "^12.18.1",
+    "react-medium-image-zoom": "^5.2.14",
+    "lucide-react": "^0.525.0",
+    "@heroicons/react": "^2.2.0",
+    "react-rnd": "^10.5.2",
+    "react-konva": "^19.0.7",
+    "konva": "^9.3.22",
+    "use-image": "^1.1.4",
+    "emoji-mart": "^5.6.0",
+    "@emoji-mart/data": "^1.2.1",
+    "emoji-picker-element": "^1.26.3",
+    "html2canvas": "^1.4.1",
+    "ccapture.js": "^1.1.0",
+    "react-hot-toast": "^2.5.2",
+    "react-color": "^2.19.3"
+  }
+}

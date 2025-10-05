@@ -1,0 +1,29 @@
+{
+  "name": "admin",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack -p 3003",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "jest --verbose",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "dependencies": {
+    "@stripe/stripe-js": "^7.4.0",
+    "next": "15.3.4",
+    "next-auth": "^4.24.11",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "swr": "^2.3.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint-config-next": "15.3.4",
+    "tailwindcss": "^4"
+  }
+}
