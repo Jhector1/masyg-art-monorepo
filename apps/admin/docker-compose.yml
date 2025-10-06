@@ -1,3 +1,4 @@
+# apps/ziledigital/docker-compose.yml  (same idea for jeanyvesart, admin)
 services:
   ziledigital-app:
     build: .
@@ -6,13 +7,6 @@ services:
     env_file: [.env]
     expose: ["3000"]
     networks: [public]
-    depends_on: ["mono-postgres"]
-    healthcheck:
-      test: ["CMD-SHELL","wget -qO- http://127.0.0.1:3000/health || exit 1"]
-      interval: 15s
-      timeout: 3s
-      retries: 10
-
 networks:
   public:
     external: true
