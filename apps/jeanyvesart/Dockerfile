@@ -33,4 +33,4 @@ COPY --from=deps /repo/apps/jeanyvesart/.next/static ./.next/static
 COPY --from=deps /repo/apps/jeanyvesart/public ./public
 ENV PORT=3001 HOSTNAME=0.0.0.0
 EXPOSE 3001
-CMD ["node","server.js"]
+CMD ["node","apps/jeanyvesart/server.js"]

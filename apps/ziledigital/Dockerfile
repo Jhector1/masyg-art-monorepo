@@ -35,4 +35,4 @@ COPY --from=deps /repo/apps/ziledigital/.next/static ./.next/static
 COPY --from=deps /repo/apps/ziledigital/public ./public
 ENV PORT=3003 HOSTNAME=0.0.0.0
 EXPOSE 3003
-CMD ["node","server.js"]
+CMD ["node","apps/ziledigital/server.js"]

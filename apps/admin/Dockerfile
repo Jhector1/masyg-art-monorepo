@@ -33,4 +33,4 @@ COPY --from=deps /repo/apps/admin/.next/static ./.next/static
 COPY --from=deps /repo/apps/admin/public ./public
 ENV PORT=3002 HOSTNAME=0.0.0.0
 EXPOSE 3002
-CMD ["node","server.js"]
+CMD ["node","apps/admin/server.js"]
