@@ -1,55 +1,35 @@
-# ----------------------------------
-# Builder (Next.js + optional Prisma)
-# ----------------------------------
-FROM node:20-alpine AS builder
-WORKDIR /app
+# ---- deps (install from ROOT lockfile with workspaces)
+FROM node:20-alpine AS deps
+WORKDIR /repo
 
-# 1) Install deps with good caching
-# after (temporary)
-COPY package*.json ./
-RUN npm install --legacy-peer-deps
+# 1) copy only manifests first for better caching
+COPY package.json package-lock.json ./
+COPY apps/admin/package.json apps/admin/
+COPY packages/ui/package.json packages/ui/
+# (add more package.json files for other internal packages this app uses)
+COPY packages/core/package.json packages/core/
+COPY packages/server/package.json packages/server/
 
-# 2) Copy source
+COPY packages/db/package.json packages/db/
+COPY packages/tailwing-preset/package.json packages/db/
+# 2) install all workspaces
+# 2) install all workspaces
+RUN npm install --workspaces --include-workspace-root --legacy-peer-deps
+
+# 3) now copy the rest of the source
 COPY . .
 
-# 3) (Optional) Generate Prisma client before build
-#    Comment out if you don't use Prisma
-RUN if [ -d "prisma" ]; then npx prisma generate; fi
+# 4) build just this app
+RUN npm run build -w apps/admin
 
-# 4) Enable standalone in next.config.js:
-#    module.exports = { output: 'standalone' }
-RUN npm run build
-
-# ----------------------------------
-# Runner (tiny, no dev deps)
-# ----------------------------------
+# ---- runner (Next.js standalone)
 FROM node:20-alpine AS runner
-ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1
-
 WORKDIR /app
-
-# Copy the minimal standalone server bundle + static assets
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-
-# (Optional) Prisma engines if present
-# If prisma was used, the generated client expects these folders:
-# - node_modules/.prisma  (engines)
-# - prisma/               (schema for runtime tools/scripts, optional)
-# They are already in the standalone bundle when present, but this is safe:
-# (Uncomment if you need to guarantee availability)
-# COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-# COPY --from=builder /app/prisma ./prisma
-
-# Run as non-root
-RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
-USER nextjs
-
-# Configurable port (default 3000)
-ENV PORT=3000
-EXPOSE 3000
-
-# The standalone bundle contains server.js at the project root
-CMD ["node", "server.js"]
+ENV NODE_ENV=production
+# If you're using Next "standalone" output, copy these:
+COPY --from=deps /repo/apps/admin/.next/standalone ./
+COPY --from=deps /repo/apps/admin/.next/static ./.next/static
+COPY --from=deps /repo/apps/admin/public ./public
+ENV PORT=3002 HOSTNAME=0.0.0.0
+EXPOSE 3002
+CMD ["node","server.js"]

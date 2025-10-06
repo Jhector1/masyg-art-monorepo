@@ -1,12 +1,14 @@
-# apps/ziledigital/docker-compose.yml  (same idea for jeanyvesart, admin)
 services:
-  ziledigital-app:
-    build: .
+  admin-app:
+    build:
+      context: /opt/masyg-art-monorepo     # 👈 repo root
+      dockerfile: apps/ziledigital/Dockerfile    # 👈 per-app Dockerfile path
     container_name: ziledigital-app
     restart: unless-stopped
     env_file: [.env]
-    expose: ["3000"]
+    expose: ["3003"]
     networks: [public]
+
 networks:
   public:
     external: true
