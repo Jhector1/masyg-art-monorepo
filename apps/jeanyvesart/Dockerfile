@@ -6,25 +6,28 @@ WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY apps/jeanyvesart/package.json apps/jeanyvesart/
 COPY packages/ui/package.json packages/ui/
-# (add more package.json files for other internal packages this app uses)
 COPY packages/core/package.json packages/core/
 COPY packages/server/package.json packages/server/
 COPY packages/db/package.json packages/db/
+# If this package exists; otherwise comment the next line
 COPY packages/tailwind-preset/package.json packages/tailwind-preset/
-# 2) install all workspaces
-RUN npm install --workspaces --include-workspace-root --legacy-peer-deps
+
+# 2) install all workspaces using the root lockfile
+RUN npm ci --workspaces --include-workspace-root --legacy-peer-deps
 
 # 3) now copy the rest of the source
 COPY . .
 
-# 4) build just this app
-RUN npm run build -w apps/jeanyvesart
+# 4) generate Prisma client from the SHARED schema
+RUN npx prisma generate --schema packages/db/prisma/schema.prisma
+
+# 5) build just this app (skip lint in container)
+RUN NEXT_DISABLE_ESLINT=1 NEXT_TELEMETRY_DISABLED=1 npm run build -w apps/jeanyvesart
 
 # ---- runner (Next.js standalone)
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-# If you're using Next "standalone" output, copy these:
 COPY --from=deps /repo/apps/jeanyvesart/.next/standalone ./
 COPY --from=deps /repo/apps/jeanyvesart/.next/static ./.next/static
 COPY --from=deps /repo/apps/jeanyvesart/public ./public
