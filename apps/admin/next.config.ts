@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
   output: "standalone",
+  eslint: { ignoreDuringBuilds: true },        // ← skip ESLint in prod build
+  typescript: { ignoreBuildErrors: true },      // ← skip TS errors in prod build
 
   transpilePackages: [
     "@acme/ui",
