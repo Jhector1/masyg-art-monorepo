@@ -10,7 +10,7 @@ COPY packages/ui/package.json packages/ui/
 COPY packages/core/package.json packages/core/
 COPY packages/server/package.json packages/server/
 COPY packages/db/package.json packages/db/
-COPY packages/tailwing-preset/package.json packages/tailwing-preset/
+COPY packages/tailwind-preset/package.json packages/tailwind-preset/
 # 2) install all workspaces
 RUN npm install --workspaces --include-workspace-root --legacy-peer-deps
 
