@@ -134,3 +134,73 @@ Learn more about the power of Turborepo:
 - [Configuration Options](https://turborepo.com/docs/reference/configuration)
 - [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
 # masyg-art-monorepo
+/opt/masyg-art-monorepo
+├─ package.json
+├─ package-lock.json
+├─ tsconfig.base.json
+├─ .gitignore
+│
+├─ apps/
+│  ├─ ziledigital/
+│  │  ├─ .env                         # DATABASE_URL, NEXTAUTH_*, etc.
+│  │  ├─ next.config.mjs
+│  │  ├─ tailwind.config.ts           # uses @acme/tailwind-preset
+│  │  ├─ src/ ...                     # app code
+│  │  ├─ public/ ...
+│  │  └─ (no Dockerfile here; shared one is used)
+│  │
+│  ├─ jeanyvesart/
+│  │  ├─ .env
+│  │  ├─ next.config.mjs
+│  │  ├─ tailwind.config.ts
+│  │  ├─ src/ ...
+│  │  └─ public/ ...
+│  │
+│  ├─ admin/
+│  │  ├─ .env
+│  │  ├─ next.config.mjs
+│  │  ├─ tailwind.config.ts
+│  │  ├─ src/ ...
+│  │  └─ public/ ...
+│  │
+│  └─ _shared/
+│     ├─ Dockerfile                   # single reusable build for all apps
+│     └─ docker-entrypoint.sh         # waits for DB + (optional) migrate + start
+│
+├─ packages/
+│  ├─ ui/
+│  │  ├─ package.json
+│  │  └─ src/ ...
+│  │
+│  ├─ core/
+│  │  ├─ package.json
+│  │  └─ src/ ...
+│  │
+│  ├─ server/
+│  │  ├─ package.json
+│  │  └─ src/ ...
+│  │
+│  ├─ db/
+│  │  ├─ package.json
+│  │  └─ prisma/
+│  │     ├─ schema.prisma
+│  │     └─ migrations/
+│  │        ├─ 2025xxxx_xxxxxx/
+│  │        │  └─ migration.sql
+│  │        └─ ... (more)
+│  │
+│  └─ tailwind-preset/
+│     ├─ package.json                 # exports ./dist/index.js
+│     ├─ tsconfig.json                # outDir: dist, moduleResolution: Bundler/NodeNext
+│     ├─ index.ts                     # preset (no `content` here)
+│     └─ dist/                        # built during Docker build
+│        └─ index.js (generated)
+│
+├─ infra/
+│  ├─ docker-compose.yml              # three services using the shared Dockerfile
+│  └─ caddy/
+│     ├─ docker-compose.yml           # if you run Caddy via compose here
+│     └─ Caddyfile                    # reverse proxy to app containers
+│
+└─ db/
+   └─ docker-compose.yml              # postgres service (mono-postgres), if you keep DB infra here

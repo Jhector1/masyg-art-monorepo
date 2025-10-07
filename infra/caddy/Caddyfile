@@ -1,0 +1,29 @@
+(common) {
+  encode zstd gzip
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options "SAMEORIGIN"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}
+
+client1.ziledigital.com {
+  import common
+  reverse_proxy ziledigital-app:3003
+}
+
+client1.jeanyveshector.com {
+  import common
+  reverse_proxy jeanyvesart-app:3001
+}
+
+admin.example.com {
+  import common
+  reverse_proxy admin-app:3002
+}
+
+client1.masyglink.com {
+  import common
+  reverse_proxy masygextractor-app:5000
+}

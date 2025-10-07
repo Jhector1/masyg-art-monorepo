@@ -1,0 +1,83 @@
+version: "3.9"
+services:
+  ziledigital-app:
+    build:
+      context: /opt/masyg-art-monorepo
+      dockerfile: apps/_shared/Dockerfile.app
+      args:
+        APP_NAME: ziledigital
+        APP_PORT: 3003
+    container_name: ziledigital-app
+    restart: unless-stopped
+    env_file:
+      - /opt/masyg-art-monorepo/apps/ziledigital/.env   # includes shared DATABASE_URL
+    environment:
+      NODE_ENV: production
+      RUN_MIGRATIONS: "1"        # ✅ only here
+    expose: ["3003"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3003/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    networks: [public]
+
+  jeanyvesart-app:
+    build:
+      context: /opt/masyg-art-monorepo
+      dockerfile: apps/_shared/Dockerfile.app
+      args:
+        APP_NAME: jeanyvesart
+        APP_PORT: 3001
+    container_name: jeanyvesart-app
+    restart: unless-stopped
+    env_file:
+      - /opt/masyg-art-monorepo/apps/jeanyvesart/.env   # same DATABASE_URL (same schema)
+    environment:
+      NODE_ENV: production
+      RUN_MIGRATIONS: "0"        # ❌ do not run migrations
+    expose: ["3001"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    networks: [public]
+
+  admin-app:
+    build:
+      context: /opt/masyg-art-monorepo
+      dockerfile: apps/_shared/Dockerfile.app
+      args:
+        APP_NAME: admin
+        APP_PORT: 3002
+    container_name: admin-app
+    restart: unless-stopped
+    env_file:
+      - /opt/masyg-art-monorepo/apps/admin/.env         # same DATABASE_URL (same schema)
+    environment:
+      NODE_ENV: production
+      RUN_MIGRATIONS: "0"        # ❌ do not run migrations
+    expose: ["3002"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3002/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    networks: [public]
+
+networks:
+  public:
+    external: true

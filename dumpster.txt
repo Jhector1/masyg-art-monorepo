@@ -1,0 +1,9 @@
+# status, health, ports
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+# explicit health and last error/exit
+docker inspect ziledigital-app \
+  --format 'health={{.State.Health.Status}} status={{.State.Status}} exit={{.State.ExitCode}} err="{{.State.Error}}"'
+
+# follow logs
+docker logs -f --since=10m ziledigital-app
