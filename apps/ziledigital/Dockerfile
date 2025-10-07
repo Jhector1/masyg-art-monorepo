@@ -1,43 +1,36 @@
-# ---- deps (install from ROOT lockfile with workspaces)
+# ---- deps
 FROM node:20-alpine AS deps
 WORKDIR /repo
 
-# 1) copy only manifests first for better caching
+# 1) manifests only for caching
 COPY package.json package-lock.json ./
 COPY apps/ziledigital/package.json apps/ziledigital/
 COPY packages/ui/package.json packages/ui/
 COPY packages/core/package.json packages/core/
 COPY packages/server/package.json packages/server/
 COPY packages/db/package.json packages/db/
-# If you have this package; otherwise comment it out:
 COPY packages/tailwind-preset/package.json packages/tailwind-preset/
 
-# 2) install all workspaces using the root lockfile
-RUN npm ci --workspaces --include-workspace-root --legacy-peer-deps
+# 2) install, but skip scripts (so postinstall doesn’t run yet)
+RUN npm ci --workspaces --include-workspace-root --legacy-peer-deps --ignore-scripts
 
 # 3) now copy the rest of the source
 COPY . .
 
-# 3.5) (only if preset is TS) build it so Next can resolve it during build
+# 4) build the TS preset now that its files are here
 RUN npm run -w packages/tailwind-preset build
 
-# 4) generate Prisma client from the SHARED schema
+# 5) prisma + app build
 RUN npx prisma generate --schema packages/db/prisma/schema.prisma
-
-# 5) build just this app (skip lint/telemetry in container)
 RUN NEXT_DISABLE_ESLINT=1 NEXT_TELEMETRY_DISABLED=1 npm run build -w apps/ziledigital
 
-# ---- runner (Next.js standalone)
+# ---- runner (unchanged)
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-
-# Copy Next standalone output
 COPY --from=deps /repo/apps/ziledigital/.next/standalone ./
 COPY --from=deps /repo/apps/ziledigital/.next/static ./.next/static
 COPY --from=deps /repo/apps/ziledigital/public ./public
-
 ENV PORT=3003 HOSTNAME=0.0.0.0
 EXPOSE 3003
-
 CMD ["node","apps/ziledigital/server.js"]

@@ -17,7 +17,7 @@
     "db:migrate:dev": "npm -w @acme/db run migrate:dev",
     "db:migrate:deploy": "npm -w @acme/db run migrate:deploy",
     "db:studio": "npm -w @acme/db run studio",
-     "postinstall": "npm run -w packages/tailwind-preset build" 
+    "postinstall": "node -e \"process.exit(require('fs').existsSync('packages/tailwind-preset/tsconfig.json')?0:0)\""
   },
   "devDependencies": {
     "turbo": "^2.5.6",
