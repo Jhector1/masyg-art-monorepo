@@ -7,9 +7,14 @@ ARG APP_PORT
 ENV APP_NAME=${APP_NAME}
 ENV APP_PORT=${APP_PORT}
 
-# 1) copy ONLY root manifests first (for caching)
-# use a glob so package-lock.json is always included
-COPY package*.json ./
+# 1) copy root manifests EXPLICITLY (no wildcard)
+COPY package.json ./package.json
+COPY package-lock.json ./package-lock.json
+
+# (optional but helpful) prove they are here
+RUN node -v && npm -v && ls -l package.json package-lock.json && \
+    head -n 5 package-lock.json || true
+
 
 COPY apps/${APP_NAME}/package.json apps/${APP_NAME}/
 COPY packages/ui/package.json packages/ui/
@@ -18,18 +23,12 @@ COPY packages/server/package.json packages/server/
 COPY packages/db/package.json packages/db/
 COPY packages/tailwind-preset/package.json packages/tailwind-preset/
 
-# 2) install (skip scripts so preset build doesn’t fail early)
-# show versions and confirm lockfile is present
-RUN node -v && npm -v && ls -l package.json package-lock.json
-# plain ci from root is enough for workspaces
-# sanity + force lockfile usage
-RUN node -v && npm -v && ls -l package.json package-lock.json && \
-    npm config set package-lock true && \
+# 2) force npm to use the lockfile, then install
+RUN npm config set package-lock true && \
     npm config set fund false && \
-    npm config set audit false
+    npm config set audit false && \
+    npm ci --legacy-peer-deps --ignore-scripts
 
-# install from the repo root for all workspaces
-RUN npm ci --legacy-peer-deps --ignore-scripts
 
 # 3) copy the source
 COPY . .
