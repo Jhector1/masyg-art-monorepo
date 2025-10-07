@@ -8,20 +8,20 @@
 
 */
 -- CreateEnum
-CREATE TYPE "public"."InventoryStatus" AS ENUM ('ACTIVE', 'RESERVED', 'SOLD');
+CREATE TYPE "ziledigital"."InventoryStatus" AS ENUM ('ACTIVE', 'RESERVED', 'SOLD');
 
 -- AlterEnum
-ALTER TYPE "public"."VariantType" ADD VALUE 'ORIGINAL';
+ALTER TYPE "ziledigital"."VariantType" ADD VALUE 'ORIGINAL';
 
 -- AlterTable
-ALTER TABLE "public"."CartItem" ADD COLUMN     "originalVariantId" TEXT,
+ALTER TABLE "ziledigital"."CartItem" ADD COLUMN     "originalVariantId" TEXT,
 ALTER COLUMN "originalPrice" SET DATA TYPE DOUBLE PRECISION;
 
 -- AlterTable
-ALTER TABLE "public"."OrderItem" ADD COLUMN     "originalVariantId" TEXT;
+ALTER TABLE "ziledigital"."OrderItem" ADD COLUMN     "originalVariantId" TEXT;
 
 -- AlterTable
-ALTER TABLE "public"."ProductVariant" ADD COLUMN     "depthIn" DOUBLE PRECISION,
+ALTER TABLE "ziledigital"."ProductVariant" ADD COLUMN     "depthIn" DOUBLE PRECISION,
 ADD COLUMN     "framed" BOOLEAN DEFAULT false,
 ADD COLUMN     "heightIn" DOUBLE PRECISION,
 ADD COLUMN     "inventory" INTEGER DEFAULT 1,
@@ -30,30 +30,30 @@ ADD COLUMN     "medium" TEXT,
 ADD COLUMN     "originalSerial" TEXT,
 ADD COLUMN     "sku" TEXT,
 ADD COLUMN     "soldAt" TIMESTAMP(3),
-ADD COLUMN     "status" "public"."InventoryStatus" DEFAULT 'ACTIVE',
+ADD COLUMN     "status" "ziledigital"."InventoryStatus" DEFAULT 'ACTIVE',
 ADD COLUMN     "surface" TEXT,
 ADD COLUMN     "weightLb" DOUBLE PRECISION,
 ADD COLUMN     "widthIn" DOUBLE PRECISION,
 ADD COLUMN     "year" INTEGER;
 
 -- AlterTable
-ALTER TABLE "public"."PurchasedDesign" DROP COLUMN "svg",
+ALTER TABLE "ziledigital"."PurchasedDesign" DROP COLUMN "svg",
 ADD COLUMN     "svg" JSONB;
 
 -- CreateIndex
-CREATE INDEX "CartItem_originalVariantId_idx" ON "public"."CartItem"("originalVariantId");
+CREATE INDEX "CartItem_originalVariantId_idx" ON "ziledigital"."CartItem"("originalVariantId");
 
 -- CreateIndex
-CREATE INDEX "OrderItem_originalVariantId_idx" ON "public"."OrderItem"("originalVariantId");
+CREATE INDEX "OrderItem_originalVariantId_idx" ON "ziledigital"."OrderItem"("originalVariantId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ProductVariant_sku_key" ON "public"."ProductVariant"("sku");
+CREATE UNIQUE INDEX "ProductVariant_sku_key" ON "ziledigital"."ProductVariant"("sku");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ProductVariant_originalSerial_key" ON "public"."ProductVariant"("originalSerial");
+CREATE UNIQUE INDEX "ProductVariant_originalSerial_key" ON "ziledigital"."ProductVariant"("originalSerial");
 
 -- AddForeignKey
-ALTER TABLE "public"."CartItem" ADD CONSTRAINT "CartItem_originalVariantId_fkey" FOREIGN KEY ("originalVariantId") REFERENCES "public"."ProductVariant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."CartItem" ADD CONSTRAINT "CartItem_originalVariantId_fkey" FOREIGN KEY ("originalVariantId") REFERENCES "ziledigital"."ProductVariant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."OrderItem" ADD CONSTRAINT "OrderItem_originalVariantId_fkey" FOREIGN KEY ("originalVariantId") REFERENCES "public"."ProductVariant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."OrderItem" ADD CONSTRAINT "OrderItem_originalVariantId_fkey" FOREIGN KEY ("originalVariantId") REFERENCES "ziledigital"."ProductVariant"("id") ON DELETE SET NULL ON UPDATE CASCADE;

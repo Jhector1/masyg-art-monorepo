@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "public"."UserDesign" (
+CREATE TABLE "ziledigital"."UserDesign" (
     "id" TEXT NOT NULL,
     "userId" TEXT,
     "guestId" TEXT,
@@ -18,22 +18,22 @@ CREATE TABLE "public"."UserDesign" (
 );
 
 -- CreateIndex
-CREATE INDEX "UserDesign_userId_idx" ON "public"."UserDesign"("userId");
+CREATE INDEX "UserDesign_userId_idx" ON "ziledigital"."UserDesign"("userId");
 
 -- CreateIndex
-CREATE INDEX "UserDesign_guestId_idx" ON "public"."UserDesign"("guestId");
+CREATE INDEX "UserDesign_guestId_idx" ON "ziledigital"."UserDesign"("guestId");
 
 -- CreateIndex
-CREATE INDEX "UserDesign_productId_idx" ON "public"."UserDesign"("productId");
+CREATE INDEX "UserDesign_productId_idx" ON "ziledigital"."UserDesign"("productId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "UserDesign_userId_productId_key" ON "public"."UserDesign"("userId", "productId");
+CREATE UNIQUE INDEX "UserDesign_userId_productId_key" ON "ziledigital"."UserDesign"("userId", "productId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "UserDesign_guestId_productId_key" ON "public"."UserDesign"("guestId", "productId");
+CREATE UNIQUE INDEX "UserDesign_guestId_productId_key" ON "ziledigital"."UserDesign"("guestId", "productId");
 
 -- AddForeignKey
-ALTER TABLE "public"."UserDesign" ADD CONSTRAINT "UserDesign_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."UserDesign" ADD CONSTRAINT "UserDesign_userId_fkey" FOREIGN KEY ("userId") REFERENCES "ziledigital"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."UserDesign" ADD CONSTRAINT "UserDesign_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."UserDesign" ADD CONSTRAINT "UserDesign_productId_fkey" FOREIGN KEY ("productId") REFERENCES "ziledigital"."Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;

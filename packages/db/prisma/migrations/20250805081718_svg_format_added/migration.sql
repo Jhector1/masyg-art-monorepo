@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "public"."Product" ADD COLUMN     "svgFormat" TEXT;
+ALTER TABLE "ziledigital"."Product" ADD COLUMN     "svgFormat" TEXT;

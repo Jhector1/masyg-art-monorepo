@@ -5,11 +5,11 @@
 
 */
 -- AlterTable
-ALTER TABLE "public"."Order" ADD COLUMN     "claimTokenExpiresAt" TIMESTAMP(3),
+ALTER TABLE "ziledigital"."Order" ADD COLUMN     "claimTokenExpiresAt" TIMESTAMP(3),
 ADD COLUMN     "claimTokenHash" TEXT;
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Order_claimTokenHash_key" ON "public"."Order"("claimTokenHash");
+CREATE UNIQUE INDEX "Order_claimTokenHash_key" ON "ziledigital"."Order"("claimTokenHash");
 
 -- CreateIndex
-CREATE INDEX "Order_claimTokenExpiresAt_idx" ON "public"."Order"("claimTokenExpiresAt");
+CREATE INDEX "Order_claimTokenExpiresAt_idx" ON "ziledigital"."Order"("claimTokenExpiresAt");

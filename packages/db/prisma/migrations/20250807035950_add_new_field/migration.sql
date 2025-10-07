@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "public"."Product" ADD COLUMN     "sizes" TEXT[];
+ALTER TABLE "ziledigital"."Product" ADD COLUMN     "sizes" TEXT[];

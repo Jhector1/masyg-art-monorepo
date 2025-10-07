@@ -5,4 +5,4 @@
 
 */
 -- AlterTable
-ALTER TABLE "public"."User" ALTER COLUMN "password" SET NOT NULL;
+ALTER TABLE "ziledigital"."User" ALTER COLUMN "password" SET NOT NULL;

@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "public"."ProductAsset" (
+CREATE TABLE "ziledigital"."ProductAsset" (
     "id" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "storageKey" TEXT,
@@ -27,7 +27,7 @@ CREATE TABLE "public"."ProductAsset" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."DownloadToken" (
+CREATE TABLE "ziledigital"."DownloadToken" (
     "id" TEXT NOT NULL,
     "orderId" TEXT NOT NULL,
     "assetId" TEXT NOT NULL,
@@ -46,37 +46,37 @@ CREATE TABLE "public"."DownloadToken" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ProductAsset_storageKey_key" ON "public"."ProductAsset"("storageKey");
+CREATE UNIQUE INDEX "ProductAsset_storageKey_key" ON "ziledigital"."ProductAsset"("storageKey");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ProductAsset_url_key" ON "public"."ProductAsset"("url");
+CREATE UNIQUE INDEX "ProductAsset_url_key" ON "ziledigital"."ProductAsset"("url");
 
 -- CreateIndex
-CREATE INDEX "ProductAsset_productId_idx" ON "public"."ProductAsset"("productId");
+CREATE INDEX "ProductAsset_productId_idx" ON "ziledigital"."ProductAsset"("productId");
 
 -- CreateIndex
-CREATE INDEX "DownloadToken_orderId_idx" ON "public"."DownloadToken"("orderId");
+CREATE INDEX "DownloadToken_orderId_idx" ON "ziledigital"."DownloadToken"("orderId");
 
 -- CreateIndex
-CREATE INDEX "DownloadToken_assetId_idx" ON "public"."DownloadToken"("assetId");
+CREATE INDEX "DownloadToken_assetId_idx" ON "ziledigital"."DownloadToken"("assetId");
 
 -- CreateIndex
-CREATE INDEX "DownloadToken_guestId_idx" ON "public"."DownloadToken"("guestId");
+CREATE INDEX "DownloadToken_guestId_idx" ON "ziledigital"."DownloadToken"("guestId");
 
 -- CreateIndex
-CREATE INDEX "DownloadToken_orderId_assetId_idx" ON "public"."DownloadToken"("orderId", "assetId");
+CREATE INDEX "DownloadToken_orderId_assetId_idx" ON "ziledigital"."DownloadToken"("orderId", "assetId");
 
 -- AddForeignKey
-ALTER TABLE "public"."ProductAsset" ADD CONSTRAINT "ProductAsset_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."ProductAsset" ADD CONSTRAINT "ProductAsset_productId_fkey" FOREIGN KEY ("productId") REFERENCES "ziledigital"."Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."DownloadToken" ADD CONSTRAINT "DownloadToken_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "public"."Order"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DownloadToken" ADD CONSTRAINT "DownloadToken_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "ziledigital"."Order"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."DownloadToken" ADD CONSTRAINT "DownloadToken_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "public"."ProductAsset"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DownloadToken" ADD CONSTRAINT "DownloadToken_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "ziledigital"."ProductAsset"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."DownloadToken" ADD CONSTRAINT "DownloadToken_orderItemId_fkey" FOREIGN KEY ("orderItemId") REFERENCES "public"."OrderItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DownloadToken" ADD CONSTRAINT "DownloadToken_orderItemId_fkey" FOREIGN KEY ("orderItemId") REFERENCES "ziledigital"."OrderItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."DownloadToken" ADD CONSTRAINT "DownloadToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DownloadToken" ADD CONSTRAINT "DownloadToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "ziledigital"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;

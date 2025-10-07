@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "public"."User" ADD COLUMN     "image" TEXT;
+ALTER TABLE "ziledigital"."User" ADD COLUMN     "image" TEXT;

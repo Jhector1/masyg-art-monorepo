@@ -1,2 +1,2 @@
 -- DropIndex
-DROP INDEX "public"."ProductAsset_productId_idx";
+DROP INDEX "ziledigital"."ProductAsset_productId_idx";

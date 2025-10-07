@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "public"."User" ADD COLUMN     "avatarPublicId" VARCHAR(191);
+ALTER TABLE "ziledigital"."User" ADD COLUMN     "avatarziledigitalId" VARCHAR(191);

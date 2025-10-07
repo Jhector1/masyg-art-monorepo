@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "public"."ProductVariant" ALTER COLUMN "type" DROP NOT NULL;
+ALTER TABLE "ziledigital"."ProductVariant" ALTER COLUMN "type" DROP NOT NULL;

@@ -5,4 +5,4 @@
 
 */
 -- CreateIndex
-CREATE UNIQUE INDEX "ProductAsset_productId_url_key" ON "public"."ProductAsset"("productId", "url");
+CREATE UNIQUE INDEX "ProductAsset_productId_url_key" ON "ziledigital"."ProductAsset"("productId", "url");

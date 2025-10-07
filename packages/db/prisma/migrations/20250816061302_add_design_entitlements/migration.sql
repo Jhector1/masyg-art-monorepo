@@ -9,27 +9,27 @@
 
 */
 -- CreateEnum
-CREATE TYPE "public"."EntitlementSource" AS ENUM ('PURCHASE', 'TOPUP', 'GRANT');
+CREATE TYPE "ziledigital"."EntitlementSource" AS ENUM ('PURCHASE', 'TOPUP', 'GRANT');
 
 -- CreateEnum
-CREATE TYPE "public"."UsageKind" AS ENUM ('EXPORT', 'EDIT');
+CREATE TYPE "ziledigital"."UsageKind" AS ENUM ('EXPORT', 'EDIT');
 
 -- AlterTable
-ALTER TABLE "public"."UserDesign" DROP COLUMN "editQuota",
+ALTER TABLE "ziledigital"."UserDesign" DROP COLUMN "editQuota",
 DROP COLUMN "editsUsed",
 DROP COLUMN "exportQuota",
 DROP COLUMN "exportsUsed",
 DROP COLUMN "purchased";
 
 -- CreateTable
-CREATE TABLE "public"."DesignEntitlement" (
+CREATE TABLE "ziledigital"."DesignEntitlement" (
     "id" TEXT NOT NULL,
     "userId" TEXT,
     "guestId" TEXT,
     "productId" TEXT NOT NULL,
     "userDesignId" TEXT,
     "purchasedDesignId" TEXT,
-    "source" "public"."EntitlementSource" NOT NULL,
+    "source" "ziledigital"."EntitlementSource" NOT NULL,
     "orderId" TEXT,
     "orderItemId" TEXT,
     "exportQuota" INTEGER NOT NULL DEFAULT 0,
@@ -44,9 +44,9 @@ CREATE TABLE "public"."DesignEntitlement" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."DesignUsage" (
+CREATE TABLE "ziledigital"."DesignUsage" (
     "id" TEXT NOT NULL,
-    "kind" "public"."UsageKind" NOT NULL,
+    "kind" "ziledigital"."UsageKind" NOT NULL,
     "userId" TEXT,
     "guestId" TEXT,
     "productId" TEXT NOT NULL,
@@ -64,55 +64,55 @@ CREATE TABLE "public"."DesignUsage" (
 );
 
 -- CreateIndex
-CREATE INDEX "DesignEntitlement_userId_idx" ON "public"."DesignEntitlement"("userId");
+CREATE INDEX "DesignEntitlement_userId_idx" ON "ziledigital"."DesignEntitlement"("userId");
 
 -- CreateIndex
-CREATE INDEX "DesignEntitlement_guestId_idx" ON "public"."DesignEntitlement"("guestId");
+CREATE INDEX "DesignEntitlement_guestId_idx" ON "ziledigital"."DesignEntitlement"("guestId");
 
 -- CreateIndex
-CREATE INDEX "DesignEntitlement_productId_idx" ON "public"."DesignEntitlement"("productId");
+CREATE INDEX "DesignEntitlement_productId_idx" ON "ziledigital"."DesignEntitlement"("productId");
 
 -- CreateIndex
-CREATE INDEX "DesignEntitlement_userDesignId_idx" ON "public"."DesignEntitlement"("userDesignId");
+CREATE INDEX "DesignEntitlement_userDesignId_idx" ON "ziledigital"."DesignEntitlement"("userDesignId");
 
 -- CreateIndex
-CREATE INDEX "DesignEntitlement_purchasedDesignId_idx" ON "public"."DesignEntitlement"("purchasedDesignId");
+CREATE INDEX "DesignEntitlement_purchasedDesignId_idx" ON "ziledigital"."DesignEntitlement"("purchasedDesignId");
 
 -- CreateIndex
-CREATE INDEX "DesignEntitlement_orderItemId_idx" ON "public"."DesignEntitlement"("orderItemId");
+CREATE INDEX "DesignEntitlement_orderItemId_idx" ON "ziledigital"."DesignEntitlement"("orderItemId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "DesignUsage_idempotencyKey_key" ON "public"."DesignUsage"("idempotencyKey");
+CREATE UNIQUE INDEX "DesignUsage_idempotencyKey_key" ON "ziledigital"."DesignUsage"("idempotencyKey");
 
 -- CreateIndex
-CREATE INDEX "DesignUsage_entitlementId_idx" ON "public"."DesignUsage"("entitlementId");
+CREATE INDEX "DesignUsage_entitlementId_idx" ON "ziledigital"."DesignUsage"("entitlementId");
 
 -- CreateIndex
-CREATE INDEX "DesignUsage_userId_idx" ON "public"."DesignUsage"("userId");
+CREATE INDEX "DesignUsage_userId_idx" ON "ziledigital"."DesignUsage"("userId");
 
 -- CreateIndex
-CREATE INDEX "DesignUsage_guestId_idx" ON "public"."DesignUsage"("guestId");
+CREATE INDEX "DesignUsage_guestId_idx" ON "ziledigital"."DesignUsage"("guestId");
 
 -- CreateIndex
-CREATE INDEX "DesignUsage_productId_idx" ON "public"."DesignUsage"("productId");
+CREATE INDEX "DesignUsage_productId_idx" ON "ziledigital"."DesignUsage"("productId");
 
 -- AddForeignKey
-ALTER TABLE "public"."DesignEntitlement" ADD CONSTRAINT "DesignEntitlement_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DesignEntitlement" ADD CONSTRAINT "DesignEntitlement_userId_fkey" FOREIGN KEY ("userId") REFERENCES "ziledigital"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."DesignEntitlement" ADD CONSTRAINT "DesignEntitlement_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DesignEntitlement" ADD CONSTRAINT "DesignEntitlement_productId_fkey" FOREIGN KEY ("productId") REFERENCES "ziledigital"."Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."DesignEntitlement" ADD CONSTRAINT "DesignEntitlement_userDesignId_fkey" FOREIGN KEY ("userDesignId") REFERENCES "public"."UserDesign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DesignEntitlement" ADD CONSTRAINT "DesignEntitlement_userDesignId_fkey" FOREIGN KEY ("userDesignId") REFERENCES "ziledigital"."UserDesign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."DesignEntitlement" ADD CONSTRAINT "DesignEntitlement_purchasedDesignId_fkey" FOREIGN KEY ("purchasedDesignId") REFERENCES "public"."PurchasedDesign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DesignEntitlement" ADD CONSTRAINT "DesignEntitlement_purchasedDesignId_fkey" FOREIGN KEY ("purchasedDesignId") REFERENCES "ziledigital"."PurchasedDesign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."DesignUsage" ADD CONSTRAINT "DesignUsage_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DesignUsage" ADD CONSTRAINT "DesignUsage_productId_fkey" FOREIGN KEY ("productId") REFERENCES "ziledigital"."Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."DesignUsage" ADD CONSTRAINT "DesignUsage_userDesignId_fkey" FOREIGN KEY ("userDesignId") REFERENCES "public"."UserDesign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DesignUsage" ADD CONSTRAINT "DesignUsage_userDesignId_fkey" FOREIGN KEY ("userDesignId") REFERENCES "ziledigital"."UserDesign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."DesignUsage" ADD CONSTRAINT "DesignUsage_entitlementId_fkey" FOREIGN KEY ("entitlementId") REFERENCES "public"."DesignEntitlement"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."DesignUsage" ADD CONSTRAINT "DesignUsage_entitlementId_fkey" FOREIGN KEY ("entitlementId") REFERENCES "ziledigital"."DesignEntitlement"("id") ON DELETE CASCADE ON UPDATE CASCADE;

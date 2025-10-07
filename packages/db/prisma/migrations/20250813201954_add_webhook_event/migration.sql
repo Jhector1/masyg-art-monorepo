@@ -1,8 +1,8 @@
 -- AlterTable
-ALTER TABLE "public"."ProductVariant" ALTER COLUMN "format" DROP NOT NULL;
+ALTER TABLE "ziledigital"."ProductVariant" ALTER COLUMN "format" DROP NOT NULL;
 
 -- CreateTable
-CREATE TABLE "public"."WebhookEvent" (
+CREATE TABLE "ziledigital"."WebhookEvent" (
     "id" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

@@ -1,8 +1,8 @@
 -- DropIndex
-DROP INDEX "public"."ProductAsset_url_key";
+DROP INDEX "ziledigital"."ProductAsset_url_key";
 
 -- CreateIndex
-CREATE INDEX "ProductAsset_productId_idx" ON "public"."ProductAsset"("productId");
+CREATE INDEX "ProductAsset_productId_idx" ON "ziledigital"."ProductAsset"("productId");
 
 -- CreateIndex
-CREATE INDEX "ProductAsset_url_idx" ON "public"."ProductAsset"("url");
+CREATE INDEX "ProductAsset_url_idx" ON "ziledigital"."ProductAsset"("url");

@@ -8,7 +8,7 @@ CREATE TABLE "Product" (
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "price" DOUBLE PRECISION NOT NULL,
-    "publicId" TEXT NOT NULL,
+    "ziledigitalId" TEXT NOT NULL,
     "thumbnails" TEXT[],
     "formats" TEXT[],
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

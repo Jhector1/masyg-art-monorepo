@@ -1,9 +1,9 @@
 -- AlterTable
-ALTER TABLE "public"."User" ADD COLUMN     "emailVerified" TIMESTAMP(3),
+ALTER TABLE "ziledigital"."User" ADD COLUMN     "emailVerified" TIMESTAMP(3),
 ALTER COLUMN "password" DROP NOT NULL;
 
 -- CreateTable
-CREATE TABLE "public"."Account" (
+CREATE TABLE "ziledigital"."Account" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE "public"."Account" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."Session" (
+CREATE TABLE "ziledigital"."Session" (
     "id" TEXT NOT NULL,
     "sessionToken" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -31,26 +31,26 @@ CREATE TABLE "public"."Session" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."VerificationToken" (
+CREATE TABLE "ziledigital"."VerificationToken" (
     "identifier" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "expires" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Account_provider_providerAccountId_key" ON "public"."Account"("provider", "providerAccountId");
+CREATE UNIQUE INDEX "Account_provider_providerAccountId_key" ON "ziledigital"."Account"("provider", "providerAccountId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Session_sessionToken_key" ON "public"."Session"("sessionToken");
+CREATE UNIQUE INDEX "Session_sessionToken_key" ON "ziledigital"."Session"("sessionToken");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "VerificationToken_token_key" ON "public"."VerificationToken"("token");
+CREATE UNIQUE INDEX "VerificationToken_token_key" ON "ziledigital"."VerificationToken"("token");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "public"."VerificationToken"("identifier", "token");
+CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "ziledigital"."VerificationToken"("identifier", "token");
 
 -- AddForeignKey
-ALTER TABLE "public"."Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "ziledigital"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ziledigital"."Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "ziledigital"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

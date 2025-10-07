@@ -1,9 +1,9 @@
 -- CreateEnum
-CREATE TYPE "public"."CldResourceType" AS ENUM ('image', 'raw', 'video');
+CREATE TYPE "ziledigital"."CldResourceType" AS ENUM ('image', 'raw', 'video');
 
 -- CreateEnum
-CREATE TYPE "public"."CldDeliveryType" AS ENUM ('upload', 'authenticated', 'private');
+CREATE TYPE "ziledigital"."CldDeliveryType" AS ENUM ('upload', 'authenticated', 'private');
 
 -- AlterTable
-ALTER TABLE "public"."ProductAsset" ADD COLUMN     "deliveryType" "public"."CldDeliveryType",
-ADD COLUMN     "resourceType" "public"."CldResourceType";
+ALTER TABLE "ziledigital"."ProductAsset" ADD COLUMN     "deliveryType" "ziledigital"."CldDeliveryType",
+ADD COLUMN     "resourceType" "ziledigital"."CldResourceType";
