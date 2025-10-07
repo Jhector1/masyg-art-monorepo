@@ -29,7 +29,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /repo/apps/ziledigital/.next/standalone ./
-COPY --from=deps /repo/apps/ziledigital/.next/static ./.next/static
+COPY --from=deps /repo/apps/ziledigital/.next/static ./apps/ziledigital/.next/static
 COPY --from=deps /repo/apps/ziledigital/public ./public
 ENV PORT=3003 HOSTNAME=0.0.0.0
 EXPOSE 3003
