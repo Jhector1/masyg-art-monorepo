@@ -17,7 +17,7 @@ COPY packages/db/package.json packages/db/
 COPY packages/tailwind-preset/package.json packages/tailwind-preset/
 
 # 2) install (skip scripts so preset build doesn’t fail early)
-RUN npm ci --include-workspace-root \
+RUN npm install --include-workspace-root \
   -w apps/${APP_NAME} \
   -w packages/ui -w packages/core -w packages/server -w packages/db -w packages/tailwind-preset \
   --legacy-peer-deps --ignore-scripts
