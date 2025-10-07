@@ -1,12 +1,27 @@
 services:
   admin-app:
     build:
-      context: /opt/masyg-art-monorepo     # 👈 repo root
-      dockerfile: apps/ziledigital/Dockerfile    # 👈 per-app Dockerfile path
+      context: /opt/masyg-art-monorepo            # repo root
+      dockerfile: apps/ziledigital/Dockerfile     # per-app Dockerfile
     container_name: ziledigital-app
     restart: unless-stopped
     env_file: [.env]
-    expose: ["3003"]
+    environment:
+      NODE_ENV: production
+      PORT: "3003"            # matches your Next runner
+      HOSTNAME: 0.0.0.0
+    expose: ["3003"]          # no host port; Caddy reaches via docker network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3003/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks: [public]
 
 networks:
