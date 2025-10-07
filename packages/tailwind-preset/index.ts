@@ -12,7 +12,7 @@ const preset: Config = {
   //       primary: "hsl(222 47% 11%)",
   //       "primary-foreground": "hsl(0 0% 100%)",
   //       muted: "hsl(215 16% 95%)",
-  //       "muted-foreground": "hsl(xx215 10% 40%)",
+  //       "muted-foreground": "hsl(215 10% 40%)",
   //       surface: "#0b0f19",
   //     },
 
