@@ -49,7 +49,8 @@ COPY --from=deps /repo/apps/${APP_NAME}/public ./public
 COPY --from=deps /repo/packages/db/prisma ./packages/db/prisma
 
 # tiny entrypoint: only ziledigital will run migrations
-COPY apps/${APP_NAME}/docker-entrypoint.sh ./docker-entrypoint.sh
+
+COPY apps/_shared/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
 EXPOSE ${APP_PORT}
