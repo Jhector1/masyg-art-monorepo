@@ -21,7 +21,7 @@ COPY . .
 RUN npm run -w packages/tailwind-preset build
 
 # 5) prisma + app build
-RUN npx prisma generate --schema packages/db/prisma/schema.prisma
+# RUN npx prisma generate --schema packages/db/prisma/schema.prisma
 RUN NEXT_DISABLE_ESLINT=1 NEXT_TELEMETRY_DISABLED=1 npm run build -w apps/ziledigital
 
 # ---- runner (unchanged)
@@ -33,4 +33,9 @@ COPY --from=deps /repo/apps/ziledigital/.next/static ./apps/ziledigital/.next/st
 COPY --from=deps /repo/apps/ziledigital/public ./public
 ENV PORT=3003 HOSTNAME=0.0.0.0
 EXPOSE 3003
-CMD ["node","apps/ziledigital/server.js"]
+# add this in runner stage (before CMD)
+COPY --from=deps /repo/packages/db/prisma ./packages/db/prisma
+COPY apps/ziledigital/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+CMD ["sh","-lc","./docker-entrypoint.sh"]
+
