@@ -2,6 +2,21 @@
 FROM node:20-alpine AS deps
 WORKDIR /repo
 
+# put these lines right after WORKDIR /repo
+ENV NPM_CONFIG_PACKAGE_LOCK=true \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_AUDIT=false
+
+# copy package.json + package-lock.json etc. (unchanged)
+
+# (optional) fix project .npmrc if present
+RUN if [ -f .npmrc ]; then \
+      sed -i 's/^package-lock=.*$/package-lock=true/' .npmrc || true; \
+      grep -n '^package-lock' .npmrc || echo 'package-lock=true' >> .npmrc; \
+    fi
+
+
+
 ARG APP_NAME
 ARG APP_PORT
 ENV APP_NAME=${APP_NAME}
