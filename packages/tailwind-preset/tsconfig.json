@@ -1,0 +1,16 @@
+ {
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": ".",
+    "module": "ES2020",
+    "target": "ES2019",
+    "moduleResolution": "Node",
+    "declaration": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true
+  },
+  "include": ["index.ts"]
+}
