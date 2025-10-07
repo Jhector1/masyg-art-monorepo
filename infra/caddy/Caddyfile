@@ -18,7 +18,7 @@ client1.jeanyveshector.com {
   reverse_proxy jeanyvesart-app:3001
 }
 
-admin.example.com {
+admin.ziledigital.com {
   import common
   reverse_proxy admin-app:3002
 }

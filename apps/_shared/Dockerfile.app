@@ -7,8 +7,10 @@ ARG APP_PORT
 ENV APP_NAME=${APP_NAME}
 ENV APP_PORT=${APP_PORT}
 
-# 1) manifests only for caching
-COPY package.json package-lock.json ./
+# 1) copy ONLY root manifests first (for caching)
+# use a glob so package-lock.json is always included
+COPY package*.json ./
+
 COPY apps/${APP_NAME}/package.json apps/${APP_NAME}/
 COPY packages/ui/package.json packages/ui/
 COPY packages/core/package.json packages/core/
@@ -17,7 +19,10 @@ COPY packages/db/package.json packages/db/
 COPY packages/tailwind-preset/package.json packages/tailwind-preset/
 
 # 2) install (skip scripts so preset build doesn’t fail early)
-RUN npm ci --workspaces --include-workspace-root --legacy-peer-deps --ignore-scripts
+# show versions and confirm lockfile is present
+RUN node -v && npm -v && ls -l package.json package-lock.json
+# plain ci from root is enough for workspaces
+RUN npm ci --legacy-peer-deps --ignore-scripts
 
 # 3) copy the source
 COPY . .
