@@ -1,17 +1,6 @@
 @config "../../tailwind.config.ts";
 
 @import "tailwindcss";
-
-
-@import "tailwindcss";
-
-/* Tell Tailwind what to scan in a monorepo */
-@source "./**/*.{js,ts,jsx,tsx,mdx}";
-@source "../**/*.{js,ts,jsx,tsx,mdx}";
-@source "../../..packages/ui/src/**/*.{js,ts,jsx,tsx,mdx}";
-@source "../../../packages/core/src/**/*.{js,ts,jsx,tsx,mdx}";
-@source "../../../packages/server/src/**/*.{js,ts,jsx,tsx,mdx}";
-
 *{
   /* border: solid;
   border-color: red; */
