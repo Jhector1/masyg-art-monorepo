@@ -21,7 +21,7 @@ COPY . .
 RUN npm run -w packages/tailwind-preset build
 
 # 5) prisma + app build
-# RUN npx prisma generate --schema packages/db/prisma/schema.prisma
+RUN npx prisma generate --schema packages/db/prisma/schema.prisma
 RUN NEXT_DISABLE_ESLINT=1 NEXT_TELEMETRY_DISABLED=1 npm run build -w apps/ziledigital
 
 # ---- runner (unchanged)
