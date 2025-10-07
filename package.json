@@ -16,7 +16,8 @@
     "db:generate": "npm -w @acme/db run generate",
     "db:migrate:dev": "npm -w @acme/db run migrate:dev",
     "db:migrate:deploy": "npm -w @acme/db run migrate:deploy",
-    "db:studio": "npm -w @acme/db run studio"
+    "db:studio": "npm -w @acme/db run studio",
+     "postinstall": "npm run -w packages/tailwind-preset build" 
   },
   "devDependencies": {
     "turbo": "^2.5.6",
