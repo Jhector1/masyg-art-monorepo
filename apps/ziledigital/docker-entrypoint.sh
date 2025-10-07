@@ -1,22 +1,26 @@
 #!/bin/sh
-set -e
+set -euo pipefail
 
 echo "Waiting for database…"
-tries=0
-until npm dlx prisma@latest db execute --schema packages/db/prisma/schema.prisma --stdin  <<'SQL'
-SELECT 1;
-SQL
-do
-  tries=$((tries+1))
-  if [ $tries -ge 30 ]; then
+# Extract host/port from DATABASE_URL via Node (robust vs. sed/awk)
+DB_HOST="$(node -e 'const u=new URL(process.env.DATABASE_URL); console.log(u.hostname)')"
+DB_PORT="$(node -e 'const u=new URL(process.env.DATABASE_URL); console.log(u.port || 5432)')"
+
+# Busybox nc is present on Alpine; if not, we install it in the Dockerfile below.
+i=0
+until nc -z "$DB_HOST" "$DB_PORT"; do
+  i=$((i+1))
+  if [ "$i" -gt 120 ]; then
     echo "Database never became ready."
     exit 1
   fi
-  sleep 2
+  sleep 1
 done
+echo "DB is up at $DB_HOST:$DB_PORT"
 
-echo "Running migrations…"
-npm dlx prisma@latest migrate deploy --schema packages/db/prisma/schema.prisma
+# Run migrations (no prompts; safe in container boot)
+echo "Running prisma migrate deploy…"
+npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
 
-echo "Starting app…"
+# Start Next.js server
 exec node apps/ziledigital/server.js
