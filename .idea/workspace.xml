@@ -7,51 +7,13 @@
     <list default="true" id="27cd0cc1-d00a-4e65-8d77-ecc340bce686" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/../haitian-art-store" beforeDir="false" afterPath="$PROJECT_DIR$/../haitian-art-store" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../haitian-art-store-masyg" beforeDir="false" afterPath="$PROJECT_DIR$/../haitian-art-store-masyg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/README.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/app/favicon.ico" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/app/fonts/GeistMonoVF.woff" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/app/fonts/GeistVF.woff" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/app/globals.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/app/layout.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/app/page.module.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/app/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/eslint.config.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/next.config.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/package.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/public/file-text.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/public/globe.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/public/next.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/public/turborepo-dark.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/public/turborepo-light.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/public/vercel.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/public/window.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/docs/tsconfig.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/README.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/app/favicon.ico" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/app/fonts/GeistMonoVF.woff" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/app/fonts/GeistVF.woff" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/app/globals.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/app/layout.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/app/page.module.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/app/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/eslint.config.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/next.config.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/package.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/public/file-text.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/public/globe.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/public/next.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/public/turborepo-dark.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/public/turborepo-light.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/public/vercel.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/public/window.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/web/tsconfig.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/packages/ui/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/packages/ui/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/packages/ui/src/button.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/packages/ui/tsconfig.json" beforeDir="false" afterPath="$PROJECT_DIR$/packages/ui/tsconfig.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg_extractor_client_ssg/masyg-extractor-vite-ssr" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg_extractor_client_ssg/masyg-extractor-vite-ssr" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/Logs/VBox.log" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/Logs/VBox.log.1" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/Logs/VBox.log.2" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/Logs/VBox.log.3" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/kali-linux-2024.3-virtualbox-amd64.vbox" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/kali-linux-2024.3-virtualbox-amd64.vbox-prev" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -59,14 +21,14 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="Git.Settings">
-    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 1
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1
+}</component>
   <component name="ProjectId" id="337ULW5edNtDwsApOHbr37oadpQ" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -77,7 +39,7 @@
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "demobranch",
+    "git-widget-placeholder": "main",
     "last_opened_file_path": "/Users/admin/Documents/NextJSProject/haitian-art-store-masyg-v2",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
@@ -97,6 +59,7 @@
       <option name="presentableId" value="Default" />
       <updated>1758667549143</updated>
       <workItem from="1758667550562" duration="4026000" />
+      <workItem from="1759818756654" duration="1992000" />
     </task>
     <servers />
   </component>

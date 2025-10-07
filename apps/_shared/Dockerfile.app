@@ -22,6 +22,13 @@ COPY packages/tailwind-preset/package.json packages/tailwind-preset/
 # show versions and confirm lockfile is present
 RUN node -v && npm -v && ls -l package.json package-lock.json
 # plain ci from root is enough for workspaces
+# sanity + force lockfile usage
+RUN node -v && npm -v && ls -l package.json package-lock.json && \
+    npm config set package-lock true && \
+    npm config set fund false && \
+    npm config set audit false
+
+# install from the repo root for all workspaces
 RUN npm ci --legacy-peer-deps --ignore-scripts
 
 # 3) copy the source
