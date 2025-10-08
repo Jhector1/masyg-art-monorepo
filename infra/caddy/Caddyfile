@@ -1,8 +1,3 @@
-{
-  email admin@ziledigital.com
-  debug
-  acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
-}
 
 (common) {
   encode zstd gzip
@@ -25,10 +20,6 @@ client1.jeanyveshector.com {
 }
 
 admin.ziledigital.com {
-  log {
-    output stderr
-    level DEBUG
-  }
 
 
 
