@@ -7,3 +7,18 @@ docker inspect ziledigital-app \
 
 # follow logs
 docker logs -f --since=10m ziledigital-app
+
+
+
+
+
+cd /opt/masyg-art-monorepo/infra
+docker compose build --no-cache ziledigital-app
+docker compose up -d ziledigital-app
+docker logs -f ziledigital-app
+
+
+cd /opt/masyg-art-monorepo/infra
+docker compose build --no-cache admin-app
+docker compose up -d admin-app
+docker logs -f admin-app
