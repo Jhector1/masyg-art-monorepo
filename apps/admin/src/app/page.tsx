@@ -2,6 +2,9 @@ import Link from "next/link";
 // import { requireAdmin } from "@acme/core/lib/auth";
 import { getAdminDashboard } from "../services/admin/dashboard";
 // import { getAdminDashboard } from "@acme/server/services/admin/dashboard";
+export const dynamic = 'force-dynamic';
+export const revalidate = 0; // never cache statically
+
 
 function StatCard({ title, value, href }: { title: string; value: number | string; href?: string }) {
   const body = (
@@ -13,8 +16,10 @@ function StatCard({ title, value, href }: { title: string; value: number | strin
   return href ? <Link href={href}>{body}</Link> : body;
 }
 
+
 export default async function AdminHomePage() {
   // await requireAdmin(); // protect the dashboard
+const { getAdminDashboard } = await import("../services/admin/dashboard");
   const stats = await getAdminDashboard();
 
   return (
@@ -38,7 +43,7 @@ export default async function AdminHomePage() {
         <div className="lg:col-span-2 rounded-2xl border p-5">
           <div className="mb-3 text-sm text-muted-foreground">Sales</div>
           <div className="text-3xl font-bold">
-            ${stats.totalSales.toFixed(2)}
+            ${Number(stats.totalSales).toFixed(2)}
           </div>
           <p className="mt-2 text-sm text-muted-foreground">All-time gross sales</p>
         </div>
