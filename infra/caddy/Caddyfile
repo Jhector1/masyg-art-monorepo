@@ -1,3 +1,9 @@
+{
+  email admin@ziledigital.com
+  debug
+  acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
 (common) {
   encode zstd gzip
   header {
@@ -19,6 +25,20 @@ client1.jeanyveshector.com {
 }
 
 admin.ziledigital.com {
+  # Emit request/TLS logs to stderr so we can see handshake/issuer activity
+  log {
+    output stderr
+    level DEBUG
+  }
+
+  # Explicitly tell Caddy to use ACME (staging) for this host
+  tls {
+    issuer acme {
+      ca https://acme-staging-v02.api.letsencrypt.org/directory
+      email admin@ziledigital.com
+    }
+  }
+
   import common
   reverse_proxy admin-app:3002
 }
