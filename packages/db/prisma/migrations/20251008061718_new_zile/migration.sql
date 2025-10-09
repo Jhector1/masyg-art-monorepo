@@ -1,20 +1,24 @@
-/*
-  Warnings:
+-- Enable UUIDs (Postgres ≥13 has gen_random_uuid() in pgcrypto)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-  - You are about to drop the column `ziledigitalId` on the `Product` table. All the data in the column will be lost.
-  - You are about to drop the column `avatarziledigitalId` on the `User` table. All the data in the column will be lost.
-  - You are about to drop the column `previewziledigitalId` on the `UserDesign` table. All the data in the column will be lost.
-  - Added the required column `publicId` to the `Product` table without a default value. This is not possible if the table is not empty.
+-- Product: drop stray FK column if it ever existed, add publicId, backfill, then enforce NOT NULL
+ALTER TABLE "ziledigital"."Product"
+  DROP COLUMN IF EXISTS "ziledigitalId",
+  ADD COLUMN IF NOT EXISTS "publicId" TEXT;
 
-*/
--- AlterTable
-ALTER TABLE "Product" DROP COLUMN IF EXISTS  "ziledigitalId",
-ADD COLUMN     "publicId" TEXT NOT NULL;
+UPDATE "ziledigital"."Product"
+SET "publicId" = COALESCE("publicId", gen_random_uuid()::text)
+WHERE "publicId" IS NULL;
 
--- AlterTable
-ALTER TABLE "User" DROP COLUMN IF EXISTS "avatarziledigitalId",
-ADD COLUMN     "avatarPublicId" VARCHAR(191);
+ALTER TABLE "ziledigital"."Product"
+  ALTER COLUMN "publicId" SET NOT NULL;
 
--- AlterTable
-ALTER TABLE "UserDesign" DROP COLUMN IF EXISTS"previewziledigitalId",
-ADD COLUMN     "previewPublicId" VARCHAR(255);
+-- User: rename avatar id field to publicId-style (guarded)
+ALTER TABLE "ziledigital"."User"
+  DROP COLUMN IF EXISTS "avatarziledigitalId",
+  ADD COLUMN IF NOT EXISTS "avatarPublicId" VARCHAR(191);
+
+-- UserDesign: same for preview (guarded)
+ALTER TABLE "ziledigital"."UserDesign"
+  DROP COLUMN IF EXISTS "previewziledigitalId",
+  ADD COLUMN IF NOT EXISTS "previewPublicId" VARCHAR(255);
