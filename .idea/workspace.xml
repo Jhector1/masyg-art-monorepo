@@ -7,6 +7,16 @@
     <list default="true" id="27cd0cc1-d00a-4e65-8d77-ecc340bce686" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/../haitian-art-store" beforeDir="false" afterPath="$PROJECT_DIR$/../haitian-art-store" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../haitian-art-store-masyg" beforeDir="false" afterPath="$PROJECT_DIR$/../haitian-art-store-masyg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/admin/next.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/admin/next.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/admin/src/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/admin/src/app/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/admin/src/app/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/admin/src/app/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/admin/src/components/Header.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/admin/src/components/Header.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/admin/tsconfig.json" beforeDir="false" afterPath="$PROJECT_DIR$/apps/admin/tsconfig.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dumpster.txt" beforeDir="false" afterPath="$PROJECT_DIR$/dumpster.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/db/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/packages/db/prisma/schema.prisma" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg_extractor_client_ssg/masyg-extractor-vite-ssr" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg_extractor_client_ssg/masyg-extractor-vite-ssr" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/Logs/VBox.log" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/Logs/VBox.log.1" beforeDir="false" />
@@ -40,7 +50,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
     "git-widget-placeholder": "main",
-    "last_opened_file_path": "/Users/admin/Documents/NextJSProject/haitian-art-store-masyg-v2",
+    "last_opened_file_path": "/Users/admin/Documents/NextJSProject/haitian-art-store-masyg-v2/apps/admin",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -60,6 +70,7 @@
       <updated>1758667549143</updated>
       <workItem from="1758667550562" duration="4026000" />
       <workItem from="1759818756654" duration="1992000" />
+      <workItem from="1759957219617" duration="827000" />
     </task>
     <servers />
   </component>

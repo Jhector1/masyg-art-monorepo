@@ -23,5 +23,8 @@ const config: NextConfig = {
       },
     ],
   },
+  serverActions: {
+    bodySizeLimit: "50mb",   // ← raise from 1 MB
+  },
 };
 export default config;

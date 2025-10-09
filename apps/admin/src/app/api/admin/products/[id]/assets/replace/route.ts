@@ -14,6 +14,8 @@ import {
   mimeFromExt,
   isVectorExt,
 } from "@acme/core/lib/productAssets";
+import {auth} from '@/lib/auth'
+
 import type { UploadApiOptions, UploadApiResponse } from "cloudinary";
 
 export const runtime = "nodejs";
@@ -62,6 +64,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+   const session = await auth();
+    if (!session?.user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  
   try {
     const {id}= await params;
     const product = await prisma.product.findUnique({

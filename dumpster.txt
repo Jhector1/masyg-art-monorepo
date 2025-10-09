@@ -11,7 +11,7 @@ docker logs -f --since=10m ziledigital-app
 
 
 
-
+/admin/private/uploader
 cd /opt/masyg-art-monorepo/infra
 docker compose build --no-cache ziledigital-app
 docker compose up -d ziledigital-app

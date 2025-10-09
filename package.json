@@ -20,19 +20,18 @@
     "postinstall": "node -e \"process.exit(require('fs').existsSync('packages/tailwind-preset/tsconfig.json')?0:0)\""
   },
   "devDependencies": {
-    "turbo": "^2.5.6",
-    "typescript": "5.9.2",
-    "prettier": "^3.6.2",
+    "@types/jest": "^30.0.0",
     "eslint": "^9",
-    "rimraf": "^5.0.10",
     "jest": "^30.0.5",
     "jest-environment-jsdom": "^30.0.5",
-    "@types/jest": "^30.0.0"
+    "prettier": "^3.6.2",
+    "rimraf": "^5.0.10",
+    "turbo": "^2.5.6",
+    "typescript": "5.9.2"
   },
   "overrides": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-
     "zod": "^4.0.17",
     "@prisma/client": "^6.10.1",
     "prisma": "^6.10.1"
@@ -40,5 +39,8 @@
   "engines": {
     "node": ">=18"
   },
-  "packageManager": "npm@11.1.0"
+  "packageManager": "npm@11.1.0",
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.11.0"
+  }
 }

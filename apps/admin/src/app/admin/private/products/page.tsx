@@ -28,6 +28,7 @@ type ProductCard = {
 };
 
 function EditorClient() {
+  
   const router = useRouter();
   const sp = useSearchParams();            // ✅ ok inside Suspense
   const q = sp?.get("q") ?? "";

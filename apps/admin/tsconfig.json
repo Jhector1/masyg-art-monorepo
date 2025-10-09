@@ -35,17 +35,22 @@
     "incremental": true,
     "isolatedModules": true,
     "jsx": "preserve",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/app/*": ["./src/app/*"],
+      "@/lib/*": ["./src/lib/*"],
+            "@/services/*": ["./src/services/*"]
+    },
+    //     "paths": {
+    //       "@/*": ["./src/*"]
+    //     },
     "plugins": [
       {
         "name": "next"
       }
     ]
   },
-  "include": [
-    "src",
-    ".next/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["src", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }

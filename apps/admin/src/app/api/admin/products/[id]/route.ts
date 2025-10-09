@@ -4,6 +4,7 @@ import { deleteProductDeep } from "@acme/core/lib/deleteProduct";
 import { prisma } from "@acme/core/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { ProductPatchSchema } from "@acme/core/lib/validators/product";
+import {auth} from '@/lib/auth'
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,9 @@ function idFromReq(req: NextRequest): string {
 }
 
 export async function GET(req: NextRequest) {
+   const session = await auth();
+      if (!session?.user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    
   const id = idFromReq(req);
   const p = await prisma.product.findUnique({ where: { id } });
   return p
