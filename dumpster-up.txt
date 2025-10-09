@@ -50,3 +50,15 @@ SET "isAdmin"   = true,
 WHERE email = '\''sygmalink@gmail.com'\'';
 SQL
 '
+
+
+
+git pull --ff-only
+
+
+
+cd /opt/masyg-art-monorepo
+git restore infra/caddy/Caddyfile          # discard working-tree change
+# if it was staged too:
+# git restore --staged infra/caddy/Caddyfile
+git pull --rebase
