@@ -8,13 +8,13 @@
 
 */
 -- AlterTable
-ALTER TABLE "Product" DROP COLUMN "ziledigitalId",
+ALTER TABLE "Product" DROP COLUMN IF EXISTS  "ziledigitalId",
 ADD COLUMN     "publicId" TEXT NOT NULL;
 
 -- AlterTable
-ALTER TABLE "User" DROP COLUMN "avatarziledigitalId",
+ALTER TABLE "User" DROP COLUMN IF EXISTS "avatarziledigitalId",
 ADD COLUMN     "avatarPublicId" VARCHAR(191);
 
 -- AlterTable
-ALTER TABLE "UserDesign" DROP COLUMN "previewziledigitalId",
+ALTER TABLE "UserDesign" DROP COLUMN IF EXISTS"previewziledigitalId",
 ADD COLUMN     "previewPublicId" VARCHAR(255);
