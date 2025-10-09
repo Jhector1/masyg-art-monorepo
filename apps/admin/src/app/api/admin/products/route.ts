@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@acme/core/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@acme/core/lib/auth";
-import {auth} from '@/lib/auth'
+// import {auth} from '@/lib/auth'
 
 export const dynamic = "force-dynamic";
 

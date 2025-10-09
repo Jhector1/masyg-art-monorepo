@@ -1,6 +1,6 @@
 // packages/server/src/services/admin/dashboard.ts
 export async function getAdminDashboard() {
-  const { prisma } = await import("@acme/db"); // ⬅ lazy import
+  const { prisma } = await import("@acme/core/lib/prisma"); // ⬅ lazy import
 
   const [products, categories, users, orders, sales] = await prisma.$transaction([
     prisma.product.count(),

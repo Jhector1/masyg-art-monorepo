@@ -35,16 +35,15 @@
     "incremental": true,
     "isolatedModules": true,
     "jsx": "preserve",
+       "baseUrl": ".", 
     "paths": {
       "@/*": ["./src/*"],
-      "@/components/*": ["./src/components/*"],
-      "@/app/*": ["./src/app/*"],
-      "@/lib/*": ["./src/lib/*"],
-            "@/services/*": ["./src/services/*"]
+      // "@/components/*": ["./src/components/*"],
+      // "@/app/*": ["./src/app/*"],
+      // "@/lib/*": ["./src/lib/*"],
+      // "@/services/*": ["./src/services/*"]
     },
-    //     "paths": {
-    //       "@/*": ["./src/*"]
-    //     },
+  
     "plugins": [
       {
         "name": "next"

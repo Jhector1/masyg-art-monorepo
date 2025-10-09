@@ -1,5 +1,5 @@
-// v4 setup (JWT strategy)
-import type { NextAuthOptions } from "next-auth";
+// src/lib/auth.ts
+import { getServerSession, type NextAuthOptions } from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
@@ -8,15 +8,13 @@ import { compare } from "bcryptjs";
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
-  .map(s => s.trim().toLowerCase())
+  .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
+// ---- your existing v4 config verbatim ----
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
-
-  // ✅ use JWT so middleware getToken() works
   session: { strategy: "jwt" },
-
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -38,10 +36,8 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-
   callbacks: {
     async jwt({ token, user }) {
-      // On initial sign-in we have "user"
       if (user) {
         const dbUser = await prisma.user.findUnique({
           where: { id: (user as any).id },
@@ -49,11 +45,9 @@ export const authOptions: NextAuthOptions = {
         });
         const email = dbUser?.email?.toLowerCase();
         token.isAdmin = dbUser?.isAdmin === true || (email && ADMIN_EMAILS.includes(email));
-        token.sub = (user as any).id; // ensure id persists
+        token.sub = (user as any).id;
         return token;
       }
-
-      // Subsequent requests: hydrate if missing
       if (typeof token.isAdmin === "undefined" && token.sub) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
@@ -64,7 +58,6 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.sub as string;
@@ -72,7 +65,6 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
-
     async redirect({ url, baseUrl }) {
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       try {
@@ -82,6 +74,12 @@ export const authOptions: NextAuthOptions = {
       return baseUrl;
     },
   },
-
   trustHost: true,
 };
+// ------------------------------------------
+
+// ✅ v4 shim so your routes can `await auth()`
+export async function auth() {
+  return getServerSession(authOptions);
+}
+export type Session = Awaited<ReturnType<typeof auth>>;
