@@ -212,6 +212,14 @@ export default function AuthenticationForm({
             required
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
           />
+          <div className="flex justify-end -mt-1 mb-2">
+<a
+href={`/authenticate/forgot-password?callbackUrl=${encodeURIComponent(safeCb)}`}
+className="text-xs text-indigo-600 hover:underline"
+>
+Forgot password?
+</a>
+</div>
 
           {mode === "signup" && (
             <label className="flex items-start gap-3 text-sm text-gray-700 dark:text-neutral-200 select-none">

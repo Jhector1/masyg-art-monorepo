@@ -8,6 +8,14 @@
       <change beforePath="$PROJECT_DIR$/../haitian-art-store" beforeDir="false" afterPath="$PROJECT_DIR$/../haitian-art-store" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../haitian-art-store-masyg" beforeDir="false" afterPath="$PROJECT_DIR$/../haitian-art-store-masyg" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/jeanyvesart/tsconfig.json" beforeDir="false" afterPath="$PROJECT_DIR$/apps/jeanyvesart/tsconfig.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/ziledigital/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/apps/ziledigital/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/ziledigital/src/app/admin/private/editor/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/ziledigital/src/app/admin/private/uploader/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/ziledigital/src/app/admin/products/[id]/edit/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/ziledigital/src/app/admin/products/new/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/dumpster.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/ui/src/components/authenticate/AuthenticationFom.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/packages/ui/src/components/authenticate/AuthenticationFom.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg_extractor_client_ssg/masyg-extractor-vite-ssr" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg_extractor_client_ssg/masyg-extractor-vite-ssr" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/Logs/VBox.log" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/Logs/VBox.log.1" beforeDir="false" />
@@ -61,7 +69,7 @@
       <updated>1758667549143</updated>
       <workItem from="1758667550562" duration="4026000" />
       <workItem from="1759818756654" duration="1992000" />
-      <workItem from="1759957219617" duration="1420000" />
+      <workItem from="1759957219617" duration="1886000" />
     </task>
     <servers />
   </component>

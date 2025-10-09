@@ -9,7 +9,7 @@
   }
 }
 
-client1.ziledigital.com {
+ziledigital.com, www.ziledigital.com {
   import common
   reverse_proxy ziledigital-app:3003
 }

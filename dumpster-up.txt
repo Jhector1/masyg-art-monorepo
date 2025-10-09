@@ -1,0 +1,52 @@
+# status, health, ports
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+# explicit health and last error/exit
+docker inspect ziledigital-app \
+  --format 'health={{.State.Health.Status}} status={{.State.Status}} exit={{.State.ExitCode}} err="{{.State.Error}}"'
+
+# follow logs
+docker logs -f --since=10m ziledigital-app
+
+
+
+
+/admin/private/uploader
+cd /opt/masyg-art-monorepo/infra
+docker compose build --no-cache ziledigital-app
+docker compose up -d ziledigital-app
+docker logs -f ziledigital-app
+
+
+cd /opt/masyg-art-monorepo/infra
+docker compose build --no-cache admin-app
+docker compose up -d admin-app
+docker logs -f admin-app
+
+
+#add admin
+
+docker exec -i mono-postgres sh -lc '
+  export PGPASSWORD="$POSTGRES_PASSWORD";
+  psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<SQL
+-- 1) Insert if missing
+INSERT INTO "ziledigital"."User"
+  (id, email, name, password, "isAdmin", "emailVerified", "createdAt", "updatedAt")
+VALUES
+  (gen_random_uuid()::text,
+   '\''sygmalink@gmail.com'\'',
+   '\''Admin'\'',
+   crypt('\''StrongTempPass!'\'' , gen_salt('\''bf'\'', 12)),
+   true,
+   now(), now(), now())
+ON CONFLICT (email) DO NOTHING;
+
+-- 2) Ensure admin + reset password (works whether it existed or was just inserted)
+UPDATE "ziledigital"."User"
+SET "isAdmin"   = true,
+    password    = crypt('\''StrongTempPass!'\'' , gen_salt('\''bf'\'', 12)),
+    "updatedAt" = now(),
+    "emailVerified" = COALESCE("emailVerified", now())
+WHERE email = '\''sygmalink@gmail.com'\'';
+SQL
+'

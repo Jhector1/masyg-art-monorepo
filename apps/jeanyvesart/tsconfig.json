@@ -31,6 +31,8 @@
     "skipLibCheck": true,
     "incremental": true,
     "isolatedModules": true,
+        "baseUrl": ".",
+
     "paths": {
       "@/*": ["src/*"]
     },
