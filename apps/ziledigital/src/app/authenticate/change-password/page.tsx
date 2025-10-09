@@ -1,15 +1,13 @@
-'use client'
+import { Suspense } from "react";
+import ChangePasswordClient from "./ChangePasswordClient";
 
-import ChangePassword from '@acme/ui/components/authenticate/ChangePassword';
+export const dynamic = "force-dynamic"; // don’t prerender at build
+export const revalidate = 0;            // no ISR
 
-
-export default function ChangePasswordPage() {
- 
-
+export default function Page() {
   return (
-    <>
-      {/* <SEO title="Haitian Digital Art Gallery" description="Buy and explore uniquely crafted Haitian vector artworks." /> */}
-      <ChangePassword  />
-    </>
+    <Suspense fallback={null}>
+      <ChangePasswordClient />
+    </Suspense>
   );
 }
