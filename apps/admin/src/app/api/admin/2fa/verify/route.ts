@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     value: token,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production", // important for localhost
+    secure: process.env.NEXT_ENV === "prod", // important for localhost
     path: "/",
     maxAge: MFA_COOKIE_TTL_SEC,
   });

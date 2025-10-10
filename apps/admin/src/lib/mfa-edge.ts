@@ -13,6 +13,6 @@ export async function checkMfaCookie(cookie: string) {
   }
   return {
     userId: payload.userId as string,
-    iat: typeof payload.iat === "number" ? payload.iat : 0,
+    // iat: typeof payload.iat === "number" ? payload.iat : 0,
   };
 }

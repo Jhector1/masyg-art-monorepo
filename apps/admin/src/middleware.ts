@@ -57,10 +57,10 @@ export async function middleware(req: NextRequest) {
   }
 
   try {
-    const { userId, iat: mfaIat } = await checkMfaCookie(mfa);
+    const { userId,  } = await checkMfaCookie(mfa);
     if (userId !== token.sub) throw new Error("uid");
-    const sessionIat = typeof token.iat === "number" ? token.iat : 0;
-    if (mfaIat < sessionIat) throw new Error("stale");
+    // const sessionIat = typeof token.iat === "number" ? token.iat : 0;
+    // if (mfaIat < sessionIat) throw new Error("stale");
   } catch {
     const dest = new URL("/verify-2fa", url.origin);
     dest.searchParams.set("next", path + url.search);
