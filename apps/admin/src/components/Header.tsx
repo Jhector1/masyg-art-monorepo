@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import * as React from "react";
+import UserMenu from "@acme/ui/components/header/UserMenu";
+import { signOut } from "next-auth/react";
 
 export type AdminHeaderProps = {
   title?: string;
@@ -65,7 +67,7 @@ function envName(explicit?: string) {
   return v[0].toUpperCase() + v.slice(1);
 }
 
-function AuthButtons({
+export function AuthButtons({
   signedIn,
   className = "",
   callbackUrl = "/admin",
@@ -260,9 +262,35 @@ export default function AdminHeader({
               </div>
             </div>
           </button>
+                 {/* {!!user.email && (
+              <UserMenu
+                userName={user?.name || user?.email || "User"}
+                // userName={user?.name || "User"}
+                userImage={user?.a?? "/placeholder.png"}
+                userEmail={user?.email || ""}
+                userRole="Pro User"
+                menuItems={[
+                  { label: "Dashboard", href: "/profile", disable: false },
+                  { label: "Settings", href: "/settings", disable: true },
+                  { label: "Earnings", href: "/earnings", disable: true },
+                ]}
+                onSignOut={() => signOut()}
+              />
+            ) 
+            : (
+              <button
+                className="hidden md:inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:border-gray-300 active:scale-95 transition"
+                onClick={openAuth}
+              >
+                <UserCircleIcon className="h-5 w-5" />
+                Sign in
+              </button>
+            )
+            
+            } */}
         </div>
       </div>
-
+     
       {/* Secondary row: page title */}
       <div className="mx-auto hidden w-full max-w-screen-2xl items-center gap-3 px-3 pb-3 sm:px-4 md:flex">
         <div className="flex flex-1 items-center justify-between">
