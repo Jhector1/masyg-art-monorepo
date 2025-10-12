@@ -15,6 +15,8 @@ type SendResult = {
 
 const OTP_LENGTH = 6;
 
+
+
 export default function Verify2FA() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -37,6 +39,25 @@ export default function Verify2FA() {
   const cooldownSec = useCountdown(cooldownUntil);
 
   const code = useMemo(() => digits.join(""), [digits]);
+
+  // inside Verify2FA component
+
+function handlePaste(i: number, e: React.ClipboardEvent<HTMLInputElement>) {
+  e.preventDefault();
+  const text = (e.clipboardData.getData("text") || "").replace(/\D/g, "");
+  if (!text) return;
+
+  setDigits((d) => {
+    const copy = [...d];
+    for (let k = 0; k < text.length && i + k < OTP_LENGTH; k++) {
+      copy[i + k] = text[k]!;
+    }
+    return copy;
+  });
+
+  setFocused(Math.min(i + text.length, OTP_LENGTH - 1));
+}
+
 
   // ----- Effects -----
   // Auto-send once per tab (idempotent)
@@ -167,6 +188,8 @@ export default function Verify2FA() {
     try {
       const r = await fetch("/api/admin/2fa/verify", {
         method: "POST",
+          credentials: "include",
+
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ code }),
       });
@@ -213,6 +236,8 @@ export default function Verify2FA() {
               <input
                 key={i}
                 ref={(el) => (inputsRef.current[i] = el)}
+                  onPaste={(e) => handlePaste(i, e)}
+
                 inputMode="numeric"
                 autoComplete={i === 0 ? "one-time-code" : "off"}
                 aria-label={`Digit ${i + 1}`}

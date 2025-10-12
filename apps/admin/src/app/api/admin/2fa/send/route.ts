@@ -23,12 +23,14 @@ export async function POST(req: Request) {
     where: { id: u.id },
     select: { email: true },
   });
-  if (!user?.email) return NextResponse.json({ error: "No email on file" }, { status: 400 });
+  if (!user?.email) {
+    return NextResponse.json({ error: "No email on file" }, { status: 400 });
+  }
 
   const now = new Date();
   const identifier = `admin-2fa:${u.id}`;
 
-  // 1) If there’s an active code and not forcing, *don’t* send again
+  // If there’s an active (unexpired) code and not forcing, do not send again
   const active = await prisma.verificationToken.findFirst({
     where: { identifier, expires: { gt: now } },
     orderBy: { expires: "desc" },
@@ -41,19 +43,22 @@ export async function POST(req: Request) {
     });
   }
 
-  // 2) Optional cooldown (even for force=false and no active)
+  // Optional resend cooldown
   const recent = await prisma.verificationToken.findFirst({
     where: { identifier },
     orderBy: { expires: "desc" },
   });
   if (!force && recent && now.getTime() - recent.expires.getTime() < RESEND_COOLDOWN_SEC * 1000) {
-    return NextResponse.json(
-      { ok: true, throttled: true },
-      { status: 202, headers: { "Retry-After": String(RESEND_COOLDOWN_SEC) } }
+    return new NextResponse(
+      JSON.stringify({ ok: true, throttled: true }),
+      {
+        status: 202,
+        headers: { "Retry-After": String(RESEND_COOLDOWN_SEC), "content-type": "application/json" },
+      }
     );
   }
 
-  // 3) Issue a fresh code and try to email
+  // Issue fresh code
   const { code, expires } = await issueCode(u.id);
 
   try {
@@ -65,8 +70,8 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ ok: true, emailed: true, expiresAt: expires });
   } catch (err: any) {
-    // The code still exists; user can use it even if email failed
     console.error("sendMail failed:", err?.message || err);
+    // Code still exists even if mail failed
     return NextResponse.json({
       ok: true,
       emailed: false,
