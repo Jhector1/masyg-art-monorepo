@@ -5,7 +5,7 @@ import {AboutComponent} from "@acme/ui/components/AboutComponent";
 // import PngEditor from "@/components/PNGEditor";
 import SEO from "@acme/ui/components/SEO";
 import VeveDrawFromSvg from "@acme/ui/components/animation/VeveDrawFromSvg";
-import DigitalCardWrapper from "@acme/ui/components/digitalCard/DigitalCardWrapper";
+// import DigitalCardWrapper from "@acme/ui/components/digitalCard/DigitalCardWrapper";
 // import SvgEditor from "@/components/SvgEditor";
 // import DigitalCard from "@/components/digitalCard/DigitalCard";
 // import dynamic from "next/dynamic";
