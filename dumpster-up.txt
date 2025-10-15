@@ -62,3 +62,28 @@ git restore infra/caddy/Caddyfile          # discard working-tree change
 # if it was staged too:
 # git restore --staged infra/caddy/Caddyfile
 git pull --rebase
+
+
+
+#db -up
+docker compose exec postgres psql -U app -d artstack
+
+
+
+
+
+
+# Restart one service after code/config change
+docker compose restart app
+docker compose restart caddy
+
+# View logs
+docker compose logs -f app
+docker compose logs -f caddy
+
+# Rebuild after changing Dockerfile/requirements
+docker compose build app
+docker compose up -d
+
+# Prune dangling images occasionally
+docker image prune -f
