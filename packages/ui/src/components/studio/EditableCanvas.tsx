@@ -152,10 +152,17 @@ function BootLayoutSkeleton() {
 function EditableCanvasInner({ productId }: { productId: string }) {
   const { isLoggedIn } = useUser();
   const { style, setStyle, defsMap, setDefsMap } = useDesignContext();
-// const [reloadTick, setReloadTick] = useState(0);
+  // const [reloadTick, setReloadTick] = useState(0);
 
-  const { previewUrl, loading,handleReset, updatePreview, baseW, baseH, onImageLoad } =
-    useLivePreview(productId);
+  const {
+    previewUrl,
+    loading,
+    handleReset,
+    updatePreview,
+    baseW,
+    baseH,
+    onImageLoad,
+  } = useLivePreview(productId);
   const { canvasRef, zoom, setZoom, drawUrl } = useCanvasRender();
   const { saveDesign, saving } = useSaveDesign(productId);
   const {
@@ -260,43 +267,32 @@ function EditableCanvasInner({ productId }: { productId: string }) {
     dirtyRef.current = isDirty;
   }, [isDirty]);
 
+  // inside EditableCanvasInner component
+  const { undo, redo } = useDesignContext();
 
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      const shift = e.shiftKey;
 
-
-
-
-
-// inside EditableCanvasInner component
-const { undo, redo } = useDesignContext();
-
-React.useEffect(() => {
-  const onKey = (e: KeyboardEvent) => {
-    const mod = e.metaKey || e.ctrlKey;
-    if (!mod) return;
-    const shift = e.shiftKey;
-
-    // Undo: Cmd/Ctrl + Z
-    if (e.key.toLowerCase() === "z" && !shift) {
-      e.preventDefault();
-      undo();
-    }
-    // Redo: Shift + Cmd/Ctrl + Z  (and also Ctrl+Y)
-    if ((e.key.toLowerCase() === "z" && shift) || e.key.toLowerCase() === "y") {
-      e.preventDefault();
-      redo();
-    }
-  };
-  window.addEventListener("keydown", onKey);
-  return () => window.removeEventListener("keydown", onKey);
-}, [undo, redo]);
-
-
-
-
-
-
-
-
+      // Undo: Cmd/Ctrl + Z
+      if (e.key.toLowerCase() === "z" && !shift) {
+        e.preventDefault();
+        undo();
+      }
+      // Redo: Shift + Cmd/Ctrl + Z  (and also Ctrl+Y)
+      if (
+        (e.key.toLowerCase() === "z" && shift) ||
+        e.key.toLowerCase() === "y"
+      ) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
 
   // Warn on refresh/close if dirty
   useEffect(() => {
@@ -344,12 +340,11 @@ React.useEffect(() => {
   // };
 
   // ——— initial boot: export status, load saved design, render fallback
-  function reloadStatus(){
-let cancelled = false;
+  function reloadStatus() {
+    let cancelled = false;
 
     (async () => {
       await fetchInitialExportStatus();
-
 
       try {
         const s = await fetch(`/api/products/${productId}/saveUserDesign`, {
@@ -409,7 +404,7 @@ let cancelled = false;
     fetchInitialExportStatus,
     drawUrl,
     // defsString, style
-      // reloadTick,           // ⬅️ add this
+    // reloadTick,           // ⬅️ add this
 
     updatePreview,
   ]);
@@ -507,11 +502,12 @@ let cancelled = false;
       ) : (
         // </div>
         <EditorHeaderBar
-        // productId={productId}
-        resetting={loading}
-        
-        handleReset={() =>{  setStyle({} as StyleState); handleReset(()=>reloadStatus())}}
-
+          // productId={productId}
+          resetting={loading}
+          handleReset={() => {
+            setStyle({} as StyleState);
+            handleReset(() => reloadStatus());
+          }}
           purchased={purchased}
           purchasedDigital={purchasedDigital}
           loading={loading}

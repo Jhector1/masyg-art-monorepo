@@ -233,6 +233,7 @@ export default function ProductDetail({
                       1
                     );
                   } else {
+                    
                     await removeFromCart(
                       product.id,
                       options.digitalVariantId!,
@@ -241,6 +242,7 @@ export default function ProductDetail({
                   }
                 }}
                 onCheckout={async () => {
+                      if (!isLoggedIn && !guestId) setModalOpen(true);
                   const result = await handleCheckoutAction({
                     openUI: false,
                     exportHref: "/account/orders",
