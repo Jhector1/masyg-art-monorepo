@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
-import { motion, useMotionValue, useTransform, animate } from "framer-motion";
-import NextImage from "next/image";
-import ImageModal from "../store/ImageModal";
+import { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+import NextImage from 'next/image';
+import ZoomCarouselModal from './ZoomCarouselModal';
 
 type Dir = 1 | -1;
 
@@ -17,13 +17,12 @@ export default function ImageSlider({
   autoPlayMs = 4500,
 }: ImageSliderProps) {
   const [index, setIndex] = useState(0);
-  const [autoDir, setAutoDir] = useState<Dir>(1); // ping-pong
+  const [autoDir, setAutoDir] = useState<Dir>(1);
   const [isTouch, setIsTouch] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [zoomImage, setZoomImage] = useState<{
-    src: string;
-    title: string;
-  } | null>(null);
+
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomStartIndex, setZoomStartIndex] = useState(0);
 
   const total = images.length;
   const frameRef = useRef<HTMLDivElement>(null);
@@ -32,30 +31,21 @@ export default function ImageSlider({
   const [frameW, setFrameW] = useState(0);
   const x = useMotionValue(0);
 
-  // pointer swipe state
+  // pointer swipe (custom, not Framer drag)
   const downX = useRef(0);
   const downY = useRef(0);
   const downT = useRef(0);
-  const lastX = useRef(0);
   const dragging = useRef(false);
 
   // thresholds
-  const CLICK_DIST = 10; // px → consider it a click
-  const SWIPE_DIST = 60; // px → consider it a swipe
-  const SWIPE_VEL = 0.6; // px/ms → flick velocity
+  const CLICK_DIST = 10;
+  const SWIPE_DIST = 60;
+  const SWIPE_VEL = 0.6; // px/ms
   const ELASTIC = 1.04;
-
-  const SPRING = {
-    type: "spring" as const,
-    stiffness: 210,
-    damping: 24,
-    mass: 0.9,
-  };
+  const SPRING = { type: 'spring' as const, stiffness: 210, damping: 24, mass: 0.9 };
 
   useEffect(() => {
-    setIsTouch(
-      typeof navigator !== "undefined" && navigator.maxTouchPoints > 0
-    );
+    setIsTouch(typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
   }, []);
 
   useLayoutEffect(() => {
@@ -68,10 +58,10 @@ export default function ImageSlider({
     measure();
     const ro = new ResizeObserver(measure);
     if (frameRef.current) ro.observe(frameRef.current);
-    window.addEventListener("resize", measure);
+    window.addEventListener('resize', measure);
     return () => {
       ro.disconnect();
-      window.removeEventListener("resize", measure);
+      window.removeEventListener('resize', measure);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -83,20 +73,11 @@ export default function ImageSlider({
 
   // autoplay ping-pong
   useEffect(() => {
-    if (
-      total <= 1 ||
-      isPaused ||
-      (typeof document !== "undefined" && document.hidden)
-    )
-      return;
+    if (total <= 1 || isPaused || (typeof document !== 'undefined' && document.hidden)) return;
     timerRef.current = window.setTimeout(async () => {
       if (!frameW) return go(autoDir);
       const dir = autoDir;
-      await animate(
-        x,
-        dir === 1 ? -frameW * ELASTIC : frameW * ELASTIC,
-        SPRING
-      );
+      await animate(x, dir === 1 ? -frameW * ELASTIC : frameW * ELASTIC, SPRING);
       await animate(x, dir === 1 ? -frameW : frameW, SPRING);
       go(dir);
       x.set(0);
@@ -115,18 +96,18 @@ export default function ImageSlider({
 
   useEffect(() => {
     const onVis = () => setIsPaused(document.hidden);
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (total <= 1) return;
-      if (e.key === "ArrowLeft") step(-1);
-      else if (e.key === "ArrowRight") step(1);
+      if (e.key === 'ArrowLeft') step(-1);
+      else if (e.key === 'ArrowRight') step(1);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [total, frameW]);
 
@@ -140,56 +121,41 @@ export default function ImageSlider({
 
   if (total === 0) return null;
 
-  // subtle FX on current slide
   const scaleFx = useTransform(x, (val) =>
     frameW ? 1 - 0.02 * Math.min(1, Math.abs(val) / frameW) : 1
   );
   const filter = useTransform(x, (val) => {
-    if (!frameW) return "blur(0px)";
+    if (!frameW) return 'blur(0px)';
     const px = (Math.min(Math.abs(val), frameW) / frameW) * 2;
     return `blur(${px}px)`;
   });
 
   const sizes = useMemo(
-    () => "(max-width: 640px) 92vw, (max-width: 1024px) 80vw, 720px",
+    () => '(max-width: 640px) 92vw, (max-width: 1024px) 80vw, 720px',
     []
   );
 
   const openZoom = () => {
-    const src = images[index] || "/placeholder.png";
-    let imageSrc = src;
-    if (typeof window !== "undefined") {
-      try {
-        imageSrc = new URL(src, window.location.origin).toString();
-      } catch {
-        /* ignore */
-      }
-    }
-    setZoomImage({ src: imageSrc, title: `Slide ${index + 1}` });
+    setZoomStartIndex(index);
+    setZoomOpen(true);
   };
 
-  // --- Pointer swipe logic on the entire frame (no Framer drag) ---
+  // --- Pointer swipe logic (no Framer drag) ---
   const onPointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
     if (!frameRef.current) return;
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     downX.current = e.clientX;
     downY.current = e.clientY;
     downT.current = performance.now();
-    lastX.current = e.clientX;
     dragging.current = true;
     setIsPaused(true);
-    // cancel any running animation so we can follow finger
     x.stop();
   };
 
   const onPointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
     if (!dragging.current || !frameW) return;
-    // horizontal swipe only (ignore vertical)
     const dx = e.clientX - downX.current;
-    // clamp to 1 frame width
-    const clamped = Math.max(-frameW, Math.min(frameW, dx));
-    x.set(clamped);
-    lastX.current = e.clientX;
+    x.set(Math.max(-frameW, Math.min(frameW, dx)));
   };
 
   const onPointerUp: React.PointerEventHandler<HTMLDivElement> = (e) => {
@@ -197,24 +163,19 @@ export default function ImageSlider({
     const dt = performance.now() - downT.current;
     const dx = e.clientX - downX.current;
     const dy = e.clientY - downY.current;
-    const absDx = Math.abs(dx);
-    const vel = absDx / Math.max(dt, 1); // px per ms
-
     dragging.current = false;
     setIsPaused(false);
 
-    // Click if tiny movement
+    const absDx = Math.abs(dx);
+    const vel = absDx / Math.max(dt, 1);
+
     if (absDx < CLICK_DIST && Math.abs(dy) < CLICK_DIST) {
-      // snap back and open zoom
-      animate(x, 0, SPRING).then(() => {
-        openZoom();
-      });
+      animate(x, 0, SPRING).then(() => openZoom());
       return;
     }
 
-    // Swipe next/prev if over distance or flick velocity
     if (absDx > SWIPE_DIST || vel > SWIPE_VEL) {
-      const dir: Dir = dx < 0 ? 1 : -1; // left swipe → next
+      const dir: Dir = dx < 0 ? 1 : -1;
       const target = dir === 1 ? -frameW : frameW;
       animate(x, target * ELASTIC, SPRING)
         .then(() => animate(x, target, SPRING))
@@ -223,7 +184,6 @@ export default function ImageSlider({
           x.set(0);
         });
     } else {
-      // not enough → bounce back
       animate(x, -dx * 0.12, SPRING).then(() => animate(x, 0, SPRING));
     }
   };
@@ -244,7 +204,30 @@ export default function ImageSlider({
         {index + 1}/{total}
       </div>
 
-      {/* Frame (handles pointer swipe + click tolerance) */}
+      {/* Desktop arrows */}
+      {!isTouch && total > 1 && (
+        <>
+          <button
+            type="button"
+            aria-label="Previous slide"
+            className="group absolute left-2 top-1/2 -translate-y-1/2 z-30 rounded-full bg-white/80 backdrop-blur px-3 py-2 shadow hover:bg-white focus:outline-none focus:ring-2 focus:ring-white/70 active:scale-95 transition"
+            onClick={() => step(-1)}
+          >
+            <span className="block text-black leading-none select-none">◀</span>
+          </button>
+
+          <button
+            type="button"
+            aria-label="Next slide"
+            className="group absolute right-2 top-1/2 -translate-y-1/2 z-30 rounded-full bg-white/80 backdrop-blur px-3 py-2 shadow hover:bg-white focus:outline-none focus:ring-2 focus:ring-white/70 active:scale-95 transition"
+            onClick={() => step(1)}
+          >
+            <span className="block text-black leading-none select-none">▶</span>
+          </button>
+        </>
+      )}
+
+      {/* Frame (handles swipe + click tolerance) */}
       <div
         ref={frameRef}
         className="relative w-full"
@@ -256,7 +239,7 @@ export default function ImageSlider({
         <div className="relative w-full aspect-[4/3] sm:aspect-[3/2] md:aspect-[16/10] lg:aspect-[16/9] max-h-[80vh]">
           <motion.div
             className="absolute inset-0 w-[300%] h-full flex"
-            style={{ x, touchAction: "none" as any, cursor: "grab" }}
+            style={{ x, touchAction: 'none' as any, cursor: 'grab' }}
           >
             {/* Prev */}
             <div className="relative h-full w-1/3">
@@ -270,12 +253,9 @@ export default function ImageSlider({
               />
             </div>
 
-            {/* Current (click/tap to open modal; small drifts allowed) */}
+            {/* Current (click/tap to open modal; micro-drifts allowed) */}
             <div className="relative h-full w-1/3 overflow-hidden">
-              <motion.div
-                className="absolute inset-0 cursor-zoom-in"
-                style={{ scale: scaleFx, filter }}
-              >
+              <motion.div className="absolute inset-0 cursor-zoom-in" style={{ scale: scaleFx, filter }}>
                 <NextImage
                   key={images[index]}
                   src={images[index]}
@@ -318,53 +298,21 @@ export default function ImageSlider({
                 step(forward <= backward ? 1 : -1);
               }}
               className={`h-2 rounded-full transition-all duration-300 ${
-                i === index
-                  ? "w-5 bg-white"
-                  : "w-2 bg-white/40 hover:bg-white/70"
+                i === index ? 'w-5 bg-white' : 'w-2 bg-white/40 hover:bg-white/70'
               }`}
             />
           ))}
         </div>
       )}
-      {!isTouch && total > 1 && (
-        <>
-          <button
-            type="button"
-            aria-label="Previous slide"
-            className="group absolute left-2 top-1/2 -translate-y-1/2 z-30
-                 rounded-full bg-white/80 backdrop-blur px-3 py-2 shadow
-                 hover:bg-white focus:outline-none focus:ring-2 focus:ring-white/70
-                 active:scale-95 transition"
-            onClick={() => step(-1)}
-          >
-            <span className="block text-black leading-none select-none">
-              ◀
-            </span>
-          </button>
 
-          <button
-            type="button"
-            aria-label="Next slide"
-            className="group absolute right-2 top-1/2 -translate-y-1/2 z-30
-                 rounded-full bg-white/80 backdrop-blur px-3 py-2 shadow
-                 hover:bg-white focus:outline-none focus:ring-2 focus:ring-white/70
-                 active:scale-95 transition"
-            onClick={() => step(1)}
-          >
-            <span className="block text-black leading-none select-none">
-              ▶
-            </span>
-          </button>
-        </>
-      )}
-
-      {/* ImageModal zoom (same API as ProductImage) */}
-      {zoomImage && (
-        <ImageModal
-          image={zoomImage.src}
-          title={zoomImage.title}
-          isOpen
-          onClose={() => setZoomImage(null)}
+      {/* Popup gallery with swipe + zoom */}
+      {zoomOpen && (
+        <ZoomCarouselModal
+          images={images}
+          startIndex={zoomStartIndex}
+          isOpen={zoomOpen}
+          onClose={() => setZoomOpen(false)}
+          title={`Slide ${zoomStartIndex + 1}`}
         />
       )}
     </div>
