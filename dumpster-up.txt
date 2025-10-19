@@ -87,3 +87,30 @@ docker compose up -d
 
 # Prune dangling images occasionally
 docker image prune -f
+
+
+
+ChatGPT said:
+
+Do a hot reload—no downtime.
+
+# 1) Validate the config inside the container (catches typos)
+docker exec -it edge-caddy caddy adapt --config /etc/caddy/Caddyfile --pretty
+
+# 2) Reload Caddy to apply the change
+docker exec -it edge-caddy caddy reload --config /etc/caddy/Caddyfile
+
+# 3) (Optional) tail logs to confirm
+docker logs --tail=50 edge-caddy
+
+
+
+As a fallback, you can also recreate just the proxy service:
+
+cd /opt/edge-proxy
+docker compose up -d caddy
+
+
+
+cd /opt/masyg-extractor-server
+docker compose up -d --force-recreate masyg-extractor-app

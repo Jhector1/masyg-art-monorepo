@@ -7,8 +7,26 @@
     <list default="true" id="27cd0cc1-d00a-4e65-8d77-ecc340bce686" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/../haitian-art-store" beforeDir="false" afterPath="$PROJECT_DIR$/../haitian-art-store" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../haitian-art-store-masyg" beforeDir="false" afterPath="$PROJECT_DIR$/../haitian-art-store-masyg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/dumpster-up.txt" beforeDir="false" afterPath="$PROJECT_DIR$/dumpster-up.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/DocsManagement/DashboardNavigation.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/DocsManagement/DashboardNavigation.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/DocsManagement/DocsAccordion/DocsAccordionFileDistributor.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/DocsManagement/DocsAccordion/DocsAccordionFileDistributor.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/DocsManagement/DocsAccordion/FileItemAccordion.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/DocsManagement/DocsAccordion/FileItemAccordion.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/DocsManagement/DocsAccordion/GroupAccordion.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/DocsManagement/DocsAccordion/GroupAccordion.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/DocsManagement/DocsAccordion/LoggerOnFileUpload.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/DocsManagement/DocsAccordion/LoggerOnFileUpload.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/MasygNavigation.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/MasygNavigation.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/integration/quickbook/form/QuickBookForm.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/integration/quickbook/form/QuickBookForm.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/integration/xero/form/XeroForm.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/component/MasygExtractor/integration/xero/form/XeroForm.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/context/ExtractedDataContext.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/context/ExtractedDataContext.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/context/SocketContext.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/context/SocketContext.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/main.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/main.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/pages/DataManager/Documents/GroupImageViewer.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/pages/DataManager/Documents/GroupImageViewer.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/tool/Progressbar/BoxPerimeterLoadingBar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/tool/Progressbar/BoxPerimeterLoadingBar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/tool/Progressbar/RainbowLoadingBar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/tool/Progressbar/RainbowLoadingBar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/tool/Spinner/LogsSpinner.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/tool/Spinner/LogsSpinner.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/tool/logs_message/ProgressBar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/tool/logs_message/ProgressBar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/tool/logs_message/SocketClient.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg-pdf-extractor/src/types.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../TypescriptProjects/masyg_extractor_client_ssg/masyg-extractor-vite-ssr" beforeDir="false" afterPath="$PROJECT_DIR$/../../TypescriptProjects/masyg_extractor_client_ssg/masyg-extractor-vite-ssr" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/Logs/VBox.log" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../../kali-linux-2024.3-virtualbox-amd64/Logs/VBox.log.1" beforeDir="false" />
@@ -36,22 +54,22 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "/Users/admin/Documents/NextJSProject/haitian-art-store-masyg-v2/apps/admin",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "ts.external.directory.path": "/Users/admin/Documents/NextJSProject/haitian-art-store-masyg-v2/node_modules/typescript/lib",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/admin/Documents/NextJSProject/haitian-art-store-masyg-v2/apps/admin&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/Users/admin/Documents/NextJSProject/haitian-art-store-masyg-v2/node_modules/typescript/lib&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
@@ -63,6 +81,7 @@
       <workItem from="1758667550562" duration="4026000" />
       <workItem from="1759818756654" duration="1992000" />
       <workItem from="1759957219617" duration="1886000" />
+      <workItem from="1760660809960" duration="59000" />
     </task>
     <servers />
   </component>
