@@ -51,7 +51,6 @@ export async function POST(req: Request) {
     let to =
       overrideEmail ||
       order.user?.email || null;
-console.log(to);
     if (!to && order.stripeSessionId) {
       try {
         const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);

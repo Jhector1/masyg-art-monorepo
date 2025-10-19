@@ -47,7 +47,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     : summary.exportsLeft <= 0
     ? "quota_exhausted"
     : null;
-console.log(purchasedDigital,purchasedPrint, kinds)
   return NextResponse.json({
     signedIn,
     purchased,

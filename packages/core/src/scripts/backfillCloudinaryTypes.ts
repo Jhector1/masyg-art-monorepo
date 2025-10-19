@@ -30,7 +30,6 @@ async function main() {
         storageKey: r.storageKey ?? publicId, // keep existing if set
       },
     });
-    console.log("Updated", r.id);
   }
 }
 

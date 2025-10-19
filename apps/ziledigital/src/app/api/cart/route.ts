@@ -200,7 +200,6 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  console.log("Type variant:", digitalType, printType);
 
   // Ensure cart exists
   let cart = await prisma.cart.findFirst({

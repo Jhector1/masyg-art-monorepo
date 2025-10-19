@@ -77,10 +77,8 @@ export async function POST(req: Request) {
       });
 
       // Optional: structured log for auditing (don’t expose publicly)
-      console.log("[forgot] sent reset", { email: identifier, expires: expires.toISOString() });
     } else {
       // Optional: log only (don’t send mail)
-      console.log("[forgot] no account for email; skipped send", { email: identifier });
     }
 
     // Generic success either way

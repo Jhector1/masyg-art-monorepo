@@ -131,7 +131,7 @@ export function useExportArtwork(productId: string) {
       const res = await fetch(`/api/products/${productId}/saveUserDesign/status`, { cache: "no-store" });
       if (!res.ok) return;
       const j = await res.json();
-      console.log(j)
+     
       setCanExport(!!j.canExport);
       setPurchased(!!j.purchased);
       setExportsLeft(j.exportsLeft ?? 0);

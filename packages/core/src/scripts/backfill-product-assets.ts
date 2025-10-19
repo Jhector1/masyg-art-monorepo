@@ -29,7 +29,6 @@ async function main() {
     },
   });
 
-  console.log(`Found ${products.length} products`);
 
   for (const p of products) {
     const urls: string[] = [];
@@ -76,14 +75,10 @@ async function main() {
         deliveryType: (id?.deliveryType as any) ?? "upload",
       });
 
-      console.log(
-        `Upserted asset for product ${p.id}: ${ext} ${url} ` +
-        (id?.publicId ? `[${id.resourceType}/${id.deliveryType}/${id.publicId}]` : "")
-      );
+    
     }
   }
 
-  console.log("Backfill complete.");
 }
 
 main()

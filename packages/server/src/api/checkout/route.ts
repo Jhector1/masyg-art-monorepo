@@ -88,12 +88,11 @@ export async function POST(req: NextRequest) {
     const cartById = new Map(cartItems.map(ci => [ci.id, ci]));
 
     for (const entry of body.cartProductList) {
-      console.log(entry)
+    
         // const digitalt = detectDigital(entry.myProduct);
       // const printt = detectPrint(entry.myProduct);
 
-      console.log("digital", cartItems)
-      //       console.log("print", printt)
+    
       const qty = Math.max(1, Number(entry.quantity ?? 1));
 
       // Server-only detection for "user design" on known cart lines
@@ -210,7 +209,7 @@ export async function POST(req: NextRequest) {
       //    const digitalt = detectDigital(p);
       // const printt = detectPrint(p);
 
-      //       console.log("print", printt)
+
       if (!p?.id || !p?.title) continue;
 
       // fetch product to get server sale fields
@@ -234,8 +233,6 @@ export async function POST(req: NextRequest) {
       const digital = detectDigital(p);
       const print = detectPrint(p);
 
-      console.log("digital", digital)
-            console.log("print", print)
 
 
       // shape minimal "variants" for pricing
