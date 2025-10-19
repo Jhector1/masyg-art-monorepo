@@ -51,7 +51,7 @@ export default function EditorHeaderBar({
   const { undo, redo, canUndo, canRedo } = useDesignContext();
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-amber-50 p-3 md:p-4 ring-1 ring-black/5">
+    <div className="flex flex-wrap items-center static md:sticky top-15 z-10 justify-between gap-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-amber-50 p-3 md:p-4 ring-1 ring-black/5">
       <div className="min-w-0">
         <h1 className="text-[clamp(1.125rem,2.5vw,1.5rem)] font-semibold">Zile Studio</h1>
         <p className="text-sm text-black/60">Edit colors & stroke, then export in PNG/JPG/WebP/TIFF/SVG.</p>
