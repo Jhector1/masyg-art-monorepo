@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, useMotionValue, animate, useTransform } from 'framer-motion';
+import { motion, useMotionValue, animate } from 'framer-motion';
 import Image from 'next/image';
 
 type Dir = 1 | -1;
@@ -23,7 +23,7 @@ export default function ZoomCarouselModal({
   const [index, setIndex] = useState(startIndex);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // slide motion
+  // slide strip motion (prev|current|next across 300%)
   const x = useMotionValue(0);
   const [vw, setVw] = useState(0);
 
@@ -32,13 +32,20 @@ export default function ZoomCarouselModal({
   const imgX = useMotionValue(0);
   const imgY = useMotionValue(0);
 
-  // pointer state for slide
+  // slide gesture state
   const downX = useRef(0);
   const downY = useRef(0);
   const downT = useRef(0);
   const dragging = useRef(false);
 
-  // pointer state for pan (while zoomed)
+  // pinch gesture state
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinching = useRef(false);
+  const pinchStartDist = useRef(0);
+  const pinchStartScale = useRef(1);
+  const pinchCenterStart = useRef({ x: 0, y: 0 }); // relative to rect center (px)
+
+  // pan origins while zoomed
   const panX = useRef(0);
   const panY = useRef(0);
 
@@ -49,6 +56,20 @@ export default function ZoomCarouselModal({
   const SWIPE_VEL = 0.6; // px/ms
   const ZOOM_MIN = 1;
   const ZOOM_MAX = 4;
+
+  const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+  const wrap = (i: number) => (total ? (i + total) % total : 0);
+  const nextIndex = wrap(index + 1);
+  const prevIndex = wrap(index - 1);
+
+  const go = (dir: Dir) => setIndex((p) => wrap(p + dir));
+  const step = async (dir: Dir) => {
+    if (!vw) return go(dir);
+    await animate(x, dir === 1 ? -vw * ELASTIC : vw * ELASTIC, SPRING);
+    await animate(x, dir === 1 ? -vw : vw, SPRING);
+    go(dir);
+    x.set(0);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -75,72 +96,155 @@ export default function ZoomCarouselModal({
   }, [isOpen]);
 
   useEffect(() => {
-    // reset transform on image change
+    // reset zoom on image change
     animate(scale, 1, { duration: 0.15 });
     animate(imgX, 0, { duration: 0.15 });
     animate(imgY, 0, { duration: 0.15 });
+    panX.current = 0;
+    panY.current = 0;
   }, [index]); // eslint-disable-line
 
-  const wrap = (i: number) => (total ? (i + total) % total : 0);
-  const nextIndex = wrap(index + 1);
-  const prevIndex = wrap(index - 1);
-  const go = (dir: Dir) => setIndex((p) => wrap(p + dir));
-  const step = async (dir: Dir) => {
-    if (!vw) return go(dir);
-    await animate(x, dir === 1 ? -vw * ELASTIC : vw * ELASTIC, SPRING);
-    await animate(x, dir === 1 ? -vw : vw, SPRING);
-    go(dir);
-    x.set(0);
+  // helpers for pinch
+  const getRect = () =>
+    (overlayRef.current?.getBoundingClientRect() ??
+      ({ width: window.innerWidth, height: window.innerHeight, left: 0, top: 0 } as DOMRect));
+
+  const updatePointer = (id: number, xPos: number, yPos: number) => {
+    pointers.current.set(id, { x: xPos, y: yPos });
   };
 
-  const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+  const currentPinchData = () => {
+    const pts = Array.from(pointers.current.values());
+    if (pts.length < 2) return null;
+    const [p1, p2] = pts;
+    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const cx = (p1.x + p2.x) / 2;
+    const cy = (p1.y + p2.y) / 2;
+    return { dist, cx, cy };
+    };
 
-  // ----- Slide gestures (outer frame) -----
+  // ----- Gestures (outer frame) -----
   const onPointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
     if (!isOpen) return;
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-    downX.current = e.clientX;
-    downY.current = e.clientY;
-    downT.current = performance.now();
-    dragging.current = true;
-    x.stop(); // follow finger immediately
-  };
 
-  const onPointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
-    if (!dragging.current || !vw) return;
-    // if zoomed, we don't slide the strip — we pan the image instead
-    if (scale.get() > 1) {
-      const dx = e.clientX - downX.current;
-      const dy = e.clientY - downY.current;
-      const s = scale.get();
-      const maxX = (vw * (s - 1)) / 2;
-      const maxY = ((overlayRef.current?.clientHeight ?? window.innerHeight) * (s - 1)) / 2;
-      imgX.set(clamp(panX.current + dx, -maxX, maxX));
-      imgY.set(clamp(panY.current + dy, -maxY, maxY));
-      return;
-    }
-    const dx = e.clientX - downX.current;
-    x.set(Math.max(-vw, Math.min(vw, dx)));
-  };
+    updatePointer(e.pointerId, e.clientX, e.clientY);
 
-  const onPointerUp: React.PointerEventHandler<HTMLDivElement> = (e) => {
-    if (!vw) return;
-    const dt = performance.now() - downT.current;
-    const dx = e.clientX - downX.current;
-    const dy = e.clientY - downY.current;
-    dragging.current = false;
-
-    if (scale.get() > 1) {
-      // finish panning and store origin for next gesture
+    if (pointers.current.size === 2) {
+      // start pinch
+      const p = currentPinchData()!;
+      const rect = getRect();
+      pinching.current = true;
+      pinchStartDist.current = p.dist;
+      pinchStartScale.current = scale.get();
+      pinchCenterStart.current = {
+        x: p.cx - (rect.left + rect.width / 2),
+        y: p.cy - (rect.top + rect.height / 2),
+      };
       panX.current = imgX.get();
       panY.current = imgY.get();
       return;
     }
 
+    // single-finger start (slide or prepare to pan if already zoomed)
+    downX.current = e.clientX;
+    downY.current = e.clientY;
+    downT.current = performance.now();
+    dragging.current = true;
+    x.stop();
+  };
+
+  const onPointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    if (!isOpen) return;
+
+    // update active pointer
+    if (pointers.current.has(e.pointerId)) {
+      updatePointer(e.pointerId, e.clientX, e.clientY);
+    }
+
+    // active pinch
+    if (pinching.current && pointers.current.size >= 2) {
+      const p = currentPinchData();
+      if (!p) return;
+      const rect = getRect();
+      const factor = p.dist / Math.max(1, pinchStartDist.current);
+      const next = clamp(pinchStartScale.current * factor, ZOOM_MIN, ZOOM_MAX);
+
+      // keep pinch center stable
+      const maxX = (rect.width * (next - 1)) / 2;
+      const maxY = (rect.height * (next - 1)) / 2;
+
+      const cxRel = p.cx - (rect.left + rect.width / 2); // current center relative to frame center
+      const cyRel = p.cy - (rect.top + rect.height / 2);
+
+      // derive target translation so that the same visual point stays under the pinch center
+      const dxFromStart = cxRel - pinchCenterStart.current.x;
+      const dyFromStart = cyRel - pinchCenterStart.current.y;
+
+      const nx = clamp(panX.current - pinchCenterStart.current.x * (next - pinchStartScale.current) + dxFromStart, -maxX, maxX);
+      const ny = clamp(panY.current - pinchCenterStart.current.y * (next - pinchStartScale.current) + dyFromStart, -maxY, maxY);
+
+      scale.set(next);
+      imgX.set(nx);
+      imgY.set(ny);
+      return;
+    }
+
+    // if zoomed (no pinch), drag pans the image
+    if (scale.get() > 1 && dragging.current) {
+      const rect = getRect();
+      const s = scale.get();
+      const dx = e.clientX - downX.current;
+      const dy = e.clientY - downY.current;
+      const maxX = (rect.width * (s - 1)) / 2;
+      const maxY = (rect.height * (s - 1)) / 2;
+      imgX.set(clamp(panX.current + dx, -maxX, maxX));
+      imgY.set(clamp(panY.current + dy, -maxY, maxY));
+      return;
+    }
+
+    // otherwise single-finger slide
+    if (dragging.current && vw) {
+      const dx = e.clientX - downX.current;
+      x.set(Math.max(-vw, Math.min(vw, dx)));
+    }
+  };
+
+  const onPointerUp: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    // remove pointer
+    pointers.current.delete(e.pointerId);
+
+    // end pinch first
+    if (pinching.current) {
+      if (pointers.current.size < 2) {
+        pinching.current = false;
+        // store pan origin for next move
+        panX.current = imgX.get();
+        panY.current = imgY.get();
+      }
+      return; // IMPORTANT: never treat as click/slide when finishing a pinch
+    }
+
+    if (!vw) return;
+
+    // if zoomed, finish pan; do not close
+    if (scale.get() > 1) {
+      panX.current = imgX.get();
+      panY.current = imgY.get();
+      dragging.current = false;
+      return;
+    }
+
+    // single-finger slide/click logic
+    const dt = performance.now() - downT.current;
+    const dx = e.clientX - downX.current;
+    const dy = e.clientY - downY.current;
+    dragging.current = false;
+
     const absDx = Math.abs(dx);
     const vel = absDx / Math.max(dt, 1);
 
-    // tiny move → click (close)
+    // tiny move → close
     if (absDx < CLICK_DIST && Math.abs(dy) < CLICK_DIST) {
       onClose();
       return;
@@ -161,11 +265,10 @@ export default function ZoomCarouselModal({
     }
   };
 
-  // ----- Zoom controls on current image -----
+  // wheel + double-click zoom (desktop)
   const onDoubleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const rect = getRect();
     const next = scale.get() > 1 ? 1 : 2.5;
-    // center toward clicked point
     const dx = e.clientX - (rect.left + rect.width / 2);
     const dy = e.clientY - (rect.top + rect.height / 2);
     const maxX = (rect.width * (next - 1)) / 2;
@@ -175,21 +278,17 @@ export default function ZoomCarouselModal({
     animate(scale, next, { type: 'spring', stiffness: 260, damping: 28 });
     animate(imgX, next === 1 ? 0 : tx, { type: 'spring', stiffness: 260, damping: 28 });
     animate(imgY, next === 1 ? 0 : ty, { type: 'spring', stiffness: 260, damping: 28 });
-    if (next === 1) {
-      panX.current = 0;
-      panY.current = 0;
-    }
+    if (next === 1) { panX.current = 0; panY.current = 0; }
   };
 
   const onWheel: React.WheelEventHandler<HTMLDivElement> = (e) => {
     e.preventDefault();
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const rect = getRect();
     const delta = -e.deltaY; // up → zoom in
     const factor = Math.exp(delta * 0.0018);
     const current = scale.get();
     const next = clamp(current * factor, ZOOM_MIN, ZOOM_MAX);
 
-    // keep pointer under cursor stable
     const cx = e.clientX - (rect.left + rect.width / 2);
     const cy = e.clientY - (rect.top + rect.height / 2);
     const maxX = (rect.width * (next - 1)) / 2;
@@ -202,10 +301,7 @@ export default function ZoomCarouselModal({
     animate(imgX, next === 1 ? 0 : nx, { duration: 0.12 });
     animate(imgY, next === 1 ? 0 : ny, { duration: 0.12 });
 
-    if (next === 1) {
-      panX.current = 0;
-      panY.current = 0;
-    }
+    if (next === 1) { panX.current = 0; panY.current = 0; }
   };
 
   const sizes = useMemo(
@@ -218,16 +314,17 @@ export default function ZoomCarouselModal({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[100] bg-white "
+      className="fixed inset-0 z-[100] bg-white"
       role="dialog"
       aria-modal="true"
       aria-label={title ?? 'Image gallery'}
+      // IMPORTANT: these run on the overlay so we can pinch anywhere
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
-      {/* Close (top-right) */}
+      {/* Close */}
       <button
         onClick={onClose}
         className="absolute right-4 top-4 z-[110] rounded-full bg-white/80 px-3 py-1.5 text-black shadow hover:bg-white focus:outline-none focus:ring-2 focus:ring-white/70"
@@ -236,7 +333,7 @@ export default function ZoomCarouselModal({
         ✕
       </button>
 
-      {/* Index badge */}
+      {/* Counter */}
       <div className="absolute left-1/2 -translate-x-1/2 top-4 z-[110] text-xs text-white/90 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full">
         {index + 1}/{total}
       </div>
@@ -261,11 +358,16 @@ export default function ZoomCarouselModal({
         </>
       )}
 
-      {/* Slides */}
+      {/* Slides strip */}
       <div className="absolute inset-0">
         <motion.div
           className="absolute inset-0 w-[300%] h-full flex"
-          style={{ x, touchAction: 'none' as any, cursor: scale.get() > 1 ? 'grab' : 'auto' }}
+          style={{
+            x,
+            // allow custom pinch/drag; disable browser gestures
+            touchAction: 'none' as any,
+            cursor: scale.get() > 1 ? 'grab' : 'auto',
+          }}
         >
           {/* Prev */}
           <div className="relative h-full w-1/3">
@@ -284,7 +386,7 @@ export default function ZoomCarouselModal({
           <div className="relative h-full w-1/3 overflow-hidden">
             <motion.div
               className="absolute inset-0"
-              style={{ scale, x: imgX, y: imgY }}
+              style={{ scale, x: imgX, y: imgY, touchAction: 'none' as any }}
               onDoubleClick={onDoubleClick}
               onWheel={onWheel}
             >
@@ -298,10 +400,6 @@ export default function ZoomCarouselModal({
                 priority
               />
             </motion.div>
-            {/* Help hint (mobile) */}
-            <div className="md:hidden absolute bottom-4 left-1/2 -translate-x-1/2 text-[11px] text-white/90 bg-black/50 rounded-full px-2 py-0.5">
-              Pinch/drag to zoom, swipe to close/next
-            </div>
           </div>
 
           {/* Next */}
