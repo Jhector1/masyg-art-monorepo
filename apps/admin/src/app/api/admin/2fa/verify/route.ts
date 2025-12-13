@@ -9,6 +9,7 @@ import {
   signMfaCookie,
   MFA_COOKIE,
   MFA_COOKIE_TTL_SEC,
+  MFA_REMEMBER_COOKIE_TTL_SEC,
 } from "@/lib/mfa-server";
 
 export async function POST(req: Request) {
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { code } = await req.json().catch(() => ({}));
+  const { code, rememberDevice } = await req.json().catch(() => ({}));
   if (!code) {
     return NextResponse.json({ error: "Missing code" }, { status: 400 });
   }
@@ -28,19 +29,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid or expired code" }, { status: 400 });
   }
 
-  const token = await signMfaCookie(u.id);
-  const jar = cookies(); // no await needed
+  const token = await signMfaCookie(u.id, !!rememberDevice);
+  const jar = cookies();
+
+  const maxAge = rememberDevice ? MFA_REMEMBER_COOKIE_TTL_SEC : MFA_COOKIE_TTL_SEC;
 
   jar.set({
     name: MFA_COOKIE,
     value: token,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NEXT_ENV === "prod",
+    secure: process.env.NEXT_ENV === "prod", // keep your existing logic
     path: "/",
-    maxAge: MFA_COOKIE_TTL_SEC,
+    maxAge,
   });
 
-  // Let the client handle where to go next (see UI change below)
+  // Let the client handle where to go next (see UI)
   return NextResponse.json({ ok: true });
 }

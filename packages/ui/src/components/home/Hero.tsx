@@ -14,9 +14,10 @@ export default function Hero() {
       <h1 className="text-4xl inline-block sm:text-5xl font-extrabold mb-4 bg-gradient-to-r from-blue-500 via-red-500 to-yellow-500 text-transparent bg-clip-text">
         <span className='texnt-blue-500'>Zile</span>Digital
       </h1>
-      <p className="text-lg text-gray-700 max-w-2xl mx-auto">
-        Explore a vibrant collection of veve symbols, historical, and cultural icons inspired by Haitian heritage.
-      </p>
+    <p className="text-lg text-gray-700 max-w-2xl mx-auto">
+  Explore vibrant Haitian-inspired artwork, stickers, prints, and collectibles — all rooted in veve symbols, history, and culture.
+</p>
+
     </motion.div>
   );
 }

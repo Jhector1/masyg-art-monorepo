@@ -10,6 +10,8 @@ export const runtime = "nodejs";          // required for raw body
 export const dynamic = "force-dynamic";   // never cache
 
 export async function POST(req: NextRequest) {
+  console.log("logs started - stripe session")
+  
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
     return new NextResponse("Missing Stripe-Signature header", { status: 400 });

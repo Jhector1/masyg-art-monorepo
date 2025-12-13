@@ -75,7 +75,7 @@ export interface AuthResponse {
   token: string;
   user: { id: string; email: string; name: string };
 }
-
+//Home
 export interface Credentials {
   email: string;
   password: string;
@@ -137,7 +137,9 @@ export const productListSelect = {
   id: true,
   title: true,
   description: true,
+  kind: true,
   price: true,
+  
   thumbnails: true,
   publicId: true,
   svgPreview: true,
@@ -170,7 +172,7 @@ export type ProductReview = Prisma.ReviewGetPayload<{
 }>;
 
 // src/types/product.ts
-import type { Review } from "@acme/db";
+import type { ProductKind, Review } from "@acme/db";
 import { StyleState } from "../../ui/src/components/studio/types";
 
 export type VariantWithInCart = ProductVariant & {
@@ -179,14 +181,11 @@ export type VariantWithInCart = ProductVariant & {
 };
 
 export interface ProductDetailResult {
-  /** UUID of the product */
   id: string;
-  /** FK to Category.id */
   category: string;
   title: string;
   description: string;
   price: number;
-  /** first thumbnail or placeholder */
   imageUrl: string;
   thumbnails: string[];
   formats: string[];
@@ -194,6 +193,7 @@ export interface ProductDetailResult {
   variants: VariantWithInCart[];
   svgPreview: string;
   reviews: Review[];
+  // kind: string;
   salePercent: number;
   salePrice: number;
   saleStartsAt: string;
@@ -205,10 +205,21 @@ export interface ProductDetailResult {
     previewUpdatedAt: string;
   };
   userDesignPreviewUrl: string;
+
+  // 👇 NEW
+  kind: ProductKind;
+  requiresShipping: boolean;
+
+  digitalVariants?: VariantWithInCart[];
+  printVariants?: VariantWithInCart[];
+  originalVariant?: VariantWithInCart | null;
+
+  /** compact, UI-ready summary per kind (shape varies by kind) */
+  kindInfo?: any;
 }
 export type CartUpdates = Record<string, string | number | boolean | null>;
 export interface HomeCategory {
-  slug: string;
+  kind: string;
   title: string;
   image: string;
   gradient: string;

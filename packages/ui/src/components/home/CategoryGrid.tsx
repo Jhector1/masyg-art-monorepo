@@ -20,7 +20,7 @@ export default function CategoryGrid({
       transition={{ delay: 0.4, duration: 0.6 }}
     >
       {categories.map((cat) => (
-        <CategoryCard key={cat.slug} {...cat} />
+        <CategoryCard key={cat.kind} {...cat} />
       ))}
     </motion.div>
   );

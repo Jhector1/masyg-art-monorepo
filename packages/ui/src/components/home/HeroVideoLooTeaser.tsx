@@ -45,17 +45,20 @@ export type EditorPromoProps = {
 };
 
 export default function EditorPromo({
-  title = "Customize your artwork in seconds",
-  subtitle =
-    "Swap backgrounds, fine‑tune strokes, adjust sizes/DPI, and export a crisp JPG when you're ready.",
-  videoSrc =
+title = "Customize select artworks in seconds",
+ subtitle =
+  "On eligible SVG artworks, swap backgrounds, fine-tune strokes, adjust sizes/DPI, and export a crisp JPG when you're ready.",
+
+videoSrc =
     "https://res.cloudinary.com/dqeqbgxvn/video/upload/v1755645824/YouCut_20250819_181240433_xksigu.mp4",
   posterSrc = "/images/editor-poster.png",
   ctaHref = "https://ziledigital.com/store/a0f28028-86a8-40df-ad53-ced5014a1ff7/studio",
   ctaLabel = "Try the Customizer",
   className = "",
-  note =
-    "High‑res exports unlock after purchase or with export credits on eligible items.",
+ note =
+  "Customization is available on eligible digital artworks. High-res exports unlock after purchase or with export credits.",
+
+ 
   features,
   actions,
   children,

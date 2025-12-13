@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { motion } from 'framer-motion';
-import Link from 'next/link';
+import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function PromoBanner() {
   return (
@@ -15,10 +15,11 @@ export default function PromoBanner() {
         ✨ Discover Cultural Collectibles
       </span>
       <span className="text-sm md:text-base">
-        Limited prints now available!
+        Prints, stickers, and everyday items inspired by Haitian culture.
       </span>
-      <Link 
-        href="/store" 
+
+      <Link
+        href="/store"
         className="bg-yellow-600 text-white px-3 py-1 rounded-lg shadow hover:bg-yellow-700 transition"
       >
         Shop Now

@@ -32,6 +32,7 @@ export default function Verify2FA() {
   const [sentOnce, setSentOnce] = useState(false);
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState<Date | null>(null);
+const [rememberDevice, setRememberDevice] = useState(false);
 
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -82,7 +83,7 @@ function handlePaste(i: number, e: React.ClipboardEvent<HTMLInputElement>) {
     try {
       const r = await fetch(`/api/admin/2fa/send${force ? "?force=1" : ""}`, { method: "POST" });
       const data = (await r.json().catch(() => ({}))) as SendResult;
-
+        console.log(data)
       // Parse Retry-After header for cooldown (seconds)
       const retryAfter = parseInt(r.headers.get("Retry-After") || "0", 10);
       if (retryAfter > 0) {
@@ -191,7 +192,7 @@ function handlePaste(i: number, e: React.ClipboardEvent<HTMLInputElement>) {
           credentials: "include",
 
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, rememberDevice }), // ⬅️ include rememberDevice
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -285,7 +286,19 @@ function handlePaste(i: number, e: React.ClipboardEvent<HTMLInputElement>) {
 
           {/* Force resend (optional: visible only if email failed) */}
           {/* <button onClick={() => send(true)} className="mt-2 text-xs text-gray-500 underline">Force resend</button> */}
-
+{/* Remember device */}
+<div className="mt-4 flex items-center gap-2 text-sm text-gray-700">
+  <input
+    id="remember-device"
+    type="checkbox"
+    checked={rememberDevice}
+    onChange={(e) => setRememberDevice(e.target.checked)}
+    className="h-4 w-4 rounded border-gray-300"
+  />
+  <label htmlFor="remember-device">
+    Remember this device for 30 days
+  </label>
+</div>
           {/* Verify button */}
           <button
             onClick={verify}

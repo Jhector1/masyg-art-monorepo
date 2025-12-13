@@ -46,7 +46,7 @@ where = {
     where,
     select: {
       id: true, title: true, price: true, thumbnails: true, publicId: true,
-      salePrice: true, salePercent: true, saleStartsAt: true, saleEndsAt: true,
+      salePrice: true,kind: true, salePercent: true, saleStartsAt: true, saleEndsAt: true,
       sizes: true,
       _count: { select: { orderItems: true } },
       designs: { select: { previewUrl: true }, where: designsWhere, take: 1 }

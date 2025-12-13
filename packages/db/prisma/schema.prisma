@@ -10,6 +10,8 @@ datasource db {
 model Product {
   id                String              @id @default(uuid())
   categoryId        String
+    externalId String?         @unique
+
   title             String
   description       String
   price             Float
@@ -36,8 +38,20 @@ model Product {
   reviews           Review[]
   designs           UserDesign[]
 
+  kind             ProductKind @default(ART)
+  tags             String[]    @default([]) // if migration balks, see note below
+  requiresShipping Boolean     @default(false)
+  isCustomizable   Boolean     @default(false)
+  optionSchema     Json?
+
+  bundleItems BundleItem[] @relation("ProductToBundleItems")
+
   @@index([saleStartsAt, saleEndsAt])
   @@index([saleEndsAt])
+  @@index([categoryId])
+  @@index([kind])
+  @@index([requiresShipping])
+  @@index([tags], type: Gin) // Postgres-only; great for array contains queries
 }
 
 model User {
@@ -106,38 +120,61 @@ model Category {
   name     String    @unique
   products Product[]
 }
-
+enum FulfillmentProvider {
+  INTERNAL
+  PRINTFUL
+}
 model ProductVariant {
-  id                   String           @id @default(cuid())
-  productId            String
-  type                 VariantType?
-  format               String?
-  size                 String?
-  material             String?
-  frame                String?
-  license              String?
-  depthIn              Float?
-  framed               Boolean?         @default(false)
-  heightIn             Float?
-  inventory            Int?             @default(1)
-  listPrice            Float?
-  medium               String?
-  originalSerial       String?          @unique
-  sku                  String?          @unique
-  soldAt               DateTime?
-  status               InventoryStatus? @default(ACTIVE)
-  surface              String?
-  weightLb             Float?
-  widthIn              Float?
-  year                 Int?
-  uploadType           VariantType?
-  CartItemsAsDigital   CartItem[]       @relation("CartItemDigital")
-  CartItemsAsOriginal  CartItem[]       @relation("CartItemOriginal")
-  CartItemsAsPrint     CartItem[]       @relation("CartItemPrint")
-  OrderItemsAsDigital  OrderItem[]      @relation("OrderItemDigital")
-  OrderItemsAsOriginal OrderItem[]      @relation("OrderItemOriginal")
-  OrderItemsAsPrint    OrderItem[]      @relation("OrderItemPrint")
-  product              Product          @relation(fields: [productId], references: [id])
+  id             String           @id @default(cuid())
+  productId      String
+  type           VariantType?
+  format         String?
+  size           String?
+  material       String?
+  frame          String?
+  license        String?
+  depthIn        Float?
+  framed         Boolean?         @default(false)
+  heightIn       Float?
+  inventory      Int?             @default(1)
+  listPrice      Float?
+    baseCost    Float?            // ✅ what Printful charges you
+
+  medium         String?
+  originalSerial String?          @unique
+  sku            String?          @unique
+  soldAt         DateTime?
+  status         InventoryStatus? @default(ACTIVE)
+  surface        String?
+  weightLb       Float?
+  widthIn        Float?
+  year           Int?
+  uploadType     VariantType?
+
+  // NEW flexible knobs
+  attributes       Json?
+  barcode          String?  @unique
+  upc              String?  @unique
+  hsCode           String?
+  packQuantity     Int?
+  requiresShipping Boolean? // null => inherit Product.requiresShipping
+  fulfillmentProvider  FulfillmentProvider @default(INTERNAL)
+  printfulVariantId    Int?      @unique          // from Printful
+  // relations
+  CartItemsAsDigital   CartItem[]   @relation("CartItemDigital")
+  CartItemsAsOriginal  CartItem[]   @relation("CartItemOriginal")
+  CartItemsAsPrint     CartItem[]   @relation("CartItemPrint")
+  OrderItemsAsDigital  OrderItem[]  @relation("OrderItemDigital")
+  OrderItemsAsOriginal OrderItem[]  @relation("OrderItemOriginal")
+  OrderItemsAsPrint    OrderItem[]  @relation("OrderItemPrint")
+  product              Product      @relation(fields: [productId], references: [id])
+  bundleItems          BundleItem[] @relation("VariantToBundleItems")
+  // (optionally add: @@index([status]), @@index([sku]) is not needed since it's unique)
+
+  // indexes
+  @@index([productId])
+  @@index([status])
+  @@index([listPrice])
 }
 
 /// Shopping Cart
@@ -490,4 +527,41 @@ enum EntitlementSource {
 enum UsageKind {
   EXPORT
   EDIT
+}
+
+enum ProductKind {
+  ART // current default
+  STICKER
+  MUG
+  CARD
+  BOOK_DIGITAL
+  OTHER
+}
+
+model Bundle {
+  id     String       @id @default(cuid())
+  title  String
+  active Boolean      @default(true)
+  items  BundleItem[]
+  price  Float? // optional fixed bundle price; else derive from components
+}
+
+model BundleItem {
+  id        String  @id @default(cuid())
+  bundleId  String
+  productId String
+  variantId String?
+  quantity  Int     @default(1)
+
+  bundle Bundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  // match Product.bundleItems
+  product Product @relation("ProductToBundleItems", fields: [productId], references: [id], onDelete: Cascade)
+
+  // match ProductVariant.bundleItems
+  variant ProductVariant? @relation("VariantToBundleItems", fields: [variantId], references: [id])
+
+  @@index([bundleId])
+  @@index([productId])
+  @@index([variantId])
 }

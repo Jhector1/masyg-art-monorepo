@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { AnimatePresence, motion } from "framer-motion";
-// import SaveOrderCta from "@/components/orders/SaveOrderCta";
 import { useUser } from "@acme/core/contexts/UserContext";
 import { OrderSuccessHeader } from "../../orders/OrderSuccessHeader";
 import { downloadFile } from "@acme/core/lib/client/downloads";
 
 /* ------------ Types from /api/checkout/success ------------- */
+type ProductKind = "STICKER" | "MUG" | "CARD" | "BOOK_DIGITAL" | "ART" | "OTHER";
+
 interface PurchasedArtwork {
   id: string;
   title: string;
@@ -29,6 +30,7 @@ interface PurchasedArtwork {
 }
 
 type OrderItemKind = "DIGITAL" | "PRINT";
+
 type SuccessResponse = {
   hasDigital?: boolean;
   hasPrint?: boolean;
@@ -45,6 +47,11 @@ type SuccessResponse = {
         id: string;
         title: string;
         imageUrl?: string | null;
+
+        // ✅ kind-aware
+        kind?: ProductKind;
+        kindInfo?: any;
+
         digital?: { id: string; format: string; license?: string };
         print?: {
           id: string;
@@ -129,6 +136,40 @@ function money(n: number) {
     currency: "USD",
   }).format(n);
 }
+const unique = <T,>(arr: T[]) => Array.from(new Set(arr));
+
+/* Kind-aware helpers for labels */
+function digitalChipLabel(kind?: ProductKind) {
+  switch (kind) {
+    case "BOOK_DIGITAL":
+      return "E-book (digital)";
+    case "STICKER":
+      return "Stickers (digital)";
+    case "CARD":
+      return "Cards (digital)";
+    case "MUG":
+      return "Mug design (digital)";
+    case "ART":
+      return "Artwork (digital)";
+    default:
+      return "Digital";
+  }
+}
+
+function printChipLabel(kind?: ProductKind) {
+  switch (kind) {
+    case "MUG":
+      return "Mug (print)";
+    case "CARD":
+      return "Cards (print)";
+    case "STICKER":
+      return "Stickers (print)";
+    case "ART":
+      return "Art print";
+    default:
+      return "Print";
+  }
+}
 
 /* --------------------- Component ---------------------------- */
 export default function CheckoutSuccessPage() {
@@ -145,11 +186,9 @@ export default function CheckoutSuccessPage() {
   const [hasDigitalUI, setHasDigitalUI] = useState(false);
   const [progress, setProgress] = useState<Record<string, number>>({});
 
-  // Which button is currently downloading
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const { isLoggedIn } = useUser();
 
-  // expanded details
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setExpanded((m) => ({ ...m, [id]: !m[id] }));
 
@@ -157,30 +196,6 @@ export default function CheckoutSuccessPage() {
     () => artworks.some((a) => a.isVector || /^(svg|pdf)$/i.test(a.format)),
     [artworks]
   );
-
-  // helper to download any URL as a file
-  // const downloadFile = async (url: string, filename: string, buttonId: string) => {
-  //   try {
-  //     setDownloadingId(buttonId);
-  //     const res = await fetch(url);
-  //     if (!res.ok) throw new Error("Network response was not ok");
-  //     const blob = await res.blob();
-  //     const blobUrl = URL.createObjectURL(blob);
-  //     const link = document.createElement("a");
-  //     link.href = blobUrl;
-  //     link.download = filename;
-  //     document.body.appendChild(link);
-  //     link.click();
-  //     link.remove();
-  //     URL.revokeObjectURL(blobUrl);
-  //     fetch("/api/downloads", { method: "POST", credentials: "include" }).catch(() => {});
-  //   } catch (err) {
-  //     console.error(err);
-  //     toast.error("Download failed");
-  //   } finally {
-  //     setDownloadingId(null);
-  //   }
-  // };
 
   /* Fetch purchased artworks + order summary once we have a session_id */
   useEffect(() => {
@@ -215,7 +230,6 @@ export default function CheckoutSuccessPage() {
         setArtworks(data.digitalDownloads ?? []);
         setOrderInfo(data.order ?? null);
 
-        // ✅ Robust flags (prefer API booleans; fall back to items)
         const items = data.order?.items ?? [];
         const itemsHasPrint =
           items.some((it) => it.type === "PRINT" || !!it.myProduct?.print) ??
@@ -264,6 +278,17 @@ export default function CheckoutSuccessPage() {
     [orderInfo]
   );
 
+  // ✅ Dominant kind for header copy (first non-null kind)
+  // console.log(orderInfo?.items)
+  const dominantKind = useMemo<ProductKind | undefined>(() => {
+    const kinds = unique(
+      (orderInfo?.items ?? [])
+        .map((it) => it.myProduct?.kind as ProductKind | undefined)
+        .filter(Boolean) as ProductKind[]
+    );
+    return kinds[0];
+  }, [orderInfo]);
+
   if (loadingPage) {
     return (
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
@@ -290,17 +315,18 @@ export default function CheckoutSuccessPage() {
       </div>
     );
   }
-
+// console.log(dominantKind)
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-      {/* Header / intro */}
+      {/* Header / intro — now kind-aware */}
       <OrderSuccessHeader
         hasDigital={hasDigitalUI}
         hasPrint={hasPrint}
         sessionId={sessionId ?? undefined}
+        kind={dominantKind}
       />
 
-      {/* 🧾 Order items — shows BOTH Digital and Print line details */}
+      {/* Order items (digital & print line details) */}
       {orderInfo && (digitalLines.length > 0 || printItems.length > 0) && (
         <section className="rounded-2xl border bg-white/70 backdrop-blur p-4 sm:p-5 mb-6 sm:mb-8 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900 mb-3">
@@ -308,67 +334,73 @@ export default function CheckoutSuccessPage() {
           </h2>
 
           <ul className="space-y-3">
-            {digitalLines.map((it) => (
-              <li
-                key={`d-${it.id}`}
-                className="flex flex-wrap items-center gap-2 text-sm"
-              >
-                <Chip>Digital</Chip>
-                <span className="font-medium">{it.myProduct.title}</span>
-                {it.myProduct.digital?.format && <Dot />}
-                {it.myProduct.digital?.format && (
-                  <span>Format: {toTitle(it.myProduct.digital.format)}</span>
-                )}
-                {it.myProduct.digital?.license && <Dot />}
-                {it.myProduct.digital?.license && (
-                  <span>
-                    License: {titleCase(it.myProduct.digital.license)}
-                  </span>
-                )}
-                <Dot />
-                <span>Qty: {it.quantity}</span>
-                <Dot />
-                <span>{money(it.price)}</span>
-              </li>
-            ))}
+            {digitalLines.map((it) => {
+              const kind = it.myProduct.kind as ProductKind | undefined;
+              return (
+                <li
+                  key={`d-${it.id}`}
+                  className="flex flex-wrap items-center gap-2 text-sm"
+                >
+                  <Chip>{digitalChipLabel(kind)}</Chip>
+                  <span className="font-medium">{it.myProduct.title}</span>
+                  {it.myProduct.digital?.format && <Dot />}
+                  {it.myProduct.digital?.format && (
+                    <span>Format: {toTitle(it.myProduct.digital.format)}</span>
+                  )}
+                  {it.myProduct.digital?.license && <Dot />}
+                  {it.myProduct.digital?.license && (
+                    <span>
+                      License: {titleCase(it.myProduct.digital.license)}
+                    </span>
+                  )}
+                  <Dot />
+                  <span>Qty: {it.quantity}</span>
+                  <Dot />
+                  <span>{money(it.price)}</span>
+                </li>
+              );
+            })}
 
-            {printItems.map((it) => (
-              <li
-                key={`p-${it.id}`}
-                className="flex flex-wrap items-center gap-2 text-sm"
-              >
-                <Chip>Print</Chip>
-                <span className="font-medium">{it.myProduct.title}</span>
-                {it.myProduct.print?.size && <Dot />}
-                {it.myProduct.print?.size && (
-                  <span>Size: {it.myProduct.print.size}</span>
-                )}
-                {it.myProduct.print?.material && <Dot />}
-                {it.myProduct.print?.material && (
-                  <span>
-                    Material: {titleCase(it.myProduct.print.material)}
-                  </span>
-                )}
-                {it.myProduct.print?.frame && <Dot />}
-                {it.myProduct.print?.frame && (
-                  <span>Frame: {titleCase(it.myProduct.print.frame)}</span>
-                )}
-                {it.myProduct.print?.format && <Dot />}
-                {it.myProduct.print?.format && (
-                  <span>Format: {toTitle(it.myProduct.print.format)}</span>
-                )}
-                <Dot />
-                <span>Qty: {it.quantity}</span>
-                <Dot />
-                <span>{money(it.price)}</span>
-              </li>
-            ))}
+            {printItems.map((it) => {
+              const kind = it.myProduct.kind as ProductKind | undefined;
+              return (
+                <li
+                  key={`p-${it.id}`}
+                  className="flex flex-wrap items-center gap-2 text-sm"
+                >
+                  <Chip>{printChipLabel(kind)}</Chip>
+                  <span className="font-medium">{it.myProduct.title}</span>
+                  {it.myProduct.print?.size && <Dot />}
+                  {it.myProduct.print?.size && (
+                    <span>Size: {it.myProduct.print.size}</span>
+                  )}
+                  {it.myProduct.print?.material && <Dot />}
+                  {it.myProduct.print?.material && (
+                    <span>
+                      Material: {titleCase(it.myProduct.print.material)}
+                    </span>
+                  )}
+                  {it.myProduct.print?.frame && <Dot />}
+                  {it.myProduct.print?.frame && (
+                    <span>Frame: {titleCase(it.myProduct.print.frame)}</span>
+                  )}
+                  {it.myProduct.print?.format && <Dot />}
+                  {it.myProduct.print?.format && (
+                    <span>Format: {toTitle(it.myProduct.print.format)}</span>
+                  )}
+                  <Dot />
+                  <span>Qty: {it.quantity}</span>
+                  <Dot />
+                  <span>{money(it.price)}</span>
+                </li>
+              );
+            })}
           </ul>
 
           {printItems.length > 0 && (
             <p className="mt-3 text-xs text-gray-600">
-              Prints are produced and shipped separately. We’ll email you
-              tracking once they ship.
+              Prints, mugs or other physical pieces are produced and shipped
+              separately. We’ll email you tracking once they ship.
             </p>
           )}
         </section>
@@ -612,7 +644,6 @@ export default function CheckoutSuccessPage() {
                             safeFilename(art.title, art.format),
                             {
                               onProgress: (p: number) => {
-                                // normalize: some libs send 0..1; others 0..100
                                 const pct =
                                   p <= 1 ? Math.round(p * 100) : Math.round(p);
                                 setProgress((prev) => ({
@@ -620,7 +651,6 @@ export default function CheckoutSuccessPage() {
                                   [art.id]: pct,
                                 }));
                               },
-                              // forceProxy: true, // (optional) if you want to route via your server
                             }
                           );
                         } catch (e) {
@@ -628,16 +658,12 @@ export default function CheckoutSuccessPage() {
                           console.error(e);
                         } finally {
                           setDownloadingId(null);
-                          // remove this item's progress entry
                           setProgress((prev) => {
                             const { [art.id]: _, ...rest } = prev;
                             return rest;
                           });
                         }
                       }}
-                      // onClick={() =>
-                      //   downloadFile(art.downloadUrl, safeFilename(art.title, art.format), art.id)
-                      // }
                       className={`w-full sm:w-auto inline-flex justify-center items-center gap-2 px-4 py-2 rounded-full transition
                         ${
                           busy || isExpired || noRemaining
@@ -683,34 +709,6 @@ export default function CheckoutSuccessPage() {
 
           {/* ZIP download */}
           <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            {/* <button
-              type="button"
-              disabled={downloadingId === "zip" || artworks.length === 0}
-              onClick={() => {
-                setDownloadingId("zip");
-                const url = `/api/downloads/archive?session_id=${sessionId}`;
-                const a = document.createElement("a");
-                a.href = url;
-                a.rel = "noopener";
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                setTimeout(() => setDownloadingId(null), 2000);
-              }}
-              className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2 rounded-full transition ${
-                downloadingId === "zip"
-                  ? "bg-gray-300 cursor-not-allowed text-gray-700"
-                  : "bg-blue-700 hover:bg-blue-800 text-white"
-              }`}
-            >
-              {downloadingId === "zip" ? (
-                <>
-                  <Spinner /> Preparing ZIP…
-                </>
-              ) : (
-                "Download All (ZIP)"
-              )}
-            </button> */}
             <button
               type="button"
               disabled={downloadingId === "zip" || artworks.length === 0}
@@ -722,17 +720,17 @@ export default function CheckoutSuccessPage() {
                   const url = `/api/downloads/archive?session_id=${sessionId}`;
                   await downloadFile(url, safeFilename("artworks", "zip"), {
                     onProgress: (p: number) => {
-                      const pct = p <= 1 ? Math.round(p * 100) : Math.round(p);
+                      const pct =
+                        p <= 1 ? Math.round(p * 100) : Math.round(p);
                       setProgress((prev) => ({ ...prev, zip: pct }));
                     },
-                    // forceProxy: true, // optional if your helper supports/needs it
                   });
                 } catch (e) {
                   toast.error("Failed to prepare ZIP");
                   console.error(e);
                 } finally {
                   setDownloadingId(null);
-                  setProgress(({ zip, ...rest }) => rest); // remove zip entry
+                  setProgress(({ zip, ...rest }) => rest);
                 }
               }}
               className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2 rounded-full transition ${
@@ -790,7 +788,6 @@ export default function CheckoutSuccessPage() {
             </p>
           </div>
 
-          {/* Tiny disclosures */}
           <p className="mt-5 sm:mt-6 text-[10.5px] sm:text-[11px] leading-5 text-gray-500">
             Colors vary across displays and printers. Vector formats (SVG/PDF)
             scale without quality loss. Rasters are best printed at their max
@@ -881,11 +878,10 @@ function EmptyState() {
   return (
     <div className="rounded-2xl border p-6 sm:p-8 text-center bg-white/70">
       <h2 className="text-base sm:text-lg font-semibold">
-        No digital items this time
+        Thanks for your order
       </h2>
       <p className="text-gray-600 mt-2 text-sm">
-        If you purchased a print, you’ll get separate shipping emails with
-        tracking.
+        You’ll get separate shipping emails with tracking.
       </p>
     </div>
   );
@@ -904,7 +900,7 @@ function PrintItemsOnly({
       <ul className="space-y-3">
         {printItems.map((it) => (
           <li key={it.id} className="flex flex-wrap items-center gap-2 text-sm">
-            <Chip>Print</Chip>
+            <Chip>{printChipLabel(it.myProduct.kind as ProductKind | undefined)}</Chip>
             <span className="font-medium">{it.myProduct.title}</span>
             {it.myProduct.print?.size && <Dot />}
             {it.myProduct.print?.size && (

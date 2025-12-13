@@ -176,10 +176,10 @@ export async function GET(req: NextRequest) {
    POST /api/cart
    Creates a cart line; ignores any client-sent price; computes sale server-side
    ──────────────────────────────────────────────────────────────────── */
+// File: src/app/api/cart/route.ts  (POST only; rest unchanged)
 export async function POST(req: NextRequest) {
   const { userId, guestId } = await getCustomerIdFromRequest(req);
 
-  // Note: we'll ignore any client-provided price/originalPrice
   const {
     productId,
     digitalType,
@@ -195,208 +195,250 @@ export async function POST(req: NextRequest) {
   } = (await req.json()) as AddToCartBody;
 
   if (!productId || (!digitalType && !printType)) {
-    return NextResponse.json(
-      { error: "Missing required fields." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
   // Ensure cart exists
-  let cart = await prisma.cart.findFirst({
-    where: { OR: [{ userId }, { guestId }] },
-  });
+  let cart = await prisma.cart.findFirst({ where: { OR: [{ userId }, { guestId }] } });
   if (!cart) cart = await prisma.cart.create({ data: { userId, guestId } });
 
-  // (Optional) Design handling (ownership check, preview upload, snapshot)
-  let designId: string | null = null;
-  let previewUrlSnapshot: string | null = null;
-  let styleSnapshot: any = null;
-
-//  if (design) {
-//   const found = await prisma.userDesign.findFirst({
-//     where: {
-//       productId,
-//       ...(design.id ? { id: design.id } : {}),
-//       OR: [{ userId: userId ?? "" }, { guestId: guestId ?? "" }],
-//     },
-//     select: {
-//       id: true,
-//       previewUrl: true,
-//       previewPublicId: true,
-//       previewUpdatedAt: true,
-//     },
-//   });
-//   if (!found) {
-//     return NextResponse.json(
-//       { error: "Design not found or not owned by user." },
-//       { status: 403 }
-//     );
-//   }
-
-//   // Persist style/defs updates if provided
-//   if (design.style || typeof design.defs !== "undefined") {
-//     await prisma.userDesign.update({
-//       where: { id: found.id },
-//       data: {
-//         ...(design.style ? { style: design.style } : {}),
-//         ...(typeof design.defs !== "undefined" ? { defs: design.defs } : {}),
-//       },
-//     });
-//   }
-
-//     designId = found.id;
-
-//     if (design.previewDataUrl?.startsWith("data:")) {
-//       const base64 = design.previewDataUrl.split(",")[1];
-//       const input = Buffer.from(base64, "base64");
-//       const sharp = (await import("sharp")).default;
-//       const webp = await sharp(input)
-//         .resize({ width: 800, withoutEnlargement: true, fit: "inside" })
-//         .webp({ quality: 70 })
-//         .toBuffer();
-
-//       const publicId = `products/designs/previews/design_${found.id}`;
-//       const upload = await new Promise<any>((resolve, reject) => {
-//         cloudinary.uploader
-//           .upload_stream(
-//             {
-//               public_id: publicId,
-//               resource_type: "image",
-//               type: "upload",
-//               overwrite: true,
-//               format: "webp",
-//               invalidate: true,
-//             },
-//             (err, result) => (err ? reject(err) : resolve(result))
-//           )
-//           .end(webp);
-//       });
-
-//       previewUrlSnapshot = upload.secure_url as string;
-
-//       await prisma.userDesign.update({
-//         where: { id: found.id },
-//         data: {
-//           previewPublicId: upload.public_id,
-//           previewUrl: previewUrlSnapshot,
-//           previewUpdatedAt: new Date(),
-//         },
-//       });
-//     }
-// else {
-//     // NEW: if no fresh upload, use existing design preview as snapshot
-//     previewUrlSnapshot = found.previewUrl ?? null;
-//   }
-//     if (snapshot && design.style) {
-//       styleSnapshot = design.style;
-//     }
-//   }
-
-  // Create variants (if needed)
-
-
-const newest = await prisma.userDesign.findFirst({
-  where: { productId, ...(userId ? { userId } : { guestId }) },
-  orderBy: { updatedAt: "desc" },
-  select: {
-    id: true,
-    previewUrl: true,
-    previewUpdatedAt: true,
-    style: true,
-  },
-});
-
-if (newest) {
-  designId = newest.id;
-  previewUrlSnapshot = newest.previewUrl ?? null; // frozen at add time
-  styleSnapshot = newest.style ?? null;
-}
-  const digitalVariant = digitalType
-    ? await prisma.productVariant.create({
-        data: { productId, type: "DIGITAL", format, license: String(license) },
-      })
-    : null;
-
-  const printVariant = printType
-    ? await prisma.productVariant.create({
-        data: { productId, type: "PRINT", format, size, material, frame },
-      })
-    : null;
-
-  // Authoritative pricing
+  // Pull the product with data we need for normalization
   const product = await prisma.product.findUnique({
     where: { id: productId },
     select: {
+      kind: true,
       price: true,
       salePrice: true,
       salePercent: true,
       saleStartsAt: true,
       saleEndsAt: true,
-          sizes: true, // ← add this
-
+      sizes: true,
+      formats: true,
     },
   });
-  if (!product) {
-    return NextResponse.json({ error: "Product not found." }, { status: 404 });
+  if (!product) return NextResponse.json({ error: "Product not found." }, { status: 404 });
+
+  // ⬇️ KIND POLICY — what branches are allowed per kind?
+  const allow = (() => {
+    switch (product.kind) {
+      case "BOOK_DIGITAL": return { digital: true, print: false };
+      case "STICKER":
+      case "MUG":
+      case "CARD":         return { digital: false, print: true };
+      case "ART":
+      case "OTHER":
+      default:             return { digital: true, print: true };
+    }
+  })();
+
+  // Coerce illegal branches off (early version safety)
+  const wantDigital = allow.digital && !!digitalType;
+  const wantPrint   = allow.print   && !!printType;
+
+  if (!wantDigital && !wantPrint) {
+    return NextResponse.json(
+      { error: `This product kind (${product.kind}) cannot be added with that selection.` },
+      { status: 400 }
+    );
   }
 
-  const baseUnit= computeBaseUnit({
-    productBase: product.price,
-    format,
-    size,
-    material,
-    frame,
-    license,
-    digital: digitalVariant,
-    print: printVariant,
-      sizeList: product.sizes,     // ← NEW
+  // ⬇️ NORMALIZE defaults by branch
+  // formats: prefer product.formats' extensions if available
+  const extFromUrl = (u: string) => (u?.split(".").pop() ?? "").toLowerCase();
+  const productExts = (product.formats ?? [])
+    .map(extFromUrl)
+    .filter(Boolean);
+  const normalizedFormat =
+    (format || "").toLowerCase() || productExts[0] || (wantDigital ? "png" : "jpg");
 
+  // For print-only kinds, ensure size/material/frame are stable
+  const normalizedSize =
+    wantPrint ? (size ?? (product.sizes?.[0] ?? "Standard")) : null;
+
+  const normalizedMaterial =
+    wantPrint
+      ? (material ?? (product.kind === "MUG" ? "Ceramic" :
+         product.kind === "CARD" ? "310gsm" :
+         product.kind === "STICKER" ? "Matte Vinyl" : "Matte Paper"))
+      : null;
+
+  const normalizedFrame =
+    wantPrint && frame !== undefined ? frame : (wantPrint ? null : null);
+
+  const normalizedLicense = wantDigital ? (license || "personal") : null;
+
+  // ⬇️ OPTIONAL: attach most recent design snapshot (same as your existing logic)
+  let designId: string | null = null;
+  let previewUrlSnapshot: string | null = null;
+  let styleSnapshot: any = null;
+
+  const newest = await prisma.userDesign.findFirst({
+    where: { productId, ...(userId ? { userId } : { guestId }) },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, previewUrl: true, previewUpdatedAt: true, style: true },
   });
-// Apply moderated size multiplier (only if there's a print branch/size)
-// const sizeFactor =
-//   printVariant && size
-//     ? getSizeMultiplier(size, product.sizes ?? undefined)  // shared logic
-//     : 1;
-//     const baseUnit = roundMoney(baseUnitRaw * sizeFactor);
+  if (newest) {
+    designId = newest.id;
+    previewUrlSnapshot = newest.previewUrl ?? null;
+    styleSnapshot = newest.style ?? null;
+  }
 
+  // ⬇️ MERGE STRATEGY: if a line for this product already exists,
+  // update/attach variants instead of creating a new cart line.
+  let cartItem = await prisma.cartItem.findFirst({
+    where: { cartId: cart.id, productId },
+    include: { digitalVariant: true, printVariant: true, product: true },
+  });
+
+  // helpers to create/update variants consistently
+  const createDigital = () =>
+    prisma.productVariant.create({
+      data: { productId, type: "DIGITAL", format: normalizedFormat, license: String(normalizedLicense) },
+      select: { id: true, type: true },
+    });
+  const createPrint = () =>
+    prisma.productVariant.create({
+      data: {
+        productId,
+        type: "PRINT",
+        format: normalizedFormat,
+        size: normalizedSize,
+        material: normalizedMaterial,
+        frame: normalizedFrame,
+      },
+      select: { id: true, type: true },
+    });
+
+  // If no existing line, create one with whichever branches are allowed
+  if (!cartItem) {
+    const digitalVariant = wantDigital ? await createDigital() : null;
+    const printVariant   = wantPrint   ? await createPrint()   : null;
+
+    // price computation (same as your pipeline)
+    const baseUnit = computeBaseUnit({
+      productBase: product.price,
+      format: normalizedFormat,
+      size: normalizedSize,
+      material: normalizedMaterial,
+      frame: normalizedFrame,
+      license: normalizedLicense ?? undefined,
+      digital: digitalVariant,
+      print: printVariant,
+      sizeList: product.sizes,
+    });
+    const sale = getEffectiveSale({
+      price: baseUnit,
+      salePrice: product.salePrice,
+      salePercent: product.salePercent,
+      saleStartsAt: product.saleStartsAt,
+      saleEndsAt: product.saleEndsAt,
+    });
+    const priceWithBundle = applyBundleIfBoth(baseUnit, digitalVariant, printVariant);
+    const finalUnitPrice = roundMoney(Math.min(sale.price, priceWithBundle));
+
+    const created = await prisma.cartItem.create({
+      data: {
+        cartId: cart.id,
+        productId,
+        digitalVariantId: digitalVariant?.id ?? null,
+        printVariantId:   printVariant?.id ?? null,
+        price: finalUnitPrice,
+        originalPrice: baseUnit,
+        quantity,
+        designId,
+        previewUrlSnapshot,
+        styleSnapshot,
+      },
+    });
+
+    return NextResponse.json({
+      message: "Item added.",
+      result: {
+        cartItemId: created.id,
+        cartId: cart.id,
+        productId,
+        digitalVariantId: digitalVariant?.id ?? null,
+        printVariantId: printVariant?.id ?? null,
+        price: created.price,
+        originalPrice: created.originalPrice,
+        quantity: created.quantity,
+        designId,
+        previewUrlSnapshot,
+        styleSnapshot: !!styleSnapshot,
+      },
+    });
+  }
+
+  // Else: update existing line (attach/add the missing branch)
+  let nextDigitalId = cartItem.digitalVariant?.id ?? null;
+  let nextPrintId   = cartItem.printVariant?.id ?? null;
+
+  if (wantDigital && !nextDigitalId) {
+    const d = await createDigital();
+    nextDigitalId = d.id;
+  }
+  if (wantPrint && !nextPrintId) {
+    const p = await createPrint();
+    nextPrintId = p.id;
+  }
+
+  // Recompute price from current selection
+  const fresh = await prisma.cartItem.update({
+    where: { id: cartItem.id },
+    data: { digitalVariantId: nextDigitalId, printVariantId: nextPrintId, ...(designId ? { designId, previewUrlSnapshot, styleSnapshot } : {}) },
+    include: {
+      digitalVariant: true,
+      printVariant: true,
+      product: {
+        select: {
+          price: true,
+          salePrice: true,
+          salePercent: true,
+          saleStartsAt: true,
+          saleEndsAt: true,
+          sizes: true,
+        },
+      },
+    },
+  });
+
+  const baseUnit = computeBaseUnit({
+    productBase: fresh.product.price,
+    format: normalizedFormat,
+    size: normalizedSize ?? fresh.printVariant?.size ?? null,
+    material: normalizedMaterial ?? fresh.printVariant?.material ?? null,
+    frame: normalizedFrame ?? fresh.printVariant?.frame ?? null,
+    license: normalizedLicense ?? fresh.digitalVariant?.license ?? undefined,
+    digital: fresh.digitalVariant,
+    print: fresh.printVariant,
+    sizeList: fresh.product.sizes,
+  });
   const sale = getEffectiveSale({
     price: baseUnit,
-    salePrice: product.salePrice,
-    salePercent: product.salePercent,
-    saleStartsAt: product.saleStartsAt,
-    saleEndsAt: product.saleEndsAt,
+    salePrice: fresh.product.salePrice,
+    salePercent: fresh.product.salePercent,
+    saleStartsAt: fresh.product.saleStartsAt,
+    saleEndsAt: fresh.product.saleEndsAt,
   });
-// 🔥 Bundle 20% if both variants present (after sale)
-const priceWithBundle = applyBundleIfBoth(baseUnit, digitalVariant, printVariant);
-const priceWithSale   = sale.price;
-const finalUnitPrice  = roundMoney(Math.min(priceWithSale, priceWithBundle));
+  const priceWithBundle = applyBundleIfBoth(baseUnit, fresh.digitalVariant, fresh.printVariant);
+  const finalUnitPrice = roundMoney(Math.min(sale.price, priceWithBundle));
 
-  const created = await prisma.cartItem.create({
-    data: {
-      cartId: cart.id,
-      productId,
-      digitalVariantId: digitalVariant?.id ?? null,
-      printVariantId: printVariant?.id ?? null,
-      price: finalUnitPrice, // number
-      originalPrice: baseUnit, // number
-      quantity,
-      designId,
-      previewUrlSnapshot,
-      styleSnapshot,
-    },
+  await prisma.cartItem.update({
+    where: { id: fresh.id },
+    data: { price: finalUnitPrice, originalPrice: baseUnit, quantity },
   });
 
   return NextResponse.json({
-    message: "Item added.",
+    message: "Item added (merged).",
     result: {
-      cartItemId: created.id,
+      cartItemId: fresh.id,
       cartId: cart.id,
       productId,
-      digitalVariantId: digitalVariant?.id ?? null,
-      printVariantId: printVariant?.id ?? null,
-      price: created.price,
-      originalPrice: created.originalPrice,
-      quantity: created.quantity,
+      digitalVariantId: nextDigitalId,
+      printVariantId: nextPrintId,
+      price: finalUnitPrice,
+      originalPrice: baseUnit,
+      quantity,
       designId,
       previewUrlSnapshot,
       styleSnapshot: !!styleSnapshot,

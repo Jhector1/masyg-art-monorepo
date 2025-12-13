@@ -11,10 +11,18 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
-// ---- your existing v4 config verbatim ----
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
+
+  // ⬇️ keep JWT sessions, but make them live longer (e.g. 30 days)
+  session: {
+    strategy: "jwt",
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+  },
+  jwt: {
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+  },
+
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -36,6 +44,7 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
+
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
@@ -44,20 +53,24 @@ export const authOptions: NextAuthOptions = {
           select: { isAdmin: true, email: true },
         });
         const email = dbUser?.email?.toLowerCase();
-        token.isAdmin = dbUser?.isAdmin === true || (email && ADMIN_EMAILS.includes(email));
+        token.isAdmin =
+          dbUser?.isAdmin === true || (email && ADMIN_EMAILS.includes(email));
         token.sub = (user as any).id;
         return token;
       }
+
       if (typeof token.isAdmin === "undefined" && token.sub) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
           select: { isAdmin: true, email: true },
         });
         const email = dbUser?.email?.toLowerCase();
-        token.isAdmin = dbUser?.isAdmin === true || (email && ADMIN_EMAILS.includes(email));
+        token.isAdmin =
+          dbUser?.isAdmin === true || (email && ADMIN_EMAILS.includes(email));
       }
       return token;
     },
+
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.sub as string;
@@ -65,6 +78,7 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
+
     async redirect({ url, baseUrl }) {
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       try {
@@ -74,11 +88,10 @@ export const authOptions: NextAuthOptions = {
       return baseUrl;
     },
   },
+
   trustHost: true,
 };
-// ------------------------------------------
 
-// ✅ v4 shim so your routes can `await auth()`
 export async function auth() {
   return getServerSession(authOptions);
 }

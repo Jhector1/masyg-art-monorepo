@@ -21,6 +21,14 @@ const config: NextConfig = {
         protocol: "https",
         hostname: "res.cloudinary.com",
       },
+        {
+        protocol: "https",
+        hostname: "files.cdn.printful.com" ,
+      },
+        {
+        protocol: "https",
+        hostname: "files.printful.com" ,
+      },
     ],
   },
 };

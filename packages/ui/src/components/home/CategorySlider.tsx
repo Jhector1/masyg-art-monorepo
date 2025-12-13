@@ -40,7 +40,7 @@ export default function CategoryGrid({
     >
       <div className="flex transition-transform duration-700" style={{ transform: `translateX(-${index * 100}%)` }}>
         {categories.map((cat) => (
-          <Link  href={`/store`} key={cat.slug} className="min-w-full flex-shrink-0">
+          <Link  href={`/store?kind=${cat.kind}`} key={cat.kind} className="min-w-full flex-shrink-0">
             <div className={`h-72 flex flex-col justify-center items-center text-white bg-gradient-to-r ${cat.gradient} p-8 rounded-xl mx-2`}>
               <img src={cat.image} alt={cat.title} className="w-24 h-24 mb-4 bg-white rounded-full p-2" />
               <h2 className="text-2xl font-bold text-center">{cat.title}</h2>

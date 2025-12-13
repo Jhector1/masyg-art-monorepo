@@ -20,11 +20,53 @@ import type {
 } from "@acme/core/types";
 import type { SizeOption } from "../../product/shared/core/SizeSelectorCore";
 
+// --- helpers --------------------------------------------------------------
 const uniqFormats = (urls: string[] = []) => {
   const seen = new Set<string>();
   return urls
     .map((u) => (u?.split(".").pop() ?? "").toLowerCase())
     .filter((ext) => ext && !seen.has(ext) && seen.add(ext));
+};
+
+// 👇 KIND-AWARE: capability matrix
+function capabilitiesByKind(kind?: ProductDetailResult["kind"], originalVariant?: any) {
+  // If ORIGINAL exists for this product, disable both toggles (sell the original piece).
+  if (originalVariant) {
+    return {
+      supportsDigital: false,
+      supportsPrint: false,
+      isOriginalOnly: true,
+    };
+  }
+  switch (kind) {
+    case "BOOK_DIGITAL":
+      return { supportsDigital: true, supportsPrint: false, isOriginalOnly: false };
+    case "STICKER":
+    case "MUG":
+    case "CARD":
+      return { supportsDigital: false, supportsPrint: true, isOriginalOnly: false };
+    case "ART":
+    case "OTHER":
+    default:
+      return { supportsDigital: true, supportsPrint: true, isOriginalOnly: false };
+  }
+}
+
+// Given kindInfo, prefer its sizes if present; else product.sizes
+const sizesFromKindInfo = (p: ProductDetailResult): string[] => {
+  const s = p?.kindInfo?.sizes;
+  return Array.isArray(s) && s.length ? s : p.sizes ?? [];
+};
+
+// For MUG/STICKER/CARD we can lock material or show limited options.
+// If your API returns a canonical material (e.g., "Ceramic" for MUG),
+// you can preselect & limit choices. Keep it open by default otherwise.
+const preferredMaterialForKind = (p?: ProductDetailResult): string | null => {
+  if (!p?.kindInfo) return null;
+  if (p.kind === "MUG" && p.kindInfo.material) return p.kindInfo.material;
+  if (p.kind === "STICKER" && p.kindInfo.material) return p.kindInfo.material;
+  if (p.kind === "CARD" && p.kindInfo.stock) return p.kindInfo.stock; // stock ~ material
+  return null;
 };
 
 export function useProductPurchase({ productId }: { productId: string }) {
@@ -47,18 +89,25 @@ export function useProductPurchase({ productId }: { productId: string }) {
   });
 
   // single source of truth for selections
-  const [wantDigital, setWantDigital] = useState(false);
-  const [wantPrint, setWantPrint] = useState(false);
+  const [wantDigital, _setWantDigital] = useState(false);
+  const [wantPrint, _setWantPrint] = useState(false);
   const [license, setLicense] = useState<LicenseOption>(allLicenses[0]);
   const [size, setSize] = useState<SizeOption | null>(null);
   const [isCustom, setIsCustom] = useState(false);
-  const [customSize, setCustomSize] = useState<{ width: string; height: string }>({
-    width: "",
-    height: "",
-  });
+  const [customSize, setCustomSize] = useState<{ width: string; height: string }>({ width: "", height: "" });
   const [material, setMaterial] = useState<MaterialOption>(allMaterials[0]);
   const [frame, setFrame] = useState<FrameOption | null>(null);
   const [format, setFormat] = useState<string>("");
+
+  // derived caps (updated when product changes)
+  const caps = useMemo(
+    () => capabilitiesByKind(product?.kind, product?.originalVariant),
+    [product?.kind, product?.originalVariant]
+  );
+
+  // enforcers to avoid illegal toggles
+  const safeSetWantDigital = useCallback((next: boolean) => _setWantDigital(caps.supportsDigital ? next : false), [caps.supportsDigital]);
+  const safeSetWantPrint   = useCallback((next: boolean) => _setWantPrint(caps.supportsPrint ? next : false),   [caps.supportsPrint]);
 
   // ── load product + seed from cart once ─────────────────────────────
   useEffect(() => {
@@ -68,33 +117,64 @@ export function useProductPurchase({ productId }: { productId: string }) {
       .then((p) => {
         setProduct(p);
         setPreview({ src: p.imageUrl || "", alt: p.title });
-        setAllSizes(cleanSizes(p.sizes));
 
-        // formats
+        // sizes: prefer kindInfo.sizes; fall back to p.sizes
+        const rawSizes = sizesFromKindInfo(p);
+        setAllSizes(cleanSizes(rawSizes));
+
+        // formats (digital files)
         const fmts = uniqFormats(p.formats);
         setFormat(fmts[0] || "png");
 
+        // preselect material if the kind dictates one (e.g., Ceramic for MUG)
+        const pref = preferredMaterialForKind(p);
+        if (pref) {
+          const m = allMaterials.find((x) => x.label.toLowerCase() === String(pref).toLowerCase());
+          if (m) setMaterial(m);
+        }
+
         // in-cart flags
-        const printVariant = p.variants?.find(
-          (v) => v.type?.toUpperCase() === "PRINT" && v.inUserCart
-        );
-        const digitalVariant = p.variants?.find(
-          (v) => v.type?.toUpperCase() === "DIGITAL" && v.inUserCart
-        );
+        const printVariant = p.variants?.find((v) => v.type?.toUpperCase() === "PRINT" && v.inUserCart);
+        const digitalVariant = p.variants?.find((v) => v.type?.toUpperCase() === "DIGITAL" && v.inUserCart);
+
+        // seed kind-aware defaults; cart selection wins if present
+        let seedDigital = Boolean(digitalVariant);
+        let seedPrint = Boolean(printVariant);
+
+        if (!seedDigital && !seedPrint) {
+          // no cart state ⇒ choose sensible default by kind
+          if (p.originalVariant) {
+            seedDigital = false;
+            seedPrint = false;
+          } else if (p.kind === "BOOK_DIGITAL") {
+            seedDigital = true;
+            seedPrint = false;
+          } else if (p.kind === "STICKER" || p.kind === "MUG" || p.kind === "CARD") {
+            seedDigital = false;
+            seedPrint = true;
+          } else {
+            // ART/OTHER: allow both off initially
+            seedDigital = false;
+            seedPrint = false;
+          }
+        }
+
+        // enforce capabilities
+        seedDigital = caps.supportsDigital ? seedDigital : false;
+        seedPrint = caps.supportsPrint ? seedPrint : false;
 
         setOptions({
-          digital: !!digitalVariant,
-          print: !!printVariant,
+          digital: seedDigital,
+          print: seedPrint,
           digitalVariantId: digitalVariant?.id || "",
           printVariantId: printVariant?.id || "",
         });
 
-        setWantDigital(!!digitalVariant);
-        setWantPrint(!!printVariant);
+        safeSetWantDigital(seedDigital);
+        safeSetWantPrint(seedPrint);
 
-        // hydrate selections from cart snapshot (if present)
-        const byType = (t?: string | null) =>
-          allLicenses.find((l) => l.type.toLowerCase() === (t || "").toLowerCase());
+        // hydrate selections from cart (if present)
+        const byType = (t?: string | null) => allLicenses.find((l) => l.type.toLowerCase() === (t || "").toLowerCase());
         const byLabel = <T extends { label: string }>(arr: T[], lbl?: string | null) =>
           arr.find((a) => a.label.toLowerCase() === (lbl || "").toLowerCase());
 
@@ -102,17 +182,19 @@ export function useProductPurchase({ productId }: { productId: string }) {
           const lic = byType(digitalVariant.license);
           if (lic) setLicense(lic);
         }
+
+        const sizePool = cleanSizes(rawSizes);
         if (printVariant?.size) {
-          const sz = byLabel(cleanSizes(p.sizes), printVariant.size);
+          const sz = byLabel(sizePool, printVariant.size);
           if (sz) {
             setSize(sz);
             setIsCustom(sz.label.toLowerCase() === "custom");
           }
         } else {
-          // default size if available
-          const first = cleanSizes(p.sizes)[0];
+          const first = sizePool[0];
           if (first) setSize(first);
         }
+
         if (printVariant?.material) {
           const m = byLabel(allMaterials, printVariant.material);
           if (m) setMaterial(m);
@@ -123,6 +205,7 @@ export function useProductPurchase({ productId }: { productId: string }) {
         }
       })
       .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, user, guestId]);
 
   // ── derived basics ─────────────────────────────────────────────────
@@ -130,25 +213,28 @@ export function useProductPurchase({ productId }: { productId: string }) {
     ? cart.find((item) => item.id === product.id)
     : undefined;
 
-
   const formats = useMemo(() => uniqFormats(product?.formats), [product?.formats]);
-const saleStartsAt = toDate(product?.saleStartsAt as any);
-const saleEndsAt   = toDate(product?.saleEndsAt as any);
+  const saleStartsAt = toDate(product?.saleStartsAt as any);
+  const saleEndsAt   = toDate(product?.saleEndsAt as any);
 
-  // Size string we send to API / use in pricing (supports custom)
+  // Size string we send to API / use in pricing (supports custom; only if PRINT allowed)
   const sizeString = useMemo(() => {
-    if (!wantPrint) return null;
+    if (!wantPrint || !caps.supportsPrint) return null;
     if (!isCustom) return size?.label ?? null;
     const w = parseFloat(customSize.width || "");
     const h = parseFloat(customSize.height || "");
     return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0
       ? `${w}x${h} in`
       : size?.label ?? null;
-  }, [wantPrint, isCustom, customSize, size?.label]);
+  }, [wantPrint, caps.supportsPrint, isCustom, customSize, size?.label]);
 
   // ── PRICE: API-identical on client (for UI only) ───────────────────
   const priceInfo = useMemo(() => {
     if (!product) return { baseUnit: 0, priceWithSale: 0, priceWithBundle: 0, finalUnitPrice: 0 };
+
+    // Only pass fields that are allowed by kind
+    const allowDigital = caps.supportsDigital && wantDigital;
+    const allowPrint   = caps.supportsPrint && wantPrint;
 
     return computeFinalUnitPrice({
       productBase: product.price,
@@ -158,13 +244,13 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
       saleEndsAt,
 
       format,
-      size: sizeString,
-      material: wantPrint ? material.label : null,
-      frame: wantPrint ? frame?.label ?? null : null,
-      license: wantDigital ? license.type : null,
+      size: allowPrint ? sizeString : null,
+      material: allowPrint ? material.label : null,
+      frame: allowPrint ? frame?.label ?? null : null,
+      license: allowDigital ? license.type : null,
 
-      digital: wantDigital ? { type: "DIGITAL", format, license: license.type } : null,
-      print: wantPrint
+      digital: allowDigital ? { type: "DIGITAL", format, license: license.type } : null,
+      print: allowPrint
         ? { type: "PRINT", format, size: sizeString, material: material.label, frame: frame?.label ?? null }
         : null,
 
@@ -179,6 +265,8 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
     material.label,
     frame,
     license.type,
+    caps.supportsDigital,
+    caps.supportsPrint,
   ]);
 
   const finalPrice = priceInfo.finalUnitPrice; // per-unit; multiply by qty at render-time if needed
@@ -190,11 +278,11 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
     }
   };
 
-  // ── toggles: no client price sent; server recomputes ───────────────
+  // ── toggles: KIND-AWARE (no client price sent; server recomputes) ──
   const handleToggleDigital = useCallback(async () => {
-    if (!product) return;
+    if (!product || !caps.supportsDigital) return; // 👈 KIND-AWARE
     const turningOn = !wantDigital;
-    setWantDigital(turningOn);
+    safeSetWantDigital(turningOn);
     setOptions((o) => ({ ...o, digital: turningOn }));
 
     if (!inCart || !updateCart) return;
@@ -203,10 +291,7 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
       const res = await updateCart({
         productId: product.id,
         digitalVariantId: "ADD",
-        updates: {
-          format,
-          license: license.type,
-        } as CartUpdates,
+        updates: { format, license: license.type } as CartUpdates,
       });
       syncVariantId(res, "digitalVariantId");
     } else {
@@ -217,12 +302,12 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
       });
       syncVariantId(res, "digitalVariantId");
     }
-  }, [product, wantDigital, inCart, updateCart, format, license.type]);
+  }, [product, caps.supportsDigital, wantDigital, inCart, updateCart, format, license.type, safeSetWantDigital]);
 
   const handleTogglePrint = useCallback(async () => {
-    if (!product) return;
+    if (!product || !caps.supportsPrint) return; // 👈 KIND-AWARE
     const turningOn = !wantPrint;
-    setWantPrint(turningOn);
+    safeSetWantPrint(turningOn);
     setOptions((o) => ({ ...o, print: turningOn }));
 
     if (!inCart || !updateCart) return;
@@ -231,12 +316,7 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
       const res = await updateCart({
         productId: product.id,
         printVariantId: "ADD",
-        updates: {
-          format,
-          size: sizeString,
-          material: material.label,
-          frame: frame?.label ?? null,
-        } as CartUpdates,
+        updates: { format, size: sizeString, material: material.label, frame: frame?.label ?? null } as CartUpdates,
       });
       syncVariantId(res, "printVariantId");
     } else {
@@ -247,35 +327,34 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
       });
       syncVariantId(res, "printVariantId");
     }
-  }, [product, wantPrint, inCart, updateCart, format, sizeString, material.label, frame]);
+  }, [product, caps.supportsPrint, wantPrint, inCart, updateCart, format, sizeString, material.label, frame, safeSetWantPrint]);
 
   // ── selection setters that also sync cart (no price in updates) ────
   const selectLicense = useCallback(async (lic: LicenseOption) => {
     setLicense(lic);
-    if (!product || !inCart || !updateCart || !options.digital) return;
+    if (!product || !inCart || !updateCart || !options.digital || !caps.supportsDigital) return;
     const res = await updateCart({
       productId: product.id,
       digitalVariantId: options.digitalVariantId || "ADD",
       updates: { license: lic.type, format } as CartUpdates,
     });
     if (!options.digitalVariantId) syncVariantId(res, "digitalVariantId");
-  }, [product, inCart, updateCart, options.digital, options.digitalVariantId, format]);
+  }, [product, inCart, updateCart, options.digital, options.digitalVariantId, format, caps.supportsDigital]);
 
   const selectSize = useCallback(async (next: SizeOption) => {
     setSize(next);
     setIsCustom(next.label.toLowerCase() === "custom");
-
-    if (!product || !inCart || !updateCart || !options.print || !options.printVariantId) return;
+    if (!product || !inCart || !updateCart || !options.print || !options.printVariantId || !caps.supportsPrint) return;
     await updateCart({
       productId: product.id,
       printVariantId: options.printVariantId,
       updates: { size: next.label } as CartUpdates,
     });
-  }, [product, inCart, updateCart, options.print, options.printVariantId]);
+  }, [product, inCart, updateCart, options.print, options.printVariantId, caps.supportsPrint]);
 
   const changeCustomSize = useCallback(async (c: { width: string; height: string }) => {
     setCustomSize(c);
-    if (!product || !inCart || !updateCart || !options.print || !options.printVariantId) return;
+    if (!product || !inCart || !updateCart || !options.print || !options.printVariantId || !caps.supportsPrint) return;
     const w = parseFloat(c.width || "");
     const h = parseFloat(c.height || "");
     const label = Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 ? `${w}x${h} in` : null;
@@ -284,48 +363,46 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
       printVariantId: options.printVariantId,
       updates: { size: label } as CartUpdates,
     });
-  }, [product, inCart, updateCart, options.print, options.printVariantId]);
+  }, [product, inCart, updateCart, options.print, options.printVariantId, caps.supportsPrint]);
 
   const selectMaterial = useCallback(async (m: MaterialOption) => {
     setMaterial(m);
-    if (!product || !inCart || !updateCart || !options.print || !options.printVariantId) return;
+    if (!product || !inCart || !updateCart || !options.print || !options.printVariantId || !caps.supportsPrint) return;
     await updateCart({
       productId: product.id,
       printVariantId: options.printVariantId,
       updates: { material: m.label } as CartUpdates,
     });
-  }, [product, inCart, updateCart, options.print, options.printVariantId]);
+  }, [product, inCart, updateCart, options.print, options.printVariantId, caps.supportsPrint]);
 
   const selectFrame = useCallback(async (f: FrameOption | null) => {
     setFrame(f);
-    if (!product || !inCart || !updateCart || !options.print || !options.printVariantId) return;
+    if (!product || !inCart || !updateCart || !options.print || !options.printVariantId || !caps.supportsPrint) return;
     await updateCart({
       productId: product.id,
       printVariantId: options.printVariantId,
       updates: { frame: f?.label ?? null } as CartUpdates,
     });
-  }, [product, inCart, updateCart, options.print, options.printVariantId]);
+  }, [product, inCart, updateCart, options.print, options.printVariantId, caps.supportsPrint]);
 
   const selectFormat = useCallback(async (next: string) => {
     setFormat(next);
     if (!product || !inCart || !updateCart) return;
-
-    // Push to whichever variant(s) you consider format-bearing
-    if (options.print && options.printVariantId) {
+    if (options.print && options.printVariantId && caps.supportsPrint) {
       await updateCart({
         productId: product.id,
         printVariantId: options.printVariantId,
         updates: { format: next } as CartUpdates,
       });
     }
-    if (options.digital && options.digitalVariantId) {
+    if (options.digital && options.digitalVariantId && caps.supportsDigital) {
       await updateCart({
         productId: product.id,
         digitalVariantId: options.digitalVariantId,
         updates: { format: next } as CartUpdates,
       });
     }
-  }, [product, inCart, updateCart, options.print, options.printVariantId, options.digital, options.digitalVariantId]);
+  }, [product, inCart, updateCart, options.print, options.printVariantId, options.digital, options.digitalVariantId, caps.supportsDigital, caps.supportsPrint]);
 
   // ── checkout (kept direct) ─────────────────────────────────────────
   const handleCheckoutAction = (maybeSetOpen?: unknown) =>
@@ -336,15 +413,24 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
       inCart,
       addToCart,
       product,
-      options: { ...options, digital: wantDigital, print: wantPrint },
+      options: { ...options, digital: caps.supportsDigital && wantDigital, print: caps.supportsPrint && wantPrint }, // 👈 enforce caps
       format,
-      size: size || null,
-      material,
-      frame,
-      license,
+      size: caps.supportsPrint ? size || null : null,
+      material: caps.supportsPrint ? material : allMaterials[0],
+      frame: caps.supportsPrint ? frame : null,
+      license: caps.supportsDigital ? license : allLicenses[0],
       setModalOpen: typeof maybeSetOpen === "function" ? (maybeSetOpen as (b: boolean) => void) : undefined,
       finalPrice: String(finalPrice), // UI only; server is authoritative
     });
+
+  // Expose a couple of UI hints (what to hide/disable)
+  const ui = {
+    canPickDigital: caps.supportsDigital && !caps.isOriginalOnly,
+    canPickPrint: caps.supportsPrint && !caps.isOriginalOnly,
+    isOriginalOnly: caps.isOriginalOnly,
+    // For MUG/STICKER/CARD you *can* opt to lock material picker:
+    lockMaterialToKind: Boolean(preferredMaterialForKind(product || undefined)),
+  };
 
   return {
     // data + cart
@@ -361,9 +447,9 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
     formats,
     allSizes,
 
-    // selection state
-    wantDigital, setWantDigital: handleToggleDigital,   // toggle-aware
-    wantPrint,  setWantPrint:  handleTogglePrint,       // toggle-aware
+    // selection state (kind-aware toggles)
+    wantDigital, setWantDigital: handleToggleDigital,
+    wantPrint,  setWantPrint:  handleTogglePrint,
     license, setLicense: selectLicense,
     size, setSize: selectSize,
     isCustom, setIsCustom,
@@ -383,5 +469,8 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
 
     // checkout
     handleCheckoutAction,
+
+    // 👇 KIND-AWARE UI flags for your Configurator/Actions
+    ui,
   };
 }

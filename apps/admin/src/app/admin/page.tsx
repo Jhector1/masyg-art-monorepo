@@ -1,13 +1,21 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/require-admin";
+import SyncPrintfulButton from "@/components/SyncPrintfulButton";
 // import { requireAdmin } from "@acme/core/lib/auth";
 // import { getAdminDashboard } from "../services/admin/dashboard";
 // import { getAdminDashboard } from "@acme/server/services/admin/dashboard";
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 export const revalidate = 0; // never cache statically
 
-
-function StatCard({ title, value, href }: { title: string; value: number | string; href?: string }) {
+function StatCard({
+  title,
+  value,
+  href,
+}: {
+  title: string;
+  value: number | string;
+  href?: string;
+}) {
   const body = (
     <div className="rounded-2xl border p-5 hover:shadow-sm transition">
       <div className="text-sm text-muted-foreground">{title}</div>
@@ -16,7 +24,6 @@ function StatCard({ title, value, href }: { title: string; value: number | strin
   );
   return href ? <Link href={href}>{body}</Link> : body;
 }
-
 
 export default async function AdminHomePage() {
   // await requireAdmin(); // protect the dashboard
@@ -30,16 +37,42 @@ export default async function AdminHomePage() {
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <div className="flex gap-2">
-          <Link className="rounded-xl border px-3 py-2" href="/admin/private/uploader">New product</Link>
-          <Link className="rounded-xl border px-3 py-2" href="/admin/private/orders">View orders</Link>
+          <Link
+            className="rounded-xl border px-3 py-2"
+            href="/admin/private/uploader"
+          >
+            New product
+          </Link>
+          <Link
+            className="rounded-xl border px-3 py-2"
+            href="/admin/private/orders"
+          >
+            View orders
+          </Link>
         </div>
       </header>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Products"  value={stats.productCount}  href="/admin/private/products" />
-        <StatCard title="Categories" value={stats.categoryCount} href="/admin/private/categories" />
-        <StatCard title="Users"      value={stats.userCount}     href="/admin/private/users" />
-        <StatCard title="Orders"     value={stats.orderCount}     href="/admin/private/orders" />
+        <StatCard
+          title="Products"
+          value={stats.productCount}
+          href="/admin/private/products"
+        />
+        <StatCard
+          title="Categories"
+          value={stats.categoryCount}
+          href="/admin/private/categories"
+        />
+        <StatCard
+          title="Users"
+          value={stats.userCount}
+          href="/admin/private/users"
+        />
+        <StatCard
+          title="Orders"
+          value={stats.orderCount}
+          href="/admin/private/orders"
+        />
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -48,16 +81,45 @@ export default async function AdminHomePage() {
           <div className="text-3xl font-bold">
             ${Number(stats.totalSales).toFixed(2)}
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">All-time gross sales</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            All-time gross sales
+          </p>
         </div>
 
         <div className="rounded-2xl border p-5">
           <div className="mb-3 text-sm text-muted-foreground">Quick Links</div>
           <ul className="space-y-2 text-sm">
-            <li><Link className="underline" href="/admin/private/products">Manage products</Link></li>
-            <li><Link className="underline" href="/admin/private/uploader">Create product</Link></li>
-            <li><Link className="underline" href="/admin/private/categories">Manage categories</Link></li>
-            <li><Link className="underline" href="/admin/private/users">Users</Link></li>
+            <li>
+              <Link className="underline" href="/admin/private/products">
+                Manage products
+              </Link>
+            </li>
+            <li>
+              <Link className="underline" href="/admin/private/uploader">
+                Create product
+              </Link>
+            </li>
+            <li>
+              <Link className="underline" href="/admin/private/categories">
+                Manage categories
+              </Link>
+            </li>
+            <li>
+              <Link className="underline" href="/admin/private/users">
+                Users
+              </Link>
+            </li>
+            <li>
+              <section className="border rounded-xl p-4 bg-white shadow-sm">
+                <h2 className="text-lg font-semibold mb-2">
+                  Printful Integration
+                </h2>
+                <p className="text-sm text-gray-600 mb-3">
+                  Sync products from your Printful store into ZileDigital.
+                </p>
+                <SyncPrintfulButton />
+              </section>
+            </li>
           </ul>
         </div>
       </section>

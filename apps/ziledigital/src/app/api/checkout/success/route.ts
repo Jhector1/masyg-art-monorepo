@@ -36,10 +36,18 @@ export async function GET(req: NextRequest) {
       items: {
         // ✅ include BOTH types (no where filter here)
         include: {
-          product: { select: { id: true, title: true, thumbnails: true } },
+          product: {
+            select: { id: true, title: true, thumbnails: true, kind: true },
+          },
           digitalVariant: { select: { id: true, license: true, format: true } },
           printVariant: {
-            select: { id: true, format: true, size: true, material: true, frame: true },
+            select: {
+              id: true,
+              format: true,
+              size: true,
+              material: true,
+              frame: true,
+            },
           },
         },
       },
@@ -66,6 +74,8 @@ export async function GET(req: NextRequest) {
       id: it.productId,
       title: it.product?.title ?? "Artwork",
       imageUrl: it.product?.thumbnails?.[0] ?? null,
+      kind: it.product?.kind,
+
       digital:
         it.type === "DIGITAL" && it.digitalVariant
           ? {
@@ -99,7 +109,11 @@ export async function GET(req: NextRequest) {
     if (it.productId && it.product?.title) {
       titleByProduct.set(it.productId, it.product.title);
     }
-    if (it.type === VariantType.DIGITAL && it.productId && it.digitalVariant?.license) {
+    if (
+      it.type === VariantType.DIGITAL &&
+      it.productId &&
+      it.digitalVariant?.license
+    ) {
       licenseByProduct.set(it.productId, it.digitalVariant.license);
     }
   }
@@ -107,7 +121,8 @@ export async function GET(req: NextRequest) {
   const digitalDownloads = (order.downloadTokens ?? []).map((t) => {
     const a = t.asset!;
     const title = titleByProduct.get(a.productId) ?? "Artwork";
-    const license = licenseByProduct.get(a.productId) ?? t.licenseSnapshot ?? "Personal";
+    const license =
+      licenseByProduct.get(a.productId) ?? t.licenseSnapshot ?? "Personal";
     return {
       id: a.id,
       title,

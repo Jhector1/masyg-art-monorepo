@@ -19,14 +19,13 @@ export default function ProductImageGallery({
 }: Props) {
   return (
     <>
-      <div className="hidden sm:flex gap-5 lg:sticky top-5 lg:h-screen lg:justify-between">
+ <div className="hidden sm:flex gap-5 lg:sticky top-5 lg:h-screen lg:justify-between z-40">
         <ProductImagePreviews
           scenarios={product.thumbnails}
           onSelectAction={setPreview}
           selected={{ src: preview?.src || "" }}
         />
-        <div className="w-[50vw] lg:h-screen">
-        
+<div className="relative z-50 w-[50vw] lg:h-screen">        
           <ProductImage src={preview?.src || ""} alt={preview?.alt || ""} />
         </div>
       </div>
