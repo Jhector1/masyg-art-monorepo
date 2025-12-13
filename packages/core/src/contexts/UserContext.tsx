@@ -96,14 +96,22 @@ function UserContextInner({ children }: { children: React.ReactNode }) {
   const isLoggedIn = optimisticLogin ?? status === "authenticated";
 
   // merge preference: optimistic > dbUser > session.user
-  const mergedUser = useMemo<User | null>(() => {
-    return (
-      optimisticUser ??
-      dbUser ??
-      ((session?.user as unknown as User) ?? null)
-    );
-  }, [optimisticUser, dbUser, session?.user]);
 
+const mergedUser = useMemo<User | null>(() => {
+  const s = (session?.user as unknown as Partial<User>) ?? {};
+  const d = (dbUser ?? {}) as Partial<User>;
+  const o = (optimisticUser ?? {}) as Partial<User>;
+
+  // priority: optimistic > db > session
+  const merged = { ...s, ...d, ...o } as User;
+
+  // if we still don't have an id/email, treat as logged out
+  if (!merged?.email && !merged?.id) return null;
+
+  return merged;
+}, [session?.user, dbUser, optimisticUser]);
+
+// const user = mergedUser;
   const user = mergedUser;
 
   // guest id only for logged-out users
@@ -160,6 +168,10 @@ function UserContextInner({ children }: { children: React.ReactNode }) {
   // ✅ update DB snapshot locally (instant UI)
   const updateUserLocal = useCallback(
     (partial: Partial<User>) => {
+         // ✅ guarantee a cache-bust bump for avatar updates
+    if (partial.avatarUrl && !partial.updatedAt) {
+      partial.updatedAt = new Date().toISOString();
+    }
       setDbUser((prev) => {
         const base = prev ?? ((session?.user as unknown as User) ?? null);
         if (!base) {

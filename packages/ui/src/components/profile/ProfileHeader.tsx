@@ -88,8 +88,9 @@ const raw =
   null;
 
 // Compute a stable cache-bust from updatedAt or local bust
-const bust =
-  localBust || (u?.updatedAt ? Date.parse(String(u.updatedAt)) : 0);
+const parsed = user?.updatedAt ? Date.parse(String(user.updatedAt)) : NaN;
+const bust = Number.isFinite(parsed) ? parsed : 0; // 0 = no bust
+
 
 // Transform per host
 function transformAvatar(url: string): string {
