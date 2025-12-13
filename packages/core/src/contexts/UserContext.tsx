@@ -6,6 +6,8 @@ import React, {
   useState,
   useEffect,
   startTransition,
+  useCallback,
+  useMemo,
 } from "react";
 import {
   SessionProvider,
@@ -23,7 +25,8 @@ export type User = {
   name?: string | null;
   createdAt?: string;
   updatedAt?: string;
-  image?: string;
+  image?: string | null;        // NextAuth session image
+  avatarUrl?: string | null;    // DB avatar (Cloudinary)
 };
 
 type LoginCredsArgs = { email: string; password: string; callbackUrl?: string };
@@ -38,9 +41,15 @@ export type UserContextType = {
   isAuthBusy: boolean;
   authAction: AuthAction;
   sessionPulse: number;
+
+  // ✅ NEW
+  updateUser: (partial: Partial<User>) => void;
+  refreshUser: () => Promise<void>;
+
   login: () => void;
-  loginWithCredentials: (args: LoginCredsArgs) =>
-    Promise<{ ok: true } | { ok: false; error: string }>;
+  loginWithCredentials: (args: LoginCredsArgs) => Promise<
+    { ok: true } | { ok: false; error: string }
+  >;
   loginWithProvider: (args: LoginProviderArgs) => void;
   logout: () => Promise<void>;
 };
@@ -53,6 +62,10 @@ const UserContext = createContext<UserContextType>({
   isAuthBusy: false,
   authAction: "idle",
   sessionPulse: 0,
+
+  updateUser: () => {},
+  refreshUser: async () => {},
+
   login: () => {},
   loginWithCredentials: async () => ({ ok: false, error: "not implemented" }),
   loginWithProvider: () => {},
@@ -76,11 +89,29 @@ function UserContextInner({ children }: { children: React.ReactNode }) {
   const [optimisticLogin, setOptimisticLogin] = useState<boolean | null>(null);
   const [optimisticUser, setOptimisticUser] = useState<User | null>(null);
 
-  const loading = status === "loading";
-  const isLoggedIn = (optimisticLogin ?? !!session?.user);
-  const user = (optimisticUser ?? (session?.user as User)) ?? null;
+  // ✅ DB-backed snapshot (contains avatarUrl/updatedAt reliably)
+  const [dbUser, setDbUser] = useState<User | null>(null);
 
-  const guestId = !isLoggedIn ? getOrCreateGuestId() : null;
+  const loading = status === "loading";
+  const isLoggedIn = optimisticLogin ?? status === "authenticated";
+
+  // merge preference: optimistic > dbUser > session.user
+  const mergedUser = useMemo<User | null>(() => {
+    return (
+      optimisticUser ??
+      dbUser ??
+      ((session?.user as unknown as User) ?? null)
+    );
+  }, [optimisticUser, dbUser, session?.user]);
+
+  const user = mergedUser;
+
+  // guest id only for logged-out users
+  const [guestId, setGuestId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isLoggedIn) setGuestId(getOrCreateGuestId());
+    else setGuestId(null);
+  }, [isLoggedIn]);
 
   const [isAuthBusy, setAuthBusy] = useState(false);
   const [authAction, setAuthAction] = useState<AuthAction>("idle");
@@ -110,6 +141,47 @@ function UserContextInner({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ✅ refresh DB user from your API
+  const refreshUser = useCallback(async () => {
+    if (status !== "authenticated") return;
+
+    const res = await fetch("/api/auth/profile", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+    });
+
+    const data = await res.json().catch(() => ({} as any));
+    if (res.ok && data?.user) {
+      setDbUser(data.user as User);
+    }
+  }, [status]);
+
+  // ✅ update DB snapshot locally (instant UI)
+  const updateUserLocal = useCallback(
+    (partial: Partial<User>) => {
+      setDbUser((prev) => {
+        const base = prev ?? ((session?.user as unknown as User) ?? null);
+        if (!base) {
+          // if we don't have a base, only set if partial has enough identity
+          if (partial?.id && partial?.email) return partial as User;
+          return prev;
+        }
+        return { ...base, ...partial };
+      });
+    },
+    [session?.user]
+  );
+
+  // keep dbUser in sync after auth changes / pulses
+  useEffect(() => {
+    if (status === "authenticated") {
+      refreshUser();
+    } else {
+      setDbUser(null);
+    }
+  }, [status, sessionPulse, refreshUser]);
+
   const login = () => {
     const cb =
       typeof window !== "undefined"
@@ -117,56 +189,60 @@ function UserContextInner({ children }: { children: React.ReactNode }) {
         : "/";
     signIn(undefined, { callbackUrl: cb });
   };
-// in UserContextInner > loginWithCredentials
-const loginWithCredentials: UserContextType["loginWithCredentials"] = async ({
-  email,
-  password,
-  callbackUrl = "/profile",
-}) =>
-  runAuth("login", async () => {
-    const result = await signIn("credentials", {
-      redirect: false,
-      email,
-      password,
-      callbackUrl,
+
+  const loginWithCredentials: UserContextType["loginWithCredentials"] = async ({
+    email,
+    password,
+    callbackUrl = "/profile",
+  }) =>
+    runAuth("login", async () => {
+      const result = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+        callbackUrl,
+      });
+
+      if (!result) return { ok: false, error: "Login failed" };
+      if (result.error) return { ok: false, error: result.error };
+
+      setOptimisticLogin(true);
+      setOptimisticUser({ id: "optimistic", email, name: email.split("@")[0] });
+      setSessionPulse((n) => n + 1);
+
+      // force session cookie + client session update
+      await fetch("/api/auth/session", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      await update();
+      await getSession();
+      setSessionPulse((n) => n + 1);
+
+      // pull db user snapshot immediately (avatarUrl etc.)
+      await refreshUser();
+
+      // normalize to internal path
+      const toInternal = (u: string) => {
+        try {
+          if (u.startsWith("/")) return u;
+          const parsed = new URL(u);
+          if (parsed.origin === window.location.origin) {
+            return parsed.pathname + parsed.search + parsed.hash;
+          }
+        } catch {}
+        return callbackUrl.startsWith("/") ? callbackUrl : "/";
+      };
+
+      const dest = toInternal(result.url ?? callbackUrl);
+
+      startTransition(() => {
+        router.replace(dest);
+        router.refresh();
+      });
+
+      return { ok: true };
     });
-
-    if (!result) return { ok: false, error: "Login failed" };
-    if (result.error) return { ok: false, error: result.error };
-
-    setOptimisticLogin(true);
-    setOptimisticUser({ id: "optimistic", email, name: email.split("@")[0] });
-    setSessionPulse((n) => n + 1);
-
-    await fetch("/api/auth/session", { cache: "no-store", credentials: "include" });
-    await update();
-    await getSession();
-    setSessionPulse((n) => n + 1);
-
-    // 🔒 Normalize to internal path
-    const toInternal = (u: string) => {
-      try {
-        if (u.startsWith("/")) return u;                       // already relative
-        const parsed = new URL(u);
-        if (parsed.origin === window.location.origin) {
-          return parsed.pathname + parsed.search + parsed.hash; // same-origin absolute -> make relative
-        }
-      } catch {}
-      // fallback to provided callbackUrl or home
-      return callbackUrl.startsWith("/") ? callbackUrl : "/";
-    };
-
-    const dest = toInternal(result.url ?? callbackUrl);
-
-    // Use client router once it's definitely internal
-    startTransition(() => {
-      router.replace(dest);
-      router.refresh();
-    });
-
-    return { ok: true };
-  });
-
 
   // Also pulse whenever derived state flips
   useEffect(() => {
@@ -189,13 +265,17 @@ const loginWithCredentials: UserContextType["loginWithCredentials"] = async ({
     runAuth("logout", async () => {
       setOptimisticLogin(false);
       setOptimisticUser(null);
+      setDbUser(null); // ✅ clear db snapshot
       setSessionPulse((n) => n + 1);
+
       document.cookie = "guest_id=; max-age=0; path=/; SameSite=Lax";
       document.cookie = "next-auth.callback-url=; max-age=0; path=/";
       document.cookie = "__Secure-next-auth.callback-url=; max-age=0; path=/";
+
       try {
         await fetch("/api/auth/clear", { method: "POST" });
       } catch {}
+
       await signOut({ redirect: true, callbackUrl: "/" });
     });
 
@@ -209,6 +289,11 @@ const loginWithCredentials: UserContextType["loginWithCredentials"] = async ({
         isAuthBusy,
         authAction,
         sessionPulse,
+
+        // ✅ NEW
+        updateUser: updateUserLocal,
+        refreshUser,
+
         login,
         loginWithCredentials,
         loginWithProvider,

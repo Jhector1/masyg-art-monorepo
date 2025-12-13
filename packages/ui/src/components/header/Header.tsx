@@ -133,6 +133,17 @@ export default function Header() {
   const openAuth = useCallback(() => setModalOpen(true), []);
   const closeAuth = useCallback(() => setModalOpen(false), []);
 
+  const bust =
+  user?.updatedAt ? Date.parse(String(user.updatedAt)) : Date.now();
+
+const menuAvatar =
+  (user as any)?.avatarUrl ?? user?.image ?? "/placeholder.png";
+
+const menuAvatarSrc =
+  menuAvatar.includes("?")
+    ? `${menuAvatar}&t=${bust}`
+    : `${menuAvatar}?t=${bust}`;
+
   if (loading) return null;
 
   return (
@@ -192,7 +203,9 @@ export default function Header() {
               <UserMenu
                 userName={user?.name || user?.email || "User"}
                 // userName={user?.name || "User"}
-                userImage={user?.image?? "/placeholder.png"}
+                // userImage={user?.image?? "/placeholder.png"}
+                  userImage={menuAvatarSrc}
+
                 userEmail={user?.email || ""}
                 userRole="Pro User"
                 menuItems={[

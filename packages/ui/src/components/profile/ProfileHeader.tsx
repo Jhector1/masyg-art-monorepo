@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { CameraIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import type { UserProfile } from "./types";
+import { useUser } from "packages/core/src/contexts/UserContext";
 
 type HeaderUser = {
   name?: string | null;
@@ -27,6 +28,7 @@ export default function ProfileHeader({ user, onAvatarUpdated }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [localBust, setLocalBust] = useState<number>(0); // local cache-buster for instant flip
+const { updateUser } = useUser();
 
   const handlePick = () => inputRef.current?.click();
 
@@ -56,6 +58,14 @@ export default function ProfileHeader({ user, onAvatarUpdated }: Props) {
         throw new Error(data?.error || "Upload failed");
       }
       toast.success("Avatar updated");
+      if (data?.user) {
+  updateUser({
+    avatarUrl: data.user.avatarUrl,
+    updatedAt: data.user.updatedAt,
+    // optional fallback for places still using session image
+    image: data.user.avatarUrl,
+  });
+}
 
       // Instant local flip even if server forgets to bump updatedAt
       setLocalBust(Date.now());

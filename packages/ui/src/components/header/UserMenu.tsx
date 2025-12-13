@@ -50,6 +50,8 @@ export default function UserMenu({
       >
         <span className="sr-only">Open user menu</span>
         <Image
+          key={userImage}        // ✅ forces remount when avatarSrc changes
+
           src={userImage}
           alt={`${userName} photo`}
           width={32}
