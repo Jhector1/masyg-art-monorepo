@@ -1,5 +1,5 @@
 <#import "template.ftl" as t>
-<@t.page title="Create account">
+<@t.page title=msg("registerTitle")>
   <h1 class="a-title">Create account</h1>
   <p class="a-sub">Create your SSO profile for all apps.</p>
 

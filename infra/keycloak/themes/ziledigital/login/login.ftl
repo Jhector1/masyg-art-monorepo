@@ -1,5 +1,5 @@
 <#import "template.ftl" as t>
-<@t.page title="Sign in">
+<@t.page title=msg("loginTitle")>
   <h1 class="a-title">Sign in</h1>
   <p class="a-sub">Use one account across ZileDigital + JeanyvesHector.</p>
 

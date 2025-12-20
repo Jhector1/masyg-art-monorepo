@@ -12,6 +12,7 @@
       <label class="a-label" for="username">Email</label>
       <input class="a-input" id="username" name="username" type="text" autocomplete="email" />
     </div>
+
     <button class="a-btn" type="submit">Send reset email</button>
   </form>
 
