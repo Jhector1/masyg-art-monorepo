@@ -1,7 +1,7 @@
 services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
-    command: start
+    command: ["start", "--optimized"]
     environment:
       # Admin user for Keycloak UI
       KEYCLOAK_ADMIN: admin
@@ -13,6 +13,10 @@ services:
       KC_HOSTNAME_STRICT: "true"
       KC_HTTP_ENABLED: "true"          # proxy terminates https, KC runs http internally
       KC_HTTP_PORT: "8080"
+
+      KC_HOSTNAME_URL: https://accounts.ziledigital.com
+      KC_HOSTNAME_ADMIN_URL: https://accounts.ziledigital.com
+
 
       # Database (recommended; don't use dev-file in prod)
       KC_DB: postgres
