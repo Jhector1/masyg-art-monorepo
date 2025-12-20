@@ -1,12 +1,13 @@
 services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
+    container_name: keycloak
     command:
       - start
       # dev only (remove later):
       - --spi-theme-cache-themes=false
       - --spi-theme-cache-templates=false
-      # (optional once built)
+      # optional once stable:
       # - --optimized
     networks:
       - keycloak_default
@@ -19,11 +20,13 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
 
       # Behind reverse proxy (Caddy) — Keycloak 26 hostname v2 style
+      # IMPORTANT: hostname only (no https://)
       KC_PROXY_HEADERS: xforwarded
-      KC_HOSTNAME: https://accounts.ziledigital.com
+      KC_HOSTNAME: accounts.ziledigital.com
       KC_HOSTNAME_STRICT: "true"
+      KC_HOSTNAME_STRICT_HTTPS: "true"
 
-      # Keycloak runs HTTP internally, proxy terminates HTTPS
+      # Keycloak runs HTTP internally; proxy terminates HTTPS
       KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: "8080"
 
@@ -33,18 +36,24 @@ services:
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
 
-      # Optional
+      # Optional but useful
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
+
+      # (Optional) If you want logs more verbose while debugging:
+      # KC_LOG_LEVEL: INFO
+      # KC_LOG_CONSOLE_OUTPUT: default
 
     depends_on:
       - keycloak-db
     ports:
-      - "8081:8080" # Keycloak internal http; Caddy hits this
+      # Host:8081 -> Container:8080 (Caddy can hit the container via docker network too)
+      - "8081:8080"
     restart: unless-stopped
 
   keycloak-db:
     image: postgres:16
+    container_name: keycloak-db
     networks:
       - keycloak_default
     environment:
