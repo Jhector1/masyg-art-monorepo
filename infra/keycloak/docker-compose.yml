@@ -1,58 +1,39 @@
 services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
-    command: ["start"]
+    command:
+      - start
+      # dev only (remove later):
+      - --spi-theme-cache-themes=false
+      - --spi-theme-cache-templates=false
     networks:
       - keycloak_default
       - public
+    volumes:
+      - ./themes:/opt/keycloak/themes:ro
     environment:
-      # Admin user for Keycloak UI
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
 
-      # IMPORTANT when behind reverse proxy (Caddy/Nginx)
       KC_PROXY: edge
-      KC_HOSTNAME: accounts.ziledigital.com
+      KC_PROXY_HEADERS: xforwarded
+
+      KC_HOSTNAME: https://accounts.ziledigital.com
       KC_HOSTNAME_STRICT: "true"
-      KC_HTTP_ENABLED: "true"          # proxy terminates https, KC runs http internally
+
+      KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: "8080"
 
-      KC_HOSTNAME_URL: https://accounts.ziledigital.com
-      KC_HOSTNAME_ADMIN_URL: https://accounts.ziledigital.com
-
-
-      # Database (recommended; don't use dev-file in prod)
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
 
-      # Optional: improve startup / observability
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
 
     depends_on:
       - keycloak-db
     ports:
-      - "8081:8080" # Keycloak internal http, proxy will hit this
+      - "8081:8080"
     restart: unless-stopped
-
-  keycloak-db:
-    networks:
-        - keycloak_default
-    image: postgres:16
-    environment:
-      POSTGRES_DB: keycloak
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
-    volumes:
-      - keycloak_pg:/var/lib/postgresql/data
-    restart: unless-stopped
-networks:
-  keycloak_default:
-  public:
-    external: true
-
-volumes:
-  keycloak_pg:
-
