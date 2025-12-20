@@ -76,7 +76,7 @@ const { isLoggedIn, user } = useUser();
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-medium tracking-tight">
-            <span className="inline-block h-6 w-6 rounded-full bg-neutral-900" aria-hidden />
+            <img src="/logo.svg" alt="Jean Yves Logo" className="inline-block h-6 w-6  bg-white" aria-hidden="true" />
             <span className="text-[15px] uppercase">Jean Yves</span>
           </Link>
 

@@ -1,6 +1,9 @@
 // src/app/api/products/upload/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient, ProductKind, VariantType } from "@prisma/client";
+// import { PrismaClient, ProductKind, VariantType } from "@prisma/client";
+import { PrismaClient, ProductKind, VariantType, Storefront } from "@prisma/client";
+
+
 import { v2 as cloudinary } from "cloudinary";
 import slugify from "slugify";
 import crypto from "crypto";
@@ -43,6 +46,16 @@ function requiresShippingByKind(kind: ProductKind): boolean {
       return false;
   }
 }
+
+function parseSite(v: FormDataEntryValue | null): Storefront {
+  const raw = (v?.toString() ?? "").trim().toUpperCase();
+
+  if (raw === "JEANYVES" || raw === "JEAN_YVES" || raw === "JEAN-YVES") return "JEANYVES";
+  if (raw === "ZILEDIGITAL") return "ZILEDIGITAL";
+
+  throw new Error(`Invalid or missing site: "${raw}"`);
+}
+
 
 async function createVariantsForKind(args: {
   tx: PrismaClient;
@@ -199,6 +212,11 @@ export async function POST(request: Request) {
 
   try {
     const formData = await request.formData();
+    const site = parseSite(formData.get("site"));
+    console.log("site raw from formData:", formData.get("site"));
+console.log("entries(site):", formData.getAll("site"), site);
+
+
 
     const kindRaw = (formData.get("kind")?.toString() || "ART").toUpperCase() as ProductKind;
     const kind: ProductKind = ["ART", "STICKER", "MUG", "CARD", "BOOK_DIGITAL", "OTHER"].includes(kindRaw)
@@ -367,6 +385,8 @@ const mainRes = await cloudinary.uploader.upload(
         sizes: variantType !== "ORIGINAL" ? sizes : [],
         kind,
         requiresShipping,
+            site, // ✅ NEW
+
         category: { connect: { id: category.id } },
       },
     });

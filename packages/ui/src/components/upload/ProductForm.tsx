@@ -50,9 +50,7 @@ const KIND_DEFAULT_TYPE: Partial<Record<ProductKind, VariantType>> = {
 
 function sameFile(a: File, b: File) {
   return (
-    a.name === b.name &&
-    a.size === b.size &&
-    a.lastModified === b.lastModified
+    a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
   );
 }
 
@@ -64,7 +62,8 @@ function appendFiles(
   const incoming = Array.from(files);
   setter((prev) => {
     const next = [...prev];
-    for (const f of incoming) if (!prev.some((p) => sameFile(p, f))) next.push(f);
+    for (const f of incoming)
+      if (!prev.some((p) => sameFile(p, f))) next.push(f);
     return next;
   });
 }
@@ -145,7 +144,7 @@ function computeVisibility(kind: ProductKind, type: VariantType): Visibility {
   const isDigital = type === "DIGITAL";
   return {
     productTypeSelect: true,
-    sizes: !isDigital,
+    sizes: true,
     originalFields: false,
     svgBlock: isDigital,
     formatsBlock: true, // allow PNG/PDF for both digital or print
@@ -155,11 +154,13 @@ function computeVisibility(kind: ProductKind, type: VariantType): Visibility {
     bookFields: false,
   };
 }
+type Storefront = "ZILEDIGITAL" | "JEANYVES";
 
 export default function ProductForm() {
   // Kind and type
   const [kind, setKind] = useState<ProductKind>("ART");
   const [variantType, setVariantType] = useState<VariantType>("DIGITAL");
+  const [site, setSite] = useState<Storefront>("ZILEDIGITAL");
 
   // Base product fields
   const [category, setCategory] = useState("");
@@ -219,16 +220,17 @@ export default function ProductForm() {
   const [bookPages, setBookPages] = useState<number | "">("");
   const [bookLanguage, setBookLanguage] = useState("English");
 
-  // ——— Kind/type syncing ———
- useEffect(() => {
-  const fixed = KIND_DEFAULT_TYPE[kind];
-  // only force when user cannot pick a type
-  if (!computeVisibility(kind, variantType).productTypeSelect && fixed) {
-    setVariantType(fixed);
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [kind]);
+  const [sizesDraft, setSizesDraft] = useState<string[]>([]);
 
+  // ——— Kind/type syncing ———
+  useEffect(() => {
+    const fixed = KIND_DEFAULT_TYPE[kind];
+    // only force when user cannot pick a type
+    if (!computeVisibility(kind, variantType).productTypeSelect && fixed) {
+      setVariantType(fixed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind]);
 
   const vis = useMemo(
     () => computeVisibility(kind, variantType),
@@ -244,7 +246,14 @@ export default function ProductForm() {
     }
 
     // Clear sections that are now hidden
-    if (!vis.sizes) setSizes([]);
+    // If sizes section is hidden (ORIGINAL), stash them instead of wiping
+    if (!vis.sizes) {
+      setSizesDraft(sizes);
+      setSizes([]);
+    } else if (vis.sizes && sizes.length === 0 && sizesDraft.length) {
+      setSizes(sizesDraft);
+    }
+
     if (!vis.svgBlock) {
       setSvgFile(null);
       setSvgPreviewUrl(null);
@@ -321,10 +330,9 @@ export default function ProductForm() {
     e.preventDefault();
 
     const fixed = KIND_DEFAULT_TYPE[kind];
-const effectiveType: VariantType = vis.productTypeSelect
-  ? variantType
-  : (fixed ?? variantType);
-
+    const effectiveType: VariantType = vis.productTypeSelect
+      ? variantType
+      : (fixed ?? variantType);
 
     if (!main) {
       alert("Please select a main image");
@@ -391,9 +399,10 @@ const effectiveType: VariantType = vis.productTypeSelect
     data.append("description", description);
     data.append("price", price);
     data.append("main", main);
-    // data.append("variantType", effectiveType);
-data.append("type", effectiveType); // backwards compat / debugging
+    data.append("site", site);
 
+    // data.append("variantType", effectiveType);
+    data.append("type", effectiveType); // backwards compat / debugging
 
     // Media blocks
     thumbnails.forEach((f) => data.append("thumbnails", f));
@@ -473,6 +482,7 @@ data.append("type", effectiveType); // backwards compat / debugging
       setBookIsbn("");
       setBookPages("");
       setBookLanguage("English");
+      setSite("ZILEDIGITAL");
 
       // original
       setWidthIn("");
@@ -522,6 +532,19 @@ data.append("type", effectiveType); // backwards compat / debugging
             ))}
           </select>
         </div>
+        {/* site */}
+        <div className="flex flex-col">
+          <label className="mb-2 font-medium text-gray-700">Site</label>
+          <select
+            value={site}
+            onChange={(e) => setSite(e.target.value as Storefront)}
+            className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent transition"
+            disabled={uploading}
+          >
+            <option value="ZILEDIGITAL">ZileDigital</option>
+            <option value="JEANYVES">JeanYves</option>
+          </select>
+        </div>
 
         <div className="flex flex-col">
           <label className="mb-2 font-medium text-gray-700">Title</label>
@@ -558,7 +581,9 @@ data.append("type", effectiveType); // backwards compat / debugging
         {/* Type (only when allowed by kind) */}
         {vis.productTypeSelect && (
           <div className="flex flex-col">
-            <label className="mb-2 font-medium text-gray-700">Product Type</label>
+            <label className="mb-2 font-medium text-gray-700">
+              Product Type
+            </label>
             <select
               value={variantType}
               onChange={(e) => setVariantType(e.target.value as VariantType)}
@@ -716,7 +741,10 @@ data.append("type", effectiveType); // backwards compat / debugging
               checked={framed}
               onChange={(e) => setFramed(e.target.checked)}
             />
-            <label htmlFor="framed" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="framed"
+              className="text-sm font-medium text-gray-700"
+            >
               Framed
             </label>
           </div>
@@ -727,7 +755,9 @@ data.append("type", effectiveType); // backwards compat / debugging
       {vis.stickerFields && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border rounded-2xl p-4 bg-gray-50">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Material</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Material
+            </label>
             <select
               className="mt-1 w-full px-3 py-2 border rounded-xl"
               value={stickerMaterial}
@@ -741,7 +771,9 @@ data.append("type", effectiveType); // backwards compat / debugging
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Finish</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Finish
+            </label>
             <select
               className="mt-1 w-full px-3 py-2 border rounded-xl"
               value={stickerFinish}
@@ -754,7 +786,9 @@ data.append("type", effectiveType); // backwards compat / debugging
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Cut Type</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Cut Type
+            </label>
             <select
               className="mt-1 w-full px-3 py-2 border rounded-xl"
               value={stickerCut}
@@ -767,13 +801,17 @@ data.append("type", effectiveType); // backwards compat / debugging
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Pack Qty</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Pack Qty
+            </label>
             <input
               type="number"
               min={1}
               className="mt-1 w-full px-3 py-2 border rounded-xl"
               value={stickerPackQty}
-              onChange={(e) => setStickerPackQty(Math.max(1, Number(e.target.value || 1)))}
+              onChange={(e) =>
+                setStickerPackQty(Math.max(1, Number(e.target.value || 1)))
+              }
             />
           </div>
         </div>
@@ -806,7 +844,9 @@ data.append("type", effectiveType); // backwards compat / debugging
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Color</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Color
+            </label>
             <select
               className="mt-1 w-full px-3 py-2 border rounded-xl"
               value={mugColor}
@@ -823,7 +863,9 @@ data.append("type", effectiveType); // backwards compat / debugging
               checked={mugDishwasherSafe}
               onChange={(e) => setMugDishwasherSafe(e.target.checked)}
             />
-            <span className="text-sm font-medium text-gray-700">Dishwasher Safe</span>
+            <span className="text-sm font-medium text-gray-700">
+              Dishwasher Safe
+            </span>
           </label>
         </div>
       )}
@@ -832,7 +874,9 @@ data.append("type", effectiveType); // backwards compat / debugging
       {vis.cardFields && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border rounded-2xl p-4 bg-gray-50">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Stock</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Stock
+            </label>
             <select
               className="mt-1 w-full px-3 py-2 border rounded-xl"
               value={cardStock}
@@ -844,7 +888,9 @@ data.append("type", effectiveType); // backwards compat / debugging
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Finish</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Finish
+            </label>
             <select
               className="mt-1 w-full px-3 py-2 border rounded-xl"
               value={cardFinish}
@@ -856,13 +902,17 @@ data.append("type", effectiveType); // backwards compat / debugging
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Pack Qty</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Pack Qty
+            </label>
             <input
               type="number"
               min={1}
               className="mt-1 w-full px-3 py-2 border rounded-xl"
               value={cardPackQty}
-              onChange={(e) => setCardPackQty(Math.max(1, Number(e.target.value || 1)))}
+              onChange={(e) =>
+                setCardPackQty(Math.max(1, Number(e.target.value || 1)))
+              }
             />
           </div>
         </div>
@@ -872,7 +922,9 @@ data.append("type", effectiveType); // backwards compat / debugging
       {vis.bookFields && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border rounded-2xl p-4 bg-gray-50">
           <div>
-            <label className="block text-sm font-medium text-gray-700">ISBN</label>
+            <label className="block text-sm font-medium text-gray-700">
+              ISBN
+            </label>
             <input
               type="text"
               className="mt-1 w-full px-3 py-2 border rounded-xl"
@@ -882,18 +934,24 @@ data.append("type", effectiveType); // backwards compat / debugging
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Pages</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Pages
+            </label>
             <input
               type="number"
               min={1}
               className="mt-1 w-full px-3 py-2 border rounded-xl"
               value={bookPages}
-              onChange={(e) => setBookPages(e.target.value ? Number(e.target.value) : "")}
+              onChange={(e) =>
+                setBookPages(e.target.value ? Number(e.target.value) : "")
+              }
               placeholder="e.g. 120"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Language</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Language
+            </label>
             <input
               type="text"
               className="mt-1 w-full px-3 py-2 border rounded-xl"
@@ -918,8 +976,12 @@ data.append("type", effectiveType); // backwards compat / debugging
                     type="text"
                     inputMode="decimal"
                     value={size}
-                    onChange={(e) => updateSize(idx, formatSizeLive(e.target.value))}
-                    onBlur={(e) => updateSize(idx, normalizeSizeOnBlur(e.target.value))}
+                    onChange={(e) =>
+                      updateSize(idx, formatSizeLive(e.target.value))
+                    }
+                    onBlur={(e) =>
+                      updateSize(idx, normalizeSizeOnBlur(e.target.value))
+                    }
                     placeholder={`e.g. 10" x 12"`}
                     pattern={SIZE_PATTERN}
                     title={`Enter size like 10" x 12", 10x12, 10 in x 12 in, 10.5×12.25`}
@@ -1008,7 +1070,9 @@ data.append("type", effectiveType); // backwards compat / debugging
 
       {/* Thumbnails */}
       <div>
-        <label className="mb-2 block font-medium text-gray-700">Thumbnails</label>
+        <label className="mb-2 block font-medium text-gray-700">
+          Thumbnails
+        </label>
         <label className="inline-flex items-center px-6 py-3 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-purple-500 transition">
           {thumbnails.length ? "Add More Thumbnails" : "Select Thumbnails"}
           <input
@@ -1031,7 +1095,11 @@ data.append("type", effectiveType); // backwards compat / debugging
                 key={idx}
                 className="relative h-24 w-24 rounded-lg overflow-hidden shadow-md hover:scale-105 transform transition group"
               >
-                <img src={src} alt={`Thumb ${idx + 1}`} className="object-cover h-full w-full" />
+                <img
+                  src={src}
+                  alt={`Thumb ${idx + 1}`}
+                  className="object-cover h-full w-full"
+                />
                 <button
                   type="button"
                   aria-label={`Remove thumbnail ${idx + 1}`}
@@ -1128,8 +1196,13 @@ data.append("type", effectiveType); // backwards compat / debugging
                       alt={`Format ${idx + 1}`}
                       className="object-contain h-full w-full"
                     />
-                  ) : type === "application/pdf" || type === "application/epub+zip" ? (
-                    <iframe src={url} title={`Doc ${idx + 1}`} className="h-full w-full" />
+                  ) : type === "application/pdf" ||
+                    type === "application/epub+zip" ? (
+                    <iframe
+                      src={url}
+                      title={`Doc ${idx + 1}`}
+                      className="h-full w-full"
+                    />
                   ) : (
                     <span className="text-xs text-gray-600 text-center break-words">
                       {type || "File"}

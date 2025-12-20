@@ -5,7 +5,7 @@ export const runtime = "nodejs"; // Required: Prisma does NOT support edge
 
 export async function GET() {
   try {
-    const baseUrl = "https://ziledigital.com"; // Update to your correct domain
+    const baseUrl = "https://art.jeanyveshector.com"; // Update to your correct domain
 
     // Fetch dynamic product URLs
     const products = await prisma.product.findMany({
@@ -16,7 +16,7 @@ export async function GET() {
     });
 
     // Static pages
-    const staticPages = ["", "/about", "/contact", "/store"];
+    const staticPages = ["",  "/contact", "/store"];
     const staticUrls = staticPages.map(
       (path) => `
       <url>
