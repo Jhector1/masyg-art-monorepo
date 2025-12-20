@@ -10,8 +10,9 @@ export async function GET(req: NextRequest) {
       ? undefined // default NON_ORIGINAL inside core
       : (t.toUpperCase() === "ALL" || t === "*") ? "ALL" :
         t.split(",").map(s => s.trim().toUpperCase()) as any;
+  const site = "ZILEDIGITAL";
 
-  const data = await listProductsCore({ types, userId, guestId });
+  const data = await listProductsCore({ site, types, userId, guestId });
   return NextResponse.json(data);
 }
 

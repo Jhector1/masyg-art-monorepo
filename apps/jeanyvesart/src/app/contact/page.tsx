@@ -45,7 +45,7 @@ export default function ContactPage() {
               We&apos;d love to hear from you! Whether it&apos;s a question, feedback, or just to say hi — feel free to reach out.
             </p>
             <div className="space-y-4">
-              <ContactInfo icon="✉️" text="info@ziledigital.com" />
+              <ContactInfo icon="✉️" text="myart@jeanyveshector.com" />
             </div>
           </div>
 

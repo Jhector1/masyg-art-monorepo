@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       if (!session?.user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     
   const id = idFromReq(req);
-  const p = await prisma.product.findUnique({ where: { id } });
+  const p = await prisma.product.findUnique({ where: { id }, include: { variants: true } });
   return p
     ? NextResponse.json(p)
     : NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -9,6 +9,7 @@ import sharp from "sharp";
 import { prisma } from "@acme/core/lib/prisma";
 import { cloudinary } from "@acme/core/lib/cloudinary";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+import { Storefront } from "@prisma/client"; // <-- use the real enum name from your schema
 
 type JsonPayload = {
   name?: string;
@@ -190,15 +191,40 @@ export async function PATCH(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId } = await getCustomerIdFromRequest(req);
-    if (!userId) {
+    const { userId, guestId } = await getCustomerIdFromRequest(req);
+
+    if (!userId && !guestId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Pull user + light related info
-    const [user, entAgg] = await Promise.all([
+    // IMPORTANT: must match your Prisma type/value
+const site: Storefront = "ZILEDIGITAL";
+ // example if enum name is Storefront
+
+    // ✅ Guest-only: return minimal payload (no User query)
+    if (!userId) {
+      const cart = await prisma.cart.findFirst({
+        where: { site, guestId },
+        select: { _count: { select: { items: true } } },
+      });
+
+      return NextResponse.json(
+        {
+          user: null,
+          guest: {
+            guestId,
+            counts: { cartItems: cart?._count.items ?? 0 },
+          },
+        },
+        { status: 200, headers: { "Cache-Control": "private, max-age=0, must-revalidate" } }
+      );
+    }
+
+    const uid = String(userId);
+
+    const [user, entAgg, cart] = await Promise.all([
       prisma.user.findUnique({
-        where: { id: String(userId) },
+        where: { id: uid },
         select: {
           id: true,
           name: true,
@@ -215,12 +241,6 @@ export async function GET(req: NextRequest) {
               reviews: true,
               designs: true,
               purchasedDesigns: true,
-            },
-          },
-          cart: {
-            select: {
-              id: true,
-              _count: { select: { items: true } },
             },
           },
           orders: {
@@ -241,14 +261,15 @@ export async function GET(req: NextRequest) {
           },
         },
       }),
+
       prisma.designEntitlement.aggregate({
-        where: { userId: String(userId) },
-        _sum: {
-          exportQuota: true,
-          editQuota: true,
-          exportsUsed: true,
-          editsUsed: true,
-        },
+        where: { userId: uid },
+        _sum: { exportQuota: true, editQuota: true, exportsUsed: true, editsUsed: true },
+      }),
+
+      prisma.cart.findFirst({
+        where: { site, userId: uid },
+        select: { _count: { select: { items: true } } },
       }),
     ]);
 
@@ -261,48 +282,36 @@ export async function GET(req: NextRequest) {
     const editQuota = sums.editQuota ?? 0;
     const exportsUsed = sums.exportsUsed ?? 0;
     const editsUsed = sums.editsUsed ?? 0;
-    const lastOrder = user.orders?.[0] ?? null;
-
-    const payload = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      image: user.image,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      downloadCount: user.downloadCount,
-      counts: {
-        favorites: user._count.favorites,
-        orders: user._count.orders,
-        reviews: user._count.reviews,
-        designs: user._count.designs,
-        purchasedDesigns: user._count.purchasedDesigns,
-        cartItems: user.cart?._count.items ?? 0,
-      },
-      lastOrder,
-      addresses: user.addresses,
-      entitlements: {
-        exportQuota,
-        editQuota,
-        exportsUsed,
-        editsUsed,
-        exportRemaining: Math.max(0, exportQuota - exportsUsed),
-        editRemaining: Math.max(0, editQuota - editsUsed),
-      },
-    };
 
     return NextResponse.json(
-      { user: payload },
       {
-        status: 200,
-        headers: {
-          "Cache-Control": "private, max-age=0, must-revalidate",
+        user: {
+          ...user,
+          counts: {
+            favorites: user._count.favorites,
+            orders: user._count.orders,
+            reviews: user._count.reviews,
+            designs: user._count.designs,
+            purchasedDesigns: user._count.purchasedDesigns,
+            cartItems: cart?._count.items ?? 0,
+          },
+          lastOrder: user.orders?.[0] ?? null,
+          entitlements: {
+            exportQuota,
+            editQuota,
+            exportsUsed,
+            editsUsed,
+            exportRemaining: Math.max(0, exportQuota - exportsUsed),
+            editRemaining: Math.max(0, editQuota - editsUsed),
+          },
         },
-      }
+      },
+      { status: 200, headers: { "Cache-Control": "private, max-age=0, must-revalidate" } }
     );
   } catch (e) {
     console.error("GET /api/auth/profile error:", e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
+
+

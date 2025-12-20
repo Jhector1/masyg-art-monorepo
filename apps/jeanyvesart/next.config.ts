@@ -10,6 +10,7 @@ const config: NextConfig = {
     "@acme/server",
     "@acme/config",
     "@acme/db",
+    "@acme/auth",
   ],
   images: {
     remotePatterns: [

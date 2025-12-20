@@ -1,62 +1,77 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
-import { listFavoritesForUser, addFavorite, removeFavorite } from "@acme/server/services/favorites";
+import {
+  listFavoritesForUser,
+  addFavorite,
+  removeFavorite,
+} from "@acme/server/services/favorites";
+import type { Storefront } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// GET /api/favorite?types=ORIGINAL | ALL | DIGITAL,PRINT
+function resolveSite(req: NextRequest): Storefront {
+  const fromHeader = req.headers.get("x-storefront")?.toUpperCase();
+  const fromQuery = req.nextUrl.searchParams.get("site")?.toUpperCase();
+  const raw = (fromHeader || fromQuery) as Storefront | undefined;
+  return raw === "JEANYVES" ? "JEANYVES" : "ZILEDIGITAL";
+}
+
 export async function GET(req: NextRequest) {
+  const site = "ZILEDIGITAL"//resolveSite(req);
   const { userId } = await getCustomerIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "Missing UserId" }, { status: 400 });
 
-  // const sp = req.nextUrl.searchParams;
-  // const typesParam = sp.get("types"); // e.g. "ORIGINAL" or "DIGITAL,PRINT" or "ALL"
-  // const types =
-  //   !typesParam || typesParam === "ALL"
-  //     ? undefined
-  //     : typesParam.split(",").map(s => s.trim().toUpperCase());
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-  const payload = await listFavoritesForUser({ userId }); // <-- FIXED: provide `types` key
+  const types = req.nextUrl.searchParams.get("types") ?? undefined;
+
+  const payload = await listFavoritesForUser({ userId: String(userId), site, types });
   return NextResponse.json(payload, { status: 200, headers: noCache() });
 }
 
-// POST /api/favorite  { productId }
 export async function POST(req: NextRequest) {
+  const site = "ZILEDIGITAL"//resolveSite(req);
   const { userId } = await getCustomerIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "Missing UserId" }, { status: 400 });
 
-  const { productId } = await req.json();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { productId } = await req.json().catch(() => ({}));
   if (!productId) return NextResponse.json({ error: "Missing productId" }, { status: 400 });
 
-  await addFavorite(userId, String(productId));
-  return NextResponse.json({ ok: true }, { status: 200 });
+  await addFavorite({ userId: String(userId), productId: String(productId), site });
+  return NextResponse.json({ ok: true }, { status: 200, headers: noCache() });
 }
 
-// DELETE /api/favorite  { productId } or ?productId=...
 export async function DELETE(req: NextRequest) {
+  const site = "ZILEDIGITAL"//resolveSite(req);
   const { userId } = await getCustomerIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "Missing UserId" }, { status: 400 });
+
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   let productId: string | null = null;
-  // try body
   try {
     const body = await req.json().catch(() => null);
     productId = body?.productId ?? null;
-  } catch {/* ignore */}
-  // fallback to query
+  } catch {}
   if (!productId) productId = new URL(req.url).searchParams.get("productId");
+
   if (!productId) return NextResponse.json({ error: "Missing productId" }, { status: 400 });
 
-  await removeFavorite(userId, String(productId));
-  return NextResponse.json({ ok: true }, { status: 200 });
+  await removeFavorite({ userId: String(userId), productId: String(productId), site });
+  return NextResponse.json({ ok: true }, { status: 200, headers: noCache() });
 }
 
 function noCache() {
   return {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-    "Pragma": "no-cache",
-    "Expires": "0"
+    Pragma: "no-cache",
+    Expires: "0",
   };
 }

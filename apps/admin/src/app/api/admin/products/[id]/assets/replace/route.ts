@@ -1,3 +1,4 @@
+// File: src/app/api/admin/products/[id]/assets/replace/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@acme/core/lib/prisma";
 import { cloudinary } from "@acme/core/lib/cloudinary";
@@ -14,7 +15,7 @@ import {
   mimeFromExt,
   isVectorExt,
 } from "@acme/core/lib/productAssets";
-import {auth} from '@/lib/auth'
+import { auth } from "@/lib/auth";
 
 import type { UploadApiOptions, UploadApiResponse } from "cloudinary";
 
@@ -26,10 +27,7 @@ const getFiles = (fd: FormData, key: string) =>
   fd.getAll(key).filter(isNonEmptyFile) as File[];
 
 /** TS-safe stream upload */
-async function uploadFile(
-  file: File,
-  opts: UploadApiOptions
-): Promise<UploadApiResponse> {
+async function uploadFile(file: File, opts: UploadApiOptions): Promise<UploadApiResponse> {
   const buf = Buffer.from(await file.arrayBuffer());
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(opts, (err, res) => {
@@ -57,24 +55,72 @@ function getStr(fd: FormData, key: string) {
   const v = fd.get(key);
   if (typeof v !== "string") return undefined;
   const s = v.trim();
-  return s.length ? s : undefined; // blank -> undefined (don't change)
+  return s.length ? s : undefined;
+}
+
+type VT = "DIGITAL" | "PRINT" | "ORIGINAL";
+function computeCapabilities(product: { kind: string }, variantTypes: Set<VT>) {
+  const hasOriginal = variantTypes.has("ORIGINAL");
+  const hasDigital = variantTypes.has("DIGITAL");
+  const hasPrint = variantTypes.has("PRINT");
+
+  const isOriginalOnly = hasOriginal && !hasDigital && !hasPrint;
+
+  // Downloadable deliverables are tied to DIGITAL / BOOK_DIGITAL
+  const isDigitalDeliverable =
+    hasDigital || product.kind === "BOOK_DIGITAL";
+
+  // SVG is typically only relevant for ART + digital deliverables
+  const allowSvg = isDigitalDeliverable && product.kind === "ART";
+
+  // Other formats are deliverables for DIGITAL / BOOK_DIGITAL
+  const allowFormats = isDigitalDeliverable;
+
+  // Size list is mostly for non-original-only products (digital/print/merch)
+  const allowSizes = !isOriginalOnly;
+
+  return {
+    hasOriginal,
+    hasDigital,
+    hasPrint,
+    isOriginalOnly,
+    allowSvg,
+    allowFormats,
+    allowSizes,
+  };
 }
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-   const session = await auth();
-    if (!session?.user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  
+  const session = await auth();
+  if (!session?.user?.isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
-    const {id}= await params;
+    const { id } = await params;
+
     const product = await prisma.product.findUnique({
       where: { id },
-      include: { category: true, assets: true },
+      include: {
+        category: true,
+        assets: true,
+        variants: { select: { type: true } }, // ✅ needed for capability logic
+      },
     });
-    if (!product)
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    if (!product) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const warnings: string[] = [];
+
+    const variantTypes = new Set<VT>();
+    for (const v of product.variants ?? []) {
+      if (v?.type) variantTypes.add(v.type as VT);
+    }
+
+    const caps = computeCapabilities(product as any, variantTypes);
 
     const form = await req.formData();
 
@@ -91,16 +137,37 @@ export async function POST(
     const thumbs = getFiles(form, "thumbnails");
     const formats = getFiles(form, "formats");
 
-    // What are we actually replacing?
-    const replacingMain = isNonEmptyFile(mainFile);
-    const replacingSvg = isNonEmptyFile(svgFile);
-    const replacingThumbs = thumbs.length > 0;
-    const replacingFormats = formats.length > 0;
+    // Requests coming from client
+    const requestedMain = isNonEmptyFile(mainFile);
+    const requestedSvg = isNonEmptyFile(svgFile);
+    const requestedThumbs = thumbs.length > 0;
+    const requestedFormats = formats.length > 0;
+
+    // Enforce capabilities (don’t let original/sticker/etc. accidentally upload deliverables)
+    const replacingMain = requestedMain;
+    const replacingThumbs = requestedThumbs;
+
+    const replacingSvg = requestedSvg && caps.allowSvg;
+    if (requestedSvg && !caps.allowSvg) {
+      warnings.push(
+        `SVG ignored: product kind=${product.kind} (and/or no digital deliverables).`
+      );
+    }
+
+    const replacingFormats = requestedFormats && caps.allowFormats;
+    if (requestedFormats && !caps.allowFormats) {
+      warnings.push(
+        `Formats ignored: product kind=${product.kind} (only DIGITAL/BOOK_DIGITAL allow deliverables).`
+      );
+    }
+
+    const willUpdateSizes = newSizes.length > 0 && caps.allowSizes;
+    if (newSizes.length > 0 && !caps.allowSizes) {
+      warnings.push(`Sizes ignored: original-only products typically don’t use a size list.`);
+    }
 
     const env = currentEnv();
-    let safeCat = product.category
-      ? toSafeCategory(product.category.name)
-      : "uncategorized";
+    let safeCat = product.category ? toSafeCategory(product.category.name) : "uncategorized";
     if (maybeCategory) safeCat = toSafeCategory(maybeCategory);
 
     // Compute root from existing publicId or generate a stable one
@@ -123,11 +190,14 @@ export async function POST(
         } catch {}
       }
     }
+
     if (replacingThumbs) await deleteByPrefix(folders.thumbnails, "image");
+
     if (replacingSvg) {
       await deleteByPrefix(folders.svg, "raw");
       await deleteByPrefix(folders.svgPreview, "raw");
     }
+
     if (replacingFormats) {
       await deleteByPrefix(folders.formats, "image");
       await deleteByPrefix(folders.formats, "raw");
@@ -194,9 +264,10 @@ export async function POST(
 
     if (replacingFormats) {
       for (const f of formats) {
+        // already handled by svg upload; skip svg here
         if (f.type === "image/svg+xml" || f.name.toLowerCase().endsWith(".svg")) continue;
-        const isPdf =
-          f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+
+        const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
         const up = await uploadFile(f, {
           folder: folders.formats,
           use_filename: true,
@@ -209,9 +280,7 @@ export async function POST(
 
     // ---- BUILD NEW FIELD ARRAYS ----
     let thumbnails: string[] = product.thumbnails ?? [];
-    const newMainUrl = replacingMain
-      ? mainRes!.secure_url
-      : product.thumbnails?.[0] ?? null;
+    const newMainUrl = replacingMain ? mainRes!.secure_url : product.thumbnails?.[0] ?? null;
 
     if (replacingThumbs) {
       thumbnails = [];
@@ -222,29 +291,22 @@ export async function POST(
       else thumbnails = [newMainUrl!];
     }
 
-    const formatsUrls = replacingFormats
-      ? otherRes.map((r) => r.secure_url)
-      : product.formats;
+    const formatsUrls = replacingFormats ? otherRes.map((r) => r.secure_url) : product.formats;
 
-    const svgFormatUrl = replacingSvg
-      ? svgRaw?.secure_url ?? null
-      : product.svgFormat;
-    const svgPreviewUrl = replacingSvg
-      ? svgPreview?.secure_url ?? null
-      : product.svgPreview;
+    const svgFormatUrl = replacingSvg ? svgRaw?.secure_url ?? null : product.svgFormat;
+    const svgPreviewUrl = replacingSvg ? svgPreview?.secure_url ?? null : product.svgPreview;
 
     // ---- PERSIST ----
     const updated = await prisma.$transaction(async (tx) => {
       const data: any = {
         publicId:
-          replacingMain && mainRes?.public_id
-            ? mainRes.public_id
-            : product.publicId,
+          replacingMain && mainRes?.public_id ? mainRes.public_id : product.publicId,
         thumbnails,
-        formats: formatsUrls,
-        svgFormat: svgFormatUrl,
-        svgPreview: svgPreviewUrl,
-        sizes: newSizes.length ? newSizes : product.sizes,
+        // Only set if allowed; otherwise preserve existing values
+        formats: replacingFormats ? formatsUrls : product.formats,
+        svgFormat: replacingSvg ? svgFormatUrl : product.svgFormat,
+        svgPreview: replacingSvg ? svgPreviewUrl : product.svgPreview,
+        sizes: willUpdateSizes ? newSizes : product.sizes,
       };
 
       // only set when provided
@@ -267,69 +329,62 @@ export async function POST(
         data,
       });
 
-   // ---- UPDATE ProductAsset rows only for what changed ----
-if (replacingSvg) {
-  // Delete only existing SVG assets
-  await tx.productAsset.deleteMany({
-    where: { productId: product.id, ext: "svg" },
-  });
+      // ---- UPDATE ProductAsset rows only for what changed ----
+      if (replacingSvg) {
+        // Delete only existing SVG assets
+        await tx.productAsset.deleteMany({
+          where: { productId: product.id, ext: "svg" },
+        });
 
-  const preview = updatedProd.thumbnails?.[0] || updatedProd.svgPreview || null;
+        const preview = updatedProd.thumbnails?.[0] || updatedProd.svgPreview || null;
 
-  if (svgRaw) {
-    await upsertProductAsset(tx, {
-      productId: product.id,
-      url: svgRaw.secure_url,
-      storageKey: svgRaw.public_id,
-      previewUrl: preview ?? undefined,
-      ext: "svg",
-      mimeType: "image/svg+xml",
-      isVector: true,
-      sizeBytes: svgRaw.bytes ?? undefined,
-      resourceType: svgRaw.resource_type as "raw" | "image" | "video",
-      deliveryType: (svgRaw as any).type as
-        | "upload"
-        | "authenticated"
-        | "private",
-    });
-  }
-}
+        if (svgRaw) {
+          await upsertProductAsset(tx, {
+            productId: product.id,
+            url: svgRaw.secure_url,
+            storageKey: svgRaw.public_id,
+            previewUrl: preview ?? undefined,
+            ext: "svg",
+            mimeType: "image/svg+xml",
+            isVector: true,
+            sizeBytes: svgRaw.bytes ?? undefined,
+            resourceType: svgRaw.resource_type as "raw" | "image" | "video",
+            deliveryType: (svgRaw as any).type as "upload" | "authenticated" | "private",
+          });
+        }
+      }
 
-if (replacingFormats) {
-  // Delete only non-SVG formats
-  await tx.productAsset.deleteMany({
-    where: { productId: product.id, NOT: { ext: "svg" } },
-  });
+      if (replacingFormats) {
+        // Delete only non-SVG formats
+        await tx.productAsset.deleteMany({
+          where: { productId: product.id, NOT: { ext: "svg" } },
+        });
 
-  const preview = updatedProd.thumbnails?.[0] || updatedProd.svgPreview || null;
+        const preview = updatedProd.thumbnails?.[0] || updatedProd.svgPreview || null;
 
-  for (const up of otherRes) {
-    const ext = (up.format || extFromUrl(up.secure_url)).toLowerCase();
-    await upsertProductAsset(tx, {
-      productId: product.id,
-      url: up.secure_url,
-      storageKey: up.public_id,
-      previewUrl: preview ?? undefined,
-      ext,
-      mimeType: mimeFromExt(ext),
-      isVector: isVectorExt(ext),
-      sizeBytes: up.bytes ?? undefined,
-      width: up.width ?? undefined,
-      height: up.height ?? undefined,
-      resourceType: up.resource_type as "raw" | "image" | "video",
-      deliveryType: (up as any).type as
-        | "upload"
-        | "authenticated"
-        | "private",
-    });
-  }
-}
-
+        for (const up of otherRes) {
+          const ext = (up.format || extFromUrl(up.secure_url)).toLowerCase();
+          await upsertProductAsset(tx, {
+            productId: product.id,
+            url: up.secure_url,
+            storageKey: up.public_id,
+            previewUrl: preview ?? undefined,
+            ext,
+            mimeType: mimeFromExt(ext),
+            isVector: isVectorExt(ext),
+            sizeBytes: up.bytes ?? undefined,
+            width: up.width ?? undefined,
+            height: up.height ?? undefined,
+            resourceType: up.resource_type as "raw" | "image" | "video",
+            deliveryType: (up as any).type as "upload" | "authenticated" | "private",
+          });
+        }
+      }
 
       return updatedProd;
     });
 
-    return NextResponse.json({ ok: true, product: updated });
+    return NextResponse.json({ ok: true, product: updated, warnings });
   } catch (err: any) {
     console.error("POST /api/admin/products/[id]/assets/replace error:", err);
     return NextResponse.json(

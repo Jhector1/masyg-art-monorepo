@@ -1,17 +1,23 @@
 // File: src/app/cart/checkout/success/page.tsx
-'use client'
 import { Suspense } from "react";
-import dynamic from "next/dynamic";
-// import CheckoutSuccessPage from "@/components/store/checkout/CheckoutSuccessPage";
+import CheckoutSuccessClient from "./CheckoutSuccessClient";
 
-const CheckoutSuccessPage = dynamic(() => import("@acme/ui/components/store/checkout/CheckoutSuccessPage"), {
-  ssr: false,
-});
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="py-10 text-center">Loading page…</div>}>
-      <CheckoutSuccessPage />
-    </Suspense>
+    <div className="mx-auto max-w-3xl p-6">
+      <Suspense
+        fallback={
+          <div className="rounded-2xl border border-neutral-200 bg-white p-5">
+            <div className="h-6 w-56 animate-pulse rounded bg-neutral-100" />
+            <div className="mt-4 h-24 animate-pulse rounded-xl bg-neutral-100" />
+          </div>
+        }
+      >
+        <CheckoutSuccessClient />
+      </Suspense>
+    </div>
   );
 }

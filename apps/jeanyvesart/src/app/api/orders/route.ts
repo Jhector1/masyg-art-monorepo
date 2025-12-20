@@ -1,128 +1,83 @@
 // File: src/app/api/orders/route.ts
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@acme/core/lib/prisma";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
-import { CollectionDigitalAsset, CollectionItem } from "@acme/core/types";
+import type { Storefront } from "@prisma/client";
 
-const prisma = new PrismaClient();
+function resolveSite(req: NextRequest): Storefront {
+  const fromHeader = req.headers.get("x-storefront")?.toUpperCase();
+  const fromQuery = req.nextUrl.searchParams.get("site")?.toUpperCase();
+  const raw = (fromHeader || fromQuery) as Storefront | undefined;
+  return raw === "JEANYVES" ? "JEANYVES" : "ZILEDIGITAL";
+}
 
-/**
- * GET /api/orders?type=ALL|DIGITAL|PRINT
- * Returns groups of order items keyed by YYYY-MM-DD date with download-ready metadata.
- */
+function noCache() {
+  return {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    Pragma: "no-cache",
+    Expires: "0",
+  };
+}
+
 export async function GET(req: NextRequest) {
+  const site = "JEANYVES";
   const { userId, guestId } = await getCustomerIdFromRequest(req);
-  const url = new URL(req.url);
-  const typeParam = (url.searchParams.get("type") || "ALL").toUpperCase();
 
-  const whereType =
-    typeParam === "DIGITAL" || typeParam === "PRINT"
-      ? { type: typeParam as "DIGITAL" | "PRINT" }
-      : {};
-
-  const items = await prisma.orderItem.findMany({
-    where: {
-      ...whereType,
-      order: {
-        ...(userId ? { userId } : {}),
-        ...(guestId ? { guestId } : {}),
-      },
-    },
-    include: {
-      order: { select: { placedAt: true, stripeSessionId: true, status: true } },
-      product: { select: { id: true, title: true, thumbnails: true } },
-      digitalVariant: { select: { id: true, format: true, license: true, size: true } },
-      printVariant: { select: { id: true, size: true, material: true, frame: true } },
-      purchasedDesign: { select: { id: true, previewUrl: true } },
-      downloadTokens: {
-        where: {
-          expiresAt: { gt: new Date() },
-          OR: [{ remainingUses: null }, { remainingUses: { gt: 0 } }],
-        },
-        orderBy: { createdAt: "desc" },
-        include: {
-          asset: {
-            select: {
-              url: true,
-              previewUrl: true,
-              mimeType: true,
-              ext: true,
-              isVector: true,
-              width: true,
-              height: true,
-              dpi: true,
-              colorProfile: true,
-              sizeBytes: true,
-              hasAlpha: true,
-            },
-          },
-        },
-      },
-    },
-    orderBy: { order: { placedAt: "desc" } },
-  });
-
-
-  const shaped: Record<string, CollectionItem[]> = {};
-
-  for (const it of items) {
-    const dateKey = it.order.placedAt.toISOString().slice(0, 10);
-
-    const tokens: CollectionDigitalAsset[] = it.downloadTokens.map((dt) => ({
-      tokenId: dt.id,
-      url: dt.signedUrl,
-      ext: dt.asset.ext,
-      width: dt.asset.width,
-      height: dt.asset.height,
-      dpi: dt.asset.dpi,
-      sizeBytes: dt.asset.sizeBytes,
-      colorProfile: dt.asset.colorProfile,
-      isVector: dt.asset.isVector,
-      hasAlpha: dt.asset.hasAlpha,
-    }));
-
-    const previewUrl =
-      it.purchasedDesign?.previewUrl ||
-      it.previewUrlSnapshot ||
-      it.product.thumbnails[0] ||
-      it.downloadTokens[0]?.asset.previewUrl ||
-      null;
-
-    const entry: CollectionItem = {
-      id: it.id,
-      type: it.type as "DIGITAL" | "PRINT",
-      price: it.price,
-      quantity: it.quantity,
-      order: {
-        isUserDesign: it.purchasedDesign?true: false,
-        placedAt: it.order.placedAt.toISOString(),
-        stripeSessionId: it.order.stripeSessionId,
-        status: it.order.status,
-      },
-      product: it.product,
-      previewUrl,
-      ...(it.type === "DIGITAL"
-        ? {
-            digital: {
-              variantId: it.digitalVariant?.id ?? null,
-              format: it.digitalVariant?.format ?? null,
-              license: it.digitalVariant?.license ?? null,
-              size: it.digitalVariant?.size ?? null,
-              tokens,
-            },
-          }
-        : {
-            print: {
-              variantId: it.printVariant?.id ?? null,
-              size: it.printVariant?.size ?? null,
-              material: it.printVariant?.material ?? null,
-              frame: it.printVariant?.frame ?? null,
-            },
-          }),
-    };
-
-    (shaped[dateKey] ||= []).push(entry);
+  if (!userId && !guestId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: noCache() });
   }
 
-  return NextResponse.json(shaped);
+  const where =
+    userId
+      ? { site, userId: String(userId) }
+      : { site, guestId: String(guestId) };
+
+  const orders = await prisma.order.findMany({
+    where,
+    orderBy: { placedAt: "desc" },
+    select: {
+      id: true,
+      status: true,
+      total: true,
+      placedAt: true,
+      site: true,
+      stripeSessionId: true,
+      guestId: true,
+      userId: true,
+      shipping: {
+        select: {
+          street: true,
+          city: true,
+          state: true,
+          postalCode: true,
+          country: true,
+        },
+      },
+      payment: { select: { status: true, provider: true, transactionId: true } },
+      items: {
+        take: 6,
+        select: {
+          id: true,
+          type: true,
+          quantity: true,
+          price: true,
+          previewUrlSnapshot: true,
+          product: {
+            select: { id: true, title: true, thumbnails: true },
+          },
+          originalVariant: {
+            select: { id: true, status: true, originalSerial: true, medium: true, year: true },
+          },
+        },
+        orderBy: { id: "desc" },
+      },
+      _count: { select: { items: true } },
+    },
+  });
+
+  return NextResponse.json({ site, orders }, { status: 200, headers: noCache() });
 }

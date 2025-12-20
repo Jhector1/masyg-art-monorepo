@@ -37,6 +37,9 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
 
+
+
+
     const categoryName = formData.get("category")?.toString().trim();
     const title = formData.get("title")?.toString().trim() || "";
     const description = formData.get("description")?.toString().trim() || "";
@@ -181,7 +184,7 @@ export async function POST(request: Request) {
         // Optional: add SVG deliverable (commented out in your code)
         // if (rawSvg) {
         //   await upsertProductAsset(tx, {
-        //     productId: product.id,
+        //     productId: product.id,a
         //     url: rawSvg.secure_url,
         //     storageKey: rawSvg.public_id,
         //     previewUrl: preview,

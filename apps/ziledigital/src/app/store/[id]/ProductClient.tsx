@@ -75,7 +75,6 @@ export default function ProductDetail({
     priceWithSale,
     priceWithBundle,
   } = useProductData({ productId });
-  console.log(product)
 
   const loadingUI = <div className="p-10 text-center">Loading product…</div>;
 

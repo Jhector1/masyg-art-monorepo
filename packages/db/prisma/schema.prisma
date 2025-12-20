@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Storefront {
+  ZILEDIGITAL
+  JEANYVES
+}
 model Product {
   id                String              @id @default(uuid())
   categoryId        String
@@ -44,8 +48,13 @@ model Product {
   isCustomizable   Boolean     @default(false)
   optionSchema     Json?
 
-  bundleItems BundleItem[] @relation("ProductToBundleItems")
+  bundleItems BundleItem[] @relation("ProductToBundleItems")  
+  site        Storefront @default(ZILEDIGITAL)
 
+  @@index([site])
+  @@index([site, categoryId])
+  @@index([site, kind])
+  
   @@index([saleStartsAt, saleEndsAt])
   @@index([saleEndsAt])
   @@index([categoryId])
@@ -69,7 +78,8 @@ model User {
   isAdmin           Boolean             @default(false)
   accounts          Account[]
   addresses         Address[]
-  cart              Cart?
+    carts Cart[]
+
   DesignEntitlement DesignEntitlement[]
   downloadTokens    DownloadToken[]
   favorites         Favorite[]
@@ -179,15 +189,19 @@ model ProductVariant {
 
 /// Shopping Cart
 model Cart {
-  id        String     @id @default(cuid())
-  userId    String?    @unique
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  guestId   String?    @unique
-  user      User?      @relation(fields: [userId], references: [id])
-  items     CartItem[]
+  id        String   @id @default(cuid())
+  userId    String?
+  guestId   String?
+  site      Storefront @default(ZILEDIGITAL)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([guestId])
+  user  User? @relation(fields: [userId], references: [id])
+  items CartItem[]
+
+  @@unique([userId, site])
+  @@unique([guestId, site])
+  @@index([guestId, site])
 }
 
 model CartItem {
@@ -218,18 +232,21 @@ model CartItem {
 
 /// Favorites / Wishlist
 model Favorite {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   userId    String?
   productId String
-  createdAt DateTime @default(now())
   guestId   String?
+  site      Storefront @default(ZILEDIGITAL) // ✅ new
+  createdAt DateTime   @default(now())
+
   product   Product  @relation(fields: [productId], references: [id])
   user      User?    @relation(fields: [userId], references: [id])
 
-  @@unique([userId, productId])
-  @@unique([guestId, productId])
+  @@unique([userId, productId, site])   // ✅ new composite unique
+  @@unique([guestId, productId, site])  // ✅ new composite unique
+  @@index([userId, site])
+  @@index([guestId, site])
 }
-
 /// Product Reviews
 model Review {
   id        String   @id @default(cuid())
@@ -266,7 +283,8 @@ model Order {
   items               OrderItem[]
   payment             Payment?
   purchasedDesigns    PurchasedDesign[] @relation("Order_PurchasedDesigns")
-
+  site Storefront @default(ZILEDIGITAL)
+  @@index([site])
   @@index([guestId])
   @@index([claimTokenExpiresAt])
 }

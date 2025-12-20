@@ -1,16 +1,19 @@
-// apps/jeanyvesart/src/components/layout/Header.tsx
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bars3Icon, XMarkIcon, ShoppingBagIcon, HeartIcon, UserIcon } from "@heroicons/react/24/outline";
+import { useUser } from "@acme/core/contexts/UserContext";
+
+import { useSession, signOut } from "next-auth/react";
+import UserMenu from "./UserMenu";
 
 type NavItem = { href: string; label: string };
 const NAV: NavItem[] = [
   { href: "/", label: "Home" },
   { href: "/store", label: "Shop" },
-  { href: "/about", label: "About" },
+  // { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -18,6 +21,9 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [elevated, setElevated] = useState(false);
+const { isLoggedIn, user } = useUser();
+  const { data: session, status } = useSession();
+  // const user = session?.user as any;
 
   useEffect(() => {
     const onScroll = () => setElevated(window.scrollY > 2);
@@ -27,6 +33,43 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
   }, []);
 
   useEffect(() => setOpen(false), [pathname]);
+
+  const menuItems = useMemo(
+    () => [
+      { label: "Profile", href: "/profile" },
+      { label: "Orders", href: "/account/orders" },
+      // { label: "Downloads", href: "/downloads" },
+      // // example admin link
+      // { label: "Admin", href: "https://admin.ziledigital.com", disabled: user?.isAdmin !== true },
+    ],
+    [user?.isAdmin]
+  );
+
+  const accountSlot = (() => {
+    if (status === "loading") {
+      // tiny placeholader to avoid layout jump
+      return <div className="h-9 w-9 rounded-full bg-neutral-200 animate-pulse" aria-hidden />;
+    }
+
+    if (!session?.user) {
+      return (
+        <Link href="/authenticate" aria-label="Account" className="p-2 rounded-full hover:bg-neutral-100">
+          <UserIcon className="h-5 w-5 text-neutral-700" />
+        </Link>
+      );
+    }
+
+    return (
+      <UserMenu
+        userName={user?.name || "Account"}
+        userImage={user?.image || user?.avatarUrl || "/placeholder.png" || null}
+        userEmail={user?.email || null}
+        userRole={user?.isAdmin ? "Admin" : "Member"}
+        menuItems={menuItems}
+        onSignOut={() => signOut({ callbackUrl: "/" })}
+      />
+    );
+  })();
 
   return (
     <header className={`sticky top-0 z-50 backdrop-blur bg-white/70 ${elevated ? "shadow-sm border-b border-neutral-200/60" : ""}`}>
@@ -59,9 +102,9 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
             <Link href="/favorites" aria-label="Favorites" className="p-2 rounded-full hover:bg-neutral-100">
               <HeartIcon className="h-5 w-5 text-neutral-700" />
             </Link>
-            <Link href="/account" aria-label="Account" className="p-2 rounded-full hover:bg-neutral-100">
-              <UserIcon className="h-5 w-5 text-neutral-700" />
-            </Link>
+
+            {accountSlot}
+
             <Link href="/cart" aria-label="Cart" className="relative p-2 rounded-full hover:bg-neutral-100">
               <ShoppingBagIcon className="h-5 w-5 text-neutral-700" />
               {cartCount > 0 && (

@@ -180,6 +180,7 @@ export default function ProductConfigurator(props: ProductConfiguratorProps) {
   const policy = getKindPolicy(product);
   const availableSizes = cleanSizes(product.sizes);
   const { updateCart } = useCart();
+  console.log("license data",licenseData.license);
 
   const ctrl = usePurchaseConfigurator({
     product,

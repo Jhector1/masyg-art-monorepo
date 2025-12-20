@@ -33,6 +33,22 @@ export function useProductData({ productId }: { productId: string }) {
   const setMaterial  = wrapSet(p.material as MaterialOption, p.setMaterial);
   const setFrame     = wrapSet(p.frame as FrameOption | null, p.setFrame);
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   return {
     // data + cart
     product: p.product,

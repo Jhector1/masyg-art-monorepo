@@ -220,12 +220,15 @@ export default function ProductForm() {
   const [bookLanguage, setBookLanguage] = useState("English");
 
   // ——— Kind/type syncing ———
-  useEffect(() => {
-    const fixed = KIND_DEFAULT_TYPE[kind];
-    if (fixed) {
-      setVariantType(fixed);
-    }
-  }, [kind]);
+ useEffect(() => {
+  const fixed = KIND_DEFAULT_TYPE[kind];
+  // only force when user cannot pick a type
+  if (!computeVisibility(kind, variantType).productTypeSelect && fixed) {
+    setVariantType(fixed);
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [kind]);
+
 
   const vis = useMemo(
     () => computeVisibility(kind, variantType),
@@ -318,7 +321,10 @@ export default function ProductForm() {
     e.preventDefault();
 
     const fixed = KIND_DEFAULT_TYPE[kind];
-    const effectiveType = fixed ?? variantType;
+const effectiveType: VariantType = vis.productTypeSelect
+  ? variantType
+  : (fixed ?? variantType);
+
 
     if (!main) {
       alert("Please select a main image");
@@ -385,6 +391,9 @@ export default function ProductForm() {
     data.append("description", description);
     data.append("price", price);
     data.append("main", main);
+    // data.append("variantType", effectiveType);
+data.append("type", effectiveType); // backwards compat / debugging
+
 
     // Media blocks
     thumbnails.forEach((f) => data.append("thumbnails", f));

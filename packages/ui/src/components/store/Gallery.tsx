@@ -107,17 +107,20 @@ export default function Gallery({
 
       <motion.div
         className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 mt-8"
-        initial="hidden"
+  initial={false}          // ✅ important: do NOT render hidden on the server
         animate="visible"
         variants={{
           hidden: { opacity: 0 },
           visible: { opacity: 1, transition: { staggerChildren: 0.04 } },
         }}
       >
+           {/* <>{JSON.stringify(products)}</> */}
+
         {products.map((p) => {
           const liked = isFavorite(p.id);
           const imgSrc = getPrimaryImage(p);
           const isCartItem = isCartSelectedItem(p);
+          // console.log("Rendering product", p.id, { imgSrc });
 
           const pricing = derivePricing(p);
           const current = isCartItem ? (p as CartSelectedItem).price : pricing.price;
@@ -126,12 +129,17 @@ export default function Gallery({
             : pricing.compareAt ?? null;
           const discounted = compare != null && current < compare;
 
+
           return (
             <motion.div
               key={p.id + (isCartItem ? (p as CartSelectedItem).previewUrl ?? "" : "")}
               variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
+              initial={{ opacity: 0, y: 16 }}
+  animate={{ opacity: 1, y: 0 }}
               className="group"
             >
+            {/* <>Hello Javascript</> */}
+
               <div
                 className={[
                   // Card shell — neutral, airy, understated

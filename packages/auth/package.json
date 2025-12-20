@@ -1,0 +1,13 @@
+{
+  "name": "@acme/auth",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+    
+
+  },
+  "dependencies": {
+    "next-auth": "^4.24.11"
+  }
+}

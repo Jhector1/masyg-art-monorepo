@@ -113,6 +113,12 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
     });
   }, [wantPrint, product, format, sizeString, material.label, frame?.label]);
 
+
+
+
+
+
+  
   const digitalPriceNum = Number(digitalUnit.finalUnitPrice) || 0;
   const printPriceNum   = Number(printUnit.finalUnitPrice) || 0;
   const digitalPriceStr = digitalPriceNum.toFixed(2);
@@ -161,7 +167,7 @@ const saleEndsAt   = toDate(product?.saleEndsAt as any);
         printVariantId: "ADD",
         updates: {
           format: "jpg",
-          size: size.label,
+          size: size?.label,
           material: material.label,
           frame: frame?.label ?? null,
         } as CartUpdates,

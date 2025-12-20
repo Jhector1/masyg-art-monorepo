@@ -3,395 +3,370 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
+import crypto from "crypto";
+
 import { stripe } from "@acme/core/lib/stripe";
 import { prisma } from "@acme/core/lib/prisma";
-import type { OrderList } from "@acme/core/types";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
-import { applyBundleIfBoth, computeBaseUnit, getEffectiveSale, roundMoney } from "@acme/core/lib/pricing";
-// import { getSizeMultiplier } from "@/utils/helpers";
+import { getEffectiveSale, roundMoney } from "@acme/core/lib/pricing";
+import { getOrCreateGuestId } from "@acme/auth";
 
-/** Latest UserDesign for a given (user|guest)+productId */
-async function findDesign(productId: string, userId: string | null, guestId: string | null) {
-  if (!userId && !guestId) return null;
-  return prisma.userDesign.findFirst({
-    where: userId ? { userId, productId } : { guestId: guestId!, productId },
-    orderBy: { updatedAt: "desc" },
-    select: { id: true, previewUrl: true, previewPublicId: true },
-  });
+
+const SITE = "JEANYVES" as const;
+
+function moneyToCents(v: number) {
+  return Math.max(0, Math.round(v * 100));
 }
 
-/** Fallback: detect digital/print selection shape from body.myProduct (used only if cartItemId missing) */
-function detectDigital(p: any) {
-  const obj = p?.digital;
-  const id =(typeof obj === "object" && obj?.id) || null;
-  const present = Boolean(id) || obj === true || obj === "Digital" || obj === "DIGITAL";
-  const format = (typeof obj === "object" && obj?.format) || undefined;
-  const license = (typeof obj === "object" && obj?.license)  || undefined;
-  return { present, id, format, license };
-}
-function detectPrint(p: any) {
-  const obj = p?.print;
-  const id = obj?.id || (typeof obj === "object" && obj?.id) || null;
-  const present = Boolean(id) || obj === true || obj === "Print" || obj === "PRINT";
-  const format = (typeof obj === "object" && obj?.format) || undefined;
-  const size = (typeof obj === "object" && obj?.size) || undefined;
-  const material = (typeof obj === "object" && obj?.material) || undefined;
-  const frame = (typeof obj === "object" && obj?.frame) || undefined;
-  return { present, id, format, size, material, frame };
-}
+type CheckoutEntry =
+  | { cartItemId: string; quantity?: number }
+  | { productId: string; originalVariantId: string; quantity?: number };
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, guestId } = await getCustomerIdFromRequest(req);
-    const body = (await req.json()) as OrderList;
-
-    if (!Array.isArray(body?.cartProductList)) {
-      return NextResponse.json({ error: "cartProductList missing/invalid" }, { status: 400 });
+    let { userId, guestId } = await getCustomerIdFromRequest(req);
+    if (!userId && !guestId) {
+      guestId=getOrCreateGuestId();
     }
 
-    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
-    const purchasedCartItemIds: string[] = [];
-    let requiresShipping = false;
-    let hasAnyDesign = false;
+    const body = (await req.json().catch(() => null)) as any;
+    const list: CheckoutEntry[] = body?.cartProductList;
 
-    // Prefer server data by cartItemId; fallback to safe compute from product+selection
-    const requestedIds = body.cartProductList.map(i => String(i.cartItemId ?? "")).filter(Boolean);
+    if (!Array.isArray(list) || list.length === 0) {
+      return NextResponse.json(
+        { error: "cartProductList missing/invalid" },
+        { status: 400 }
+      );
+    }
 
-    const cartItems = requestedIds.length
+    // normalize + enforce qty=1 for originals
+    const normalized = list.map((e: any) => ({
+      cartItemId: e?.cartItemId ? String(e.cartItemId) : null,
+      productId: e?.productId ? String(e.productId) : null,
+      originalVariantId: e?.originalVariantId
+        ? String(e.originalVariantId)
+        : null,
+      qty: 1,
+    }));
+
+    const cartItemIds = normalized
+      .map((x) => x.cartItemId)
+      .filter(Boolean) as string[];
+    const directPairs = normalized
+      .filter((x) => !x.cartItemId && x.productId && x.originalVariantId)
+      .map((x) => ({
+        productId: x.productId!,
+        originalVariantId: x.originalVariantId!,
+      }));
+
+    if (cartItemIds.length === 0 && directPairs.length === 0) {
+      return NextResponse.json(
+        {
+          error: "invalid_payload",
+          message: "Provide cartItemId OR (productId + originalVariantId).",
+        },
+        { status: 400 }
+      );
+    }
+
+    // 1) load cart items (server source of truth)
+    const cartItems = cartItemIds.length
       ? await prisma.cartItem.findMany({
-          where: { id: { in: requestedIds } },
+          where: {
+            id: { in: cartItemIds },
+            cart: userId
+              ? { userId, site: SITE }
+              : { guestId: guestId!, site: SITE },
+          },
           include: {
             product: {
               select: {
                 id: true,
                 title: true,
-                price: true,
                 thumbnails: true,
+                site: true,
+                price: true,
                 salePrice: true,
                 salePercent: true,
                 saleStartsAt: true,
                 saleEndsAt: true,
-                    sizes: true, // ← ADD
-
               },
             },
-            digitalVariant: true,
-            printVariant: true,
+            originalVariant: true,
             design: { select: { id: true, previewUrl: true } },
-            // NOTE: scalar fields (previewUrlSnapshot, styleSnapshot) are included by default
           },
         })
       : [];
 
+    const cartById = new Map(cartItems.map((ci) => [ci.id, ci]));
 
-    // Quick lookup for cartItems by id
-    const cartById = new Map(cartItems.map(ci => [ci.id, ci]));
-
-    for (const entry of body.cartProductList) {
-        // const digitalt = detectDigital(entry.myProduct);
-      // const printt = detectPrint(entry.myProduct);
-
-      const qty = Math.max(1, Number(entry.quantity ?? 1));
-
-      // Server-only detection for "user design" on known cart lines
-      const ciFromMap = entry.cartItemId ? cartById.get(entry.cartItemId) : null;
-      const serverSawDesign =
-        Boolean(ciFromMap?.design?.id) ||
-        Boolean((ciFromMap as any)?.styleSnapshot) ||
-        Boolean((ciFromMap as any)?.previewUrlSnapshot);
-
-      hasAnyDesign ||= serverSawDesign;
-
-       
-
-      // 1) If we have a server cart line, use it as the single source of truth
-      if (entry.cartItemId && ciFromMap) {
-        const ci = ciFromMap;
-        const product = ci.product;
-        const digitalVariant = ci.digitalVariant;
-        const printVariant = ci.printVariant;
-
-        // server-side price derivation
-        const baseUnit = computeBaseUnit({
-          productBase: product.price,
-          format: digitalVariant?.format ?? printVariant?.format,
-          size: printVariant?.size,
-          material: printVariant?.material,
-          frame: printVariant?.frame,
-          license: digitalVariant?.license,
-          digital: digitalVariant,
-          print: printVariant,
-            sizeList: product.sizes,     // ← NEW
-
-        });
-        // Use moderated size multiplier (same as cart)
-// const sizeFactor =
-//   printVariant?.size
-//     ? getSizeMultiplier(String(printVariant.size), product.sizes ?? undefined)
-//     : 1;
-
-// const baseUnit = roundMoney(baseUnitRaw * sizeFactor);
-
-
-
-        const sale = getEffectiveSale({
-          price: baseUnit,
-          salePrice: product.salePrice,
-          salePercent: product.salePercent,
-          saleStartsAt: product.saleStartsAt,
-          saleEndsAt: product.saleEndsAt,
-        });
-
-        const priceWithBundle = applyBundleIfBoth(baseUnit, digitalVariant, printVariant);
-        const priceWithSale = sale.price;
-        const finalUnit = roundMoney(Math.min(priceWithSale, priceWithBundle));
-        const unitCents = Math.round(finalUnit * 100);
-
-        // split (for webhook orderItem splitting)
-        let digitalUnitCents: number | undefined;
-        let printUnitCents: number | undefined;
-        if (digitalVariant && printVariant) {
-          digitalUnitCents = Math.floor(unitCents / 2);
-          printUnitCents = unitCents - digitalUnitCents;
-        } else if (digitalVariant) {
-          digitalUnitCents = unitCents;
-        } else if (printVariant) {
-          printUnitCents = unitCents;
-        }
-
-        const imageUrl = ci.design?.previewUrl || product.thumbnails?.[0];
-        if (printVariant) requiresShipping = true;
-
-        line_items.push({
-          price_data: {
-            currency: "usd",
-            unit_amount: unitCents,
-            product_data: {
-              name: product.title,
-              ...(imageUrl ? { images: [imageUrl] } : {}),
-              metadata: {
-                productId: product.id,
-                variantType:
-                  digitalVariant && printVariant ? "BUNDLE" : (digitalVariant ? "DIGITAL" : "PRINT"),
-                ...(digitalVariant && {
-                  digitalVariantId: digitalVariant.id,
-                  digitalFormat: digitalVariant.format ?? "",
-                  ...(typeof digitalUnitCents === "number" ? { digitalUnitCents: String(digitalUnitCents) } : {}),
-                }),
-                ...(printVariant && {
-                  printVariantId: printVariant.id,
-                  printFormat: printVariant.format ?? "",
-                  ...(printVariant.size ? { printSize: String(printVariant.size) } : {}),
-                  ...(printVariant.material ? { printMaterial: String(printVariant.material) } : {}),
-                  ...(printVariant.frame ? { printFrame: String(printVariant.frame) } : {}),
-                  ...(typeof printUnitCents === "number" ? { printUnitCents: String(printUnitCents) } : {}),
-                }),
-                ...(ci.design?.id ? { designId: String(ci.design.id) } : {}),
-                ...(serverSawDesign ? { isDesignOrder: "1" } : {}),
-                ...(userId ? { userId } : {}),
-                ...(guestId ? { guestId } : {}),
-                cartItemId: ci.id,
-              },
-            },
+    // 2) load direct “buy now” items (no cart needed)
+    const directLoaded = await Promise.all(
+      directPairs.map(async ({ productId, originalVariantId }) => {
+        const product = await prisma.product.findUnique({
+          where: { id: productId },
+          select: {
+            id: true,
+            title: true,
+            thumbnails: true,
+            site: true,
+            price: true,
+            salePrice: true,
+            salePercent: true,
+            saleStartsAt: true,
+            saleEndsAt: true,
           },
-          quantity: qty,
         });
 
-        purchasedCartItemIds.push(ci.id);
-        continue;
+        const variant = await prisma.productVariant.findUnique({
+          where: { id: originalVariantId },
+          select: {
+            id: true,
+            productId: true,
+            type: true,
+            status: true,
+            listPrice: true,
+            medium: true,
+            year: true,
+            widthIn: true,
+            heightIn: true,
+            originalSerial: true,
+          },
+        });
+
+        return { product, variant };
+      })
+    );
+
+    // Build unified checkout items (cart-based or direct)
+    const items = [];
+
+    // from cart
+    for (const id of cartItemIds) {
+      const ci = cartById.get(id);
+      if (!ci) {
+        return NextResponse.json(
+          { error: "invalid_cart_item", message: `Missing cartItemId ${id}` },
+          { status: 400 }
+        );
+      }
+      if (ci.product.site !== SITE) {
+        return NextResponse.json({ error: "wrong_site" }, { status: 400 });
+      }
+      if (
+        !ci.originalVariantId ||
+        !ci.originalVariant ||
+        ci.originalVariant.type !== "ORIGINAL"
+      ) {
+        return NextResponse.json({ error: "not_original" }, { status: 400 });
+      }
+      if (ci.originalVariant.status !== "ACTIVE") {
+        return NextResponse.json(
+          { error: "unavailable", message: "Original is not available." },
+          { status: 409 }
+        );
       }
 
-      // 2) Fallback (no cartItemId): compute from product + selection, still server-authoritative
-      const p = (entry as any).myProduct as any;
-      //    const digitalt = detectDigital(p);
-      // const printt = detectPrint(p);
-
-      if (!p?.id || !p?.title) continue;
-
-      // fetch product to get server sale fields
-      const product = await prisma.product.findUnique({
-        where: { id: String(p.id) },
-        select: {
-          id: true,
-          title: true,
-          price: true,
-          thumbnails: true,
-          salePrice: true,
-          salePercent: true,
-          saleStartsAt: true,
-          saleEndsAt: true,
-              sizes: true, // ← ADD
-
-        },
+      items.push({
+        productId: ci.productId,
+        title: ci.product.title,
+        imageUrl:
+          ci.previewUrlSnapshot ||
+          ci.design?.previewUrl ||
+          ci.product.thumbnails?.[0] ||
+          null,
+        unitPrice: ci.price, // cart is source of truth here
+        originalVariantId: ci.originalVariantId,
       });
-      if (!product) continue;
+    }
 
-      const digital = detectDigital(p);
-      const print = detectPrint(p);
+    // from direct buy-now
+    for (const row of directLoaded) {
+      const product = row.product;
+      const variant = row.variant;
 
+      if (!product || !variant) {
+        return NextResponse.json(
+          { error: "invalid_product_or_variant" },
+          { status: 400 }
+        );
+      }
+      if (product.site !== SITE) {
+        return NextResponse.json({ error: "wrong_site" }, { status: 400 });
+      }
+      if (variant.productId !== product.id || variant.type !== "ORIGINAL") {
+        return NextResponse.json({ error: "not_original" }, { status: 400 });
+      }
+      if (variant.status !== "ACTIVE") {
+        return NextResponse.json(
+          { error: "unavailable", message: "Original is not available." },
+          { status: 409 }
+        );
+      }
 
-
-      // shape minimal "variants" for pricing
-      const digitalVariant = digital.present
-        ? { id: digital.id ?? "tmp", type: "DIGITAL", format: digital.format, license: digital.license }
-        : null;
-      const printVariant = print.present
-        ? { id: print.id ?? "tmp", type: "PRINT", format: print.format, size: print.size, material: print.material, frame: print.frame }
-        : null;
-
-      // derive price on server
-      const baseUnit = computeBaseUnit({
-        productBase: product.price,
-        format: digitalVariant?.format ?? printVariant?.format,
-        size: printVariant?.size,
-        material: printVariant?.material,
-        frame: printVariant?.frame,
-        license: digitalVariant?.license,
-        digital: digitalVariant as any,
-        print: printVariant as any,
-          sizeList: product.sizes,     // ← NEW
-
-      });
-// const sizeFactor =
-//   printVariant?.size
-//     ? getSizeMultiplier(String(printVariant.size), product.sizes ?? undefined)
-//     : 1;
-
-// const baseUnit = roundMoney(baseUnitRaw * sizeFactor);
-
+      const base =
+        typeof variant.listPrice === "number"
+          ? variant.listPrice
+          : product.price;
       const sale = getEffectiveSale({
-        price: baseUnit,
+        price: base,
         salePrice: product.salePrice,
         salePercent: product.salePercent,
         saleStartsAt: product.saleStartsAt,
         saleEndsAt: product.saleEndsAt,
       });
+      const finalUnit = roundMoney(sale.price);
 
-      const priceWithBundle = applyBundleIfBoth(baseUnit, digitalVariant, printVariant);
-      const priceWithSale = sale.price;
-      const finalUnit = roundMoney(Math.min(priceWithSale, priceWithBundle));
-      const unitCents = Math.round(finalUnit * 100);
+      items.push({
+        productId: product.id,
+        title: product.title,
+        imageUrl: product.thumbnails?.[0] || null,
+        unitPrice: finalUnit,
+        originalVariantId: variant.id,
+      });
+    }
 
-      let digitalUnitCents: number | undefined;
-      let printUnitCents: number | undefined;
-      if (digitalVariant && printVariant) {
-        digitalUnitCents = Math.floor(unitCents / 2);
-        printUnitCents = unitCents - digitalUnitCents;
-      } else if (digitalVariant) {
-        digitalUnitCents = unitCents;
-      } else if (printVariant) {
-        printUnitCents = unitCents;
-      }
+    if (items.length === 0) {
+      return NextResponse.json({ error: "no_items" }, { status: 400 });
+    }
 
-      const design = await findDesign(product.id, userId ?? null, guestId ?? null);
-      const serverSawDesignFallback = Boolean(design);
-      hasAnyDesign ||= serverSawDesignFallback;
-      if (printVariant) requiresShipping = true;
+    // guest claim token for "create account to save purchase"
+    const isGuest = Boolean(guestId && !userId);
+    const claimToken = isGuest ? crypto.randomBytes(32).toString("hex") : null;
+    const claimTokenHash = claimToken
+      ? crypto.createHash("sha256").update(claimToken).digest("hex")
+      : null;
+    const claimTokenExpiresAt = claimToken
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      : null;
 
-      const imageUrl = design?.previewUrl || p.imageUrl || product.thumbnails?.[0];
+    // Reserve + create Order + create Stripe session
+    // compute totals OUTSIDE tx (fast + no DB)
+    const total = items.reduce((sum, i) => sum + i.unitPrice, 0);
 
-      line_items.push({
+    // guest claim token computed OUTSIDE tx too (you already do)
+  const order = await prisma.$transaction(async (tx) => {
+  const originalIds = items.map((i) => i.originalVariantId);
+
+  // 1) reserve originals
+  const reserved = await tx.productVariant.updateMany({
+    where: { id: { in: originalIds }, type: "ORIGINAL", status: "ACTIVE" },
+    data: { status: "RESERVED" },
+  });
+
+  if (reserved.count !== originalIds.length) {
+    throw new Error("One or more originals were just taken. Please refresh.");
+  }
+
+  // 2) remove those originals from EVERYONE’S carts (same site)
+  await tx.cartItem.deleteMany({
+    where: {
+      originalVariantId: { in: originalIds },
+      cart: { site: SITE }, // ✅ relation filter
+    },
+  });
+
+  // 3) create order
+  const createdOrder = await tx.order.create({
+    data: {
+      userId: userId ?? undefined,
+      guestId: guestId ?? undefined,
+      total,
+      status: "PENDING",
+      site: SITE,
+      claimTokenHash: claimTokenHash ?? undefined,
+      claimTokenExpiresAt: claimTokenExpiresAt ?? undefined,
+    },
+    select: { id: true, site: true },
+  });
+
+  // 4) create order items
+  await tx.orderItem.createMany({
+    data: items.map((i) => ({
+      orderId: createdOrder.id,
+      productId: i.productId,
+      type: "ORIGINAL",
+      price: i.unitPrice,
+      quantity: 1,
+      previewUrlSnapshot: i.imageUrl ?? null,
+      originalVariantId: i.originalVariantId,
+    })),
+  });
+
+  return createdOrder;
+}, { timeout: 20000, maxWait: 10000 });
+
+
+    const CLIENT_URL =
+      process.env.NEXT_PUBLIC_CLIENT_URL ??
+      process.env.NEXT_PUBLIC_APP_URL ??
+      req.headers.get("origin") ??
+      "http://localhost:3000";
+
+    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] =
+      items.map((i) => ({
+        quantity: 1,
         price_data: {
           currency: "usd",
-          unit_amount: unitCents,
+          unit_amount: moneyToCents(i.unitPrice),
           product_data: {
-            name: product.title,
-            ...(imageUrl ? { images: [imageUrl] } : {}),
+            name: i.title,
+            ...(i.imageUrl ? { images: [i.imageUrl] } : {}),
             metadata: {
-              productId: product.id,
-              variantType: digitalVariant && printVariant ? "BUNDLE" : (digitalVariant ? "DIGITAL" : "PRINT"),
-              ...(digitalVariant && {
-                digitalVariantId: String(digitalVariant.id ?? ""),
-                digitalFormat: digitalVariant.format ?? "",
-                ...(typeof digitalUnitCents === "number" ? { digitalUnitCents: String(digitalUnitCents) } : {}),
-              }),
-              ...(printVariant && {
-                printVariantId: String(printVariant.id ?? ""),
-                printFormat: printVariant.format ?? "",
-                ...(printVariant.size ? { printSize: String(printVariant.size) } : {}),
-                ...(printVariant.material ? { printMaterial: String(printVariant.material) } : {}),
-                ...(printVariant.frame ? { printFrame: String(printVariant.frame) } : {}),
-                ...(typeof printUnitCents === "number" ? { printUnitCents: String(printUnitCents) } : {}),
-              }),
-              ...(design?.id ? { designId: String(design.id) } : {}),
-              ...(serverSawDesignFallback ? { isDesignOrder: "1" } : {}),
-              ...(userId ? { userId } : {}),
-              ...(guestId ? { guestId } : {}),
+              site: SITE,
+              productId: i.productId,
+              variantType: "ORIGINAL",
+              originalVariantId: i.originalVariantId,
             },
           },
         },
-        quantity: qty,
-      });
-       const design2 = await findDesign(p.id, userId ?? null, guestId ?? null);
-      if (design2) hasAnyDesign = true;
+      }));
 
-    }
-
-    if (line_items.length === 0) {
-      return NextResponse.json(
-        { error: "no_purchasable_items", message: "No valid selections or non-zero prices found." },
-        { status: 400 }
-      );
-    }
-
-    const sessionMetadata: Stripe.MetadataParam = {
-      kind: "order",
-      ...(userId && { userId }),
-      ...(guestId && { guestId }),
-      ...(purchasedCartItemIds.length && { cartItemIds: purchasedCartItemIds.join(",") }),
-    };
-
-    // // Final source of truth: if any line item has a design marker -> Embedded
-    // hasAnyDesign ||= line_items.some((li) => {
-    //   const md = (li.price_data as any)?.product_data?.metadata as Record<string, string> | undefined;
-    //   return Boolean(md?.designId) || md?.isDesignOrder === "1";
-    // });
-
-    if (hasAnyDesign) {
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        ui_mode: "embedded",
-        redirect_on_completion: "never",
-        line_items,
-        ...(requiresShipping
-          ? { shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "FR"] } }
-          : {}),
-        consent_collection: { terms_of_service: "required" },
-        automatic_tax: { enabled: true },
-        metadata: sessionMetadata,
-        client_reference_id: `order:${userId ?? guestId ?? "guest"}`,
-      });
-
-      return NextResponse.json({
-        flow: "embedded",
-        clientSecret: session.client_secret,
-        sessionId: session.id,
-      });
-    }
-
-    const CLIENT_URL = process.env.NEXT_PUBLIC_CLIENT_URL!;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
-      success_url: `${CLIENT_URL}/cart/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${CLIENT_URL}/cart`,
       line_items,
-      ...(requiresShipping
-        ? { shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "FR"] } }
-        : {}),
+
+      shipping_address_collection: { allowed_countries: ["US", "CA"] },
+
       consent_collection: { terms_of_service: "required" },
       automatic_tax: { enabled: true },
-      metadata: sessionMetadata,
+
+      metadata: {
+        kind: "order",
+        orderId: order.id,
+        site: SITE,
+        ...(userId ? { userId } : {}),
+        ...(guestId ? { guestId } : {}),
+      },
+
+      success_url:
+        `${CLIENT_URL}/cart/checkout/success?session_id={CHECKOUT_SESSION_ID}` +
+        (claimToken ? `&claim=${claimToken}` : ""),
+      cancel_url: `${CLIENT_URL}/cart`,
       client_reference_id: `order:${userId ?? guestId ?? "guest"}`,
+    });
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { stripeSessionId: session.id },
     });
 
     return NextResponse.json({
       flow: "redirect",
       url: session.url,
       sessionId: session.id,
+      orderId: order.id,
     });
   } catch (err: any) {
     console.error("[CHECKOUT_ROUTE_ERROR]", err?.message || err);
+    const msg = String(err?.message ?? "");
+    if (msg.includes("just taken")) {
+      return NextResponse.json(
+        { error: "original_unavailable", message: msg },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: "checkout_failed" }, { status: 500 });
   }
 }

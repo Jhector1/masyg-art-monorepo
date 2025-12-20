@@ -91,7 +91,6 @@ export async function POST(req: NextRequest) {
         // const digitalt = detectDigital(entry.myProduct);
       // const printt = detectPrint(entry.myProduct);
 
-      //       console.log("print", printt)
       const qty = Math.max(1, Number(entry.quantity ?? 1));
 
       // Server-only detection for "user design" on known cart lines
@@ -103,7 +102,6 @@ export async function POST(req: NextRequest) {
 
       hasAnyDesign ||= serverSawDesign;
 
-      //  console.log("digital-----", digitalt)
        
 
       // 1) If we have a server cart line, use it as the single source of truth
@@ -208,7 +206,6 @@ export async function POST(req: NextRequest) {
       //    const digitalt = detectDigital(p);
       // const printt = detectPrint(p);
 
-      //       console.log("print", printt)
       if (!p?.id || !p?.title) continue;
 
       // fetch product to get server sale fields

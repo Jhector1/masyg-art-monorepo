@@ -19,7 +19,8 @@ export default async function HomePage() {
         <div className="max-w-5xl">
           <h1 className="text-3xl md:text-5xl tracking-tight font-medium">Jean&nbsp;Yves&nbsp;Hector</h1>
           <p className="mt-3 md:mt-4 text-sm md:text-base text-neutral-500 max-w-xl">
-            Originals only — paintings & drawings. Minimal. Quiet. Considered.
+Original paintings and drawings.
+By Jean Yves Hector.
           </p>
           <div className="mt-8 flex gap-3">
             <Link href="/store" className="inline-flex items-center rounded-full border border-neutral-900 px-4 py-2 text-sm hover:-translate-y-[1px] transition">
@@ -46,7 +47,7 @@ export default async function HomePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12">
             {featured.map((p) => (
-              <ProductCardOriginal key={p.id} product={p} href={`/art/${p.id}`} />
+              <ProductCardOriginal key={p.id} product={p} href={`/store/${p.id}`} />
             ))}
           </div>
         )}

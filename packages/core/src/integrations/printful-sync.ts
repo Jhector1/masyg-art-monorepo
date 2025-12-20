@@ -147,7 +147,6 @@ export async function syncPrintfulProductById(
   }
 
   const thumbnails = Array.from(thumbSet);
-  console.log("[Printful] final thumbnails for", name, thumbnails);
 
   // 4) decide description behavior
   const printfulDescription = syncProduct?.description ?? "";

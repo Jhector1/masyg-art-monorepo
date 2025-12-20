@@ -1,18 +1,24 @@
-// packages/server/src/favorites.ts
 import { prisma } from "@acme/core/lib/prisma";
-import { productListSelect } from "@acme/core/types"; // <-- server-safe select (no React)
-import { normalizeTypes, variantProductWhere, type TypesParam } from "@acme/core/utils/variants";
+import { productListSelect } from "@acme/core/types";
+import {
+  normalizeTypes,
+  variantProductWhere,
+  type TypesParam,
+} from "@acme/core/utils/variants";
+import type { Storefront } from "@prisma/client";
 
-type ListFavoritesInput = { userId: string; types?: TypesParam };
+export async function listFavoritesForUser(opts: {
+  userId: string;
+  site: Storefront;
+  types?: TypesParam;
+}) {
+  // const normalized = normalizeTypes(opts.types);
+  // const productWhere = variantProductWhere(normalized);
 
-export async function listFavoritesForUser({ userId, types }: ListFavoritesInput) {
-  const normalized = normalizeTypes(types);                // e.g. ["DIGITAL","PRINT"] | ["ORIGINAL"] | undefined
-  const productWhere = variantProductWhere(normalized);    // server-safe pure function
-
-  const products = await prisma.product.findMany({
+  return prisma.product.findMany({
     where: {
-      ...productWhere,
-      favorites: { some: { userId } },
+      // ...productWhere,
+      favorites: { some: { userId: opts.userId, site: opts.site } },
     },
     select: {
       ...productListSelect,
@@ -20,22 +26,34 @@ export async function listFavoritesForUser({ userId, types }: ListFavoritesInput
     },
     orderBy: { createdAt: "desc" },
   });
-
-  return products;
 }
 
-export async function addFavorite(userId: string, productId: string) {
+export async function addFavorite(opts: {
+  userId: string;
+  productId: string;
+  site: Storefront;
+}) {
+  const { userId, productId, site } = opts;
+
   await prisma.favorite.upsert({
-    where: { userId_productId: { userId, productId } },
+    where: { userId_productId_site: { userId, productId, site } }, // ✅ matches schema
     update: {},
-    create: { userId, productId },
+    create: { userId, productId, site },
   });
+
   return { ok: true };
 }
 
-export async function removeFavorite(userId: string, productId: string) {
+export async function removeFavorite(opts: {
+  userId: string;
+  productId: string;
+  site: Storefront;
+}) {
+  const { userId, productId, site } = opts;
+
   await prisma.favorite.deleteMany({
-    where: { userId, productId },
+    where: { userId, productId, site },
   });
+
   return { ok: true };
 }

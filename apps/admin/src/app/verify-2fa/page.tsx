@@ -83,7 +83,7 @@ function handlePaste(i: number, e: React.ClipboardEvent<HTMLInputElement>) {
     try {
       const r = await fetch(`/api/admin/2fa/send${force ? "?force=1" : ""}`, { method: "POST" });
       const data = (await r.json().catch(() => ({}))) as SendResult;
-        console.log(data)
+     
       // Parse Retry-After header for cooldown (seconds)
       const retryAfter = parseInt(r.headers.get("Retry-After") || "0", 10);
       if (retryAfter > 0) {

@@ -1,5 +1,7 @@
 import { prisma } from "@acme/core/lib/prisma";          // ✅ fix
 export async function listProductsCore(params: {
+    site: "ZILEDIGITAL" | "JEANYVES";          // ✅ add
+
   types?: Array<"DIGITAL" | "PRINT" | "ORIGINAL"> | "ALL";
   userId?: string | null;
   guestId?: string | null;
@@ -13,8 +15,9 @@ export async function listProductsCore(params: {
   if (params.types === "ALL") {
     normalized = "ALL";
   } else if (!params.types || (Array.isArray(params.types) && params.types.length === 0)) {
-    normalized = NON_ORIGINAL; // default: non-originals
-  } else {
+  normalized = "ALL"; // show everything by default
+}
+ else {
     const filtered = (params.types as Variant[]).filter(t => VALID.has(t));
     normalized = filtered.includes("ORIGINAL") ? (["ORIGINAL"] as Variant[]) : NON_ORIGINAL;
   }
@@ -36,23 +39,37 @@ where = {
 };
 
   }
-
+ where = { AND: [where, { site: params.site }] };
   const designsWhere =
     params.userId || params.guestId
       ? { OR: [{ userId: params.userId ?? undefined }, { guestId: params.guestId ?? undefined }] }
       : undefined;
 
-  const products = await prisma.product.findMany({
-    where,
-    select: {
-      id: true, title: true, price: true, thumbnails: true, publicId: true,
-      salePrice: true,kind: true, salePercent: true, saleStartsAt: true, saleEndsAt: true,
-      sizes: true,
-      _count: { select: { orderItems: true } },
-      designs: { select: { previewUrl: true }, where: designsWhere, take: 1 }
+const products = await prisma.product.findMany({
+  where,
+  select: {
+    id: true,
+    title: true,
+    price: true,
+    thumbnails: true,
+    publicId: true,
+    salePrice: true,
+    kind: true,
+    salePercent: true,
+    saleStartsAt: true,
+    saleEndsAt: true,
+    sizes: true,
+
+    // ✅ add this
+    variants: {
+      select: { id: true, type: true, status: true, inventory: true },
     },
-    orderBy: { createdAt: "desc" }
-  });
+
+    _count: { select: { orderItems: true } },
+    designs: { select: { previewUrl: true }, where: designsWhere, take: 1 },
+  },
+  orderBy: { createdAt: "desc" },
+});
 
   return products.map(p => {
     const thumbs = [...p.thumbnails];
@@ -67,6 +84,8 @@ where = {
 
 /** Server builder that matches your current /api/products/[id] response shape */
 export async function buildProductDetail(payload: {
+    site: "ZILEDIGITAL" | "JEANYVES";     // ✅ add
+
   productId: string;
   userId?: string;
   guestId?: string;
@@ -74,7 +93,7 @@ export async function buildProductDetail(payload: {
   const { productId, userId, guestId } = payload;
 
   const product = await prisma.product.findUnique({
-    where: { id: productId },
+    where: { id: productId, site: payload.site },   // ✅ enforce site
     include: {
       category: { select: { name: true } },
       reviews: true,
@@ -97,11 +116,22 @@ export async function buildProductDetail(payload: {
     : null;
 
   // cart snapshot (to flag inUserCart per variant)
-  const cartWhere = userId ? { userId } : guestId ? { guestId } : { id: "__none__" };
-  const cart = await prisma.cart.findFirst({
-    where: cartWhere,
-    include: { items: { where: { productId }, include: { digitalVariant: true, printVariant: true, originalVariant: true } } },
-  });
+const cartWhere = userId
+  ? { userId, site: payload.site }
+  : guestId
+  ? { guestId, site: payload.site }
+  : { id: "__none__" };
+
+const cart = await prisma.cart.findFirst({
+  where: cartWhere,
+  include: {
+    items: {
+      where: { productId },
+      include: { digitalVariant: true, printVariant: true, originalVariant: true },
+    },
+  },
+});
+
   const cartVariantIds = new Set<string>();
   for (const it of cart?.items ?? []) {
     if (it.digitalVariant) cartVariantIds.add(it.digitalVariant.id);

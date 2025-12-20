@@ -1,16 +1,20 @@
 // src/app/api/products/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient,  } from "@prisma/client";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
 
 export const runtime = "nodejs";
 const db = new PrismaClient();
 
+// helpers
+
+
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const productId = url.pathname.split("/").pop()!;
 
-  // Identify the caller (prefer logged-in user over guest if both exist)
+  // Identify caller
   const { userId, guestId } = await getCustomerIdFromRequest(req);
 
   const product = await db.product.findUnique({
@@ -18,7 +22,28 @@ export async function GET(req: NextRequest) {
     include: {
       category: { select: { name: true } },
       reviews: true,
-      variants: true,
+      variants: {
+        select: {
+          id: true,
+          type: true,
+          size: true,
+          material: true,
+          attributes: true,
+          listPrice: true,
+          status: true,
+          inventory: true,
+          // original/physical metadata:
+          widthIn: true,
+          heightIn: true,
+          depthIn: true,
+          weightLb: true,
+          year: true,
+          medium: true,
+          surface: true,
+          framed: true,
+          sku: true,
+        },
+      },
     },
   });
 
@@ -26,43 +51,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // --- Fetch the caller's design for this product (if any) ---
-  // Prefer userId; otherwise use guestId. (Both are unique per product via schema constraints.)
-  const userDesign = userId
-    ? await db.userDesign.findUnique({
-        where: { userId_productId: { userId, productId } },
-        select: {
-          id: true,
-          previewUrl: true,
-          previewPublicId: true,
-          previewUpdatedAt: true,
-        },
-      })
-    : guestId
-    ? await db.userDesign.findUnique({
-        where: { guestId_productId: { guestId, productId } },
-        select: {
-          id: true,
-          previewUrl: true,
-          previewPublicId: true,
-          previewUpdatedAt: true,
-        },
-      })
-    : null;
 
-  // --- Cart lookup (safe single-branch match; avoid OR with undefined) ---
-  const cartWhere =
-    userId ? { userId } : guestId ? { guestId } : { id: "__nope__" };
 
+  // Cart lookup (only current caller’s cart)
+  const cartWhere = userId ? { userId, site: "JEANYVES" } : guestId ? { guestId, site: "JEANYVES" } : { id: "__nope__" };
   const cart = await db.cart.findFirst({
     where: cartWhere,
     include: {
+   
       items: {
         where: { productId },
-        include: { digitalVariant: true, printVariant: true },
+        include: { digitalVariant: true, printVariant: true, originalVariant: true },
       },
     },
   });
+
 
   let cartVariantIds: string[] = [];
   if (cart) {
@@ -70,44 +73,50 @@ export async function GET(req: NextRequest) {
       const ids: string[] = [];
       if (item.digitalVariant) ids.push(item.digitalVariant.id);
       if (item.printVariant) ids.push(item.printVariant.id);
+      if (item.originalVariant) ids.push(item.originalVariant.id);
       return ids;
     });
   }
-const mergedThumbs = product.thumbnails.length
-  ? [userDesign?.previewUrl ?? product.thumbnails[0], ...product.thumbnails.slice(1)]
-  : (userDesign?.previewUrl ? [userDesign.previewUrl] : []);
+
+  const mergedThumbs = product.thumbnails;
+
+
+  // const digitalVariants = product.variants.filter((v) => v.type === "DIGITAL");
+  // const printVariants = product.variants.filter((v) => v.type === "PRINT");
+  const originalVariant = product.variants.find((v) => v.type === "ORIGINAL") || null;
+
   const result = {
     id: product.id,
+    kind: product.kind,
+    requiresShipping: product.requiresShipping,
     category: product.category?.name ?? null,
     title: product.title,
     description: product.description,
     price: product.price,
-    imageUrl:  userDesign?.previewUrl ?? product.thumbnails[0] ?? "/placeholder.png",
-thumbnails: mergedThumbs ,
+    imageUrl:  product.thumbnails[0] ?? "/placeholder.png",
+    thumbnails: mergedThumbs,
     formats: product.formats,
     svgPreview: product.svgPreview,
-    variants: product.variants.map((v) => ({
-      ...v,
-      inUserCart: cartVariantIds.includes(v.id),
-    })),
-    reviews: product.reviews,
     salePercent: product.salePercent,
     salePrice: product.salePrice,
     saleStartsAt: product.saleStartsAt,
     saleEndsAt: product.saleEndsAt,
     sizes: product.sizes,
 
-    // 👇 New fields: current user's/guest's design info for this product
-    userDesign: userDesign
-      ? {
-          id: userDesign.id,
-          previewUrl: userDesign.previewUrl,
-          previewPublicId: userDesign.previewPublicId,
-          previewUpdatedAt: userDesign.previewUpdatedAt,
-        }
-      : null,
-    // (optional convenience alias if you just need the URL)
-    userDesignPreviewUrl: userDesign?.previewUrl ?? null,
+    // variants and cart flag
+    variants: product.variants.map((v) => ({
+      ...v,
+      inUserCart: cartVariantIds.includes(v.id),
+    })),
+
+
+    originalVariant,
+
+    // kind-aware summary for the UI info section
+  
+
+  
+    reviews: product.reviews,
   };
 
   return NextResponse.json(result);

@@ -7,11 +7,13 @@ import SEO from "@acme/ui/components/SEO";
 import Gallery from "@acme/ui/components/store/Gallery";
 import { ProductListItem } from "@acme/core/types";
 import { fetchProducts } from "@acme/core/utils/fetchProducts";
-import { KINDS } from "packages/core/src/data/categories";
+import { KINDS } from "@acme/core/data/categories";
 
-// ✅ Make ALL part of the union type safely
 type KindFilter = "ALL" | (typeof KINDS)[number];
-const KINDS_WITH_ALL = Array.from(new Set(["ALL", ...KINDS])) as KindFilter[];
+
+const KINDS_WITH_ALL: KindFilter[] = Array.from(
+  new Set(["ALL", ...KINDS.map(k => k.toUpperCase())])
+) as KindFilter[];
 
 function normalizeKindParam(value: string | null): KindFilter {
   if (!value) return "ALL";
@@ -27,17 +29,14 @@ export default function StoreClient() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Fetch products once
   useEffect(() => {
     fetchProducts().then(setProducts).catch(console.error);
   }, []);
 
-  // Sync filter with ?kind=... in URL
+  const kindParam = searchParams.get("kind");
   useEffect(() => {
-    const paramKind = normalizeKindParam(searchParams.get("kind"));
-    setKindFilter(paramKind);
-    // using toString() ensures effect reacts to param changes reliably
-  }, [searchParams.toString()]);
+    setKindFilter(normalizeKindParam(kindParam));
+  }, [kindParam]);
 
   const handleFilterChange = (next: KindFilter) => {
     setKindFilter(next);
@@ -47,40 +46,31 @@ export default function StoreClient() {
     else params.set("kind", next);
 
     const query = params.toString();
-
-    // replace avoids polluting browser history when clicking filters
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
-  // Filter products by kind
   const filtered = useMemo(() => {
     if (kindFilter === "ALL") return products;
     return products.filter((p) => p.kind === kindFilter);
   }, [products, kindFilter]);
-
   return (
     <>
-      <SEO
-        title="Haitian Digital Art Gallery"
-        description="Buy and explore uniquely crafted Haitian vector artworks."
-      />
+      <SEO title="Haitian Digital Art Gallery" description="Buy and explore uniquely crafted Haitian vector artworks." />
 
-      {/* Filter UI */}
       <div className="flex gap-3 justify-center my-6 flex-wrap">
         {KINDS_WITH_ALL.map((k) => (
           <button
             key={k}
             onClick={() => handleFilterChange(k)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition
-              ${kindFilter === k ? "bg-black text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}
-            `}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              kindFilter === k ? "bg-black text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
           >
             {k}
           </button>
         ))}
       </div>
 
-      {/* Filtered Gallery */}
       <Gallery products={filtered} />
     </>
   );

@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
  "exports": {
-    ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" }
+    ".": "./src/index.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1"
@@ -12,6 +12,8 @@
     "prisma": "^6.10.1"
   },
   "scripts": {
+      "build": "tsc -p tsconfig.build.json",
+
     "generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",

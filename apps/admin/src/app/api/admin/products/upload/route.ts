@@ -205,7 +205,15 @@ export async function POST(request: Request) {
       ? kindRaw
       : "ART";
 
-    const variantType = (formData.get("variantType")?.toString() || "DIGITAL") as VariantType;
+    // const variantType = (formData.get("variantType")?.toString() || "DIGITAL") as VariantType;
+const vtRaw = (formData.get("variantType") ?? formData.get("type") ?? "DIGITAL")
+  .toString()
+  .toUpperCase();
+
+const variantType: VariantType =
+  vtRaw === "DIGITAL" || vtRaw === "PRINT" || vtRaw === "ORIGINAL"
+    ? (vtRaw as VariantType)
+    : "DIGITAL";
 
     const categoryName = formData.get("category")?.toString().trim();
     const title = formData.get("title")?.toString().trim() || "";

@@ -60,7 +60,12 @@ async function uploadAvatar(opts: {
       try {
         const out = await sharp(buffer)
           .rotate()
-          .resize({ width: MAX_DIM, height: MAX_DIM, fit: "inside", withoutEnlargement: true })
+          .resize({
+            width: MAX_DIM,
+            height: MAX_DIM,
+            fit: "inside",
+            withoutEnlargement: true,
+          })
           .webp({ quality, effort: 4 });
         // .toBuffer() can take a Buffer directly; normalize to Buffer again
         buffer = Buffer.from(await out.toBuffer());
@@ -80,22 +85,24 @@ async function uploadAvatar(opts: {
     existingPublicId ||
     `users-${process.env.NODE_ENV}/profile/${userId}/avatar`;
 
-  const result = await new Promise<import("cloudinary").UploadApiResponse>((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        public_id: stablePublicId,    // <— stable id
-        overwrite: true,              // <— replace existing asset
-        invalidate: true,             // <— purge cached versions
-        resource_type: "image",
-        format: "webp",
-        unique_filename: false,
-        use_filename: false,
-        type: "upload",
-      },
-      (err, res) => (err ? reject(err) : resolve(res!))
-    );
-    stream.end(buffer);
-  });
+  const result = await new Promise<import("cloudinary").UploadApiResponse>(
+    (resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          public_id: stablePublicId, // <— stable id
+          overwrite: true, // <— replace existing asset
+          invalidate: true, // <— purge cached versions
+          resource_type: "image",
+          format: "webp",
+          unique_filename: false,
+          use_filename: false,
+          type: "upload",
+        },
+        (err, res) => (err ? reject(err) : resolve(res!))
+      );
+      stream.end(buffer);
+    }
+  );
 
   return { url: result.secure_url, publicId: result.public_id };
 }
@@ -132,11 +139,19 @@ export async function PATCH(req: NextRequest) {
       const file = form.get("avatar");
 
       if (!(file instanceof File)) {
-        return NextResponse.json({ error: "No file provided as 'avatar'." }, { status: 400 });
+        return NextResponse.json(
+          { error: "No file provided as 'avatar'." },
+          { status: 400 }
+        );
       }
 
-      const existingPublicId = me.avatarPublicId ?? extractPublicIdFromUrl(me.avatarUrl);
-      const { url, publicId } = await uploadAvatar({ userId: me.id, file, existingPublicId });
+      const existingPublicId =
+        me.avatarPublicId ?? extractPublicIdFromUrl(me.avatarUrl);
+      const { url, publicId } = await uploadAvatar({
+        userId: me.id,
+        file,
+        existingPublicId,
+      });
 
       const updated = await prisma.user.update({
         where: { id: me.id },
@@ -144,7 +159,13 @@ export async function PATCH(req: NextRequest) {
           avatarUrl: url,
           avatarPublicId: publicId, // store for guaranteed overwrite next time
         },
-        select: { id: true, name: true, email: true, avatarUrl: true, updatedAt: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+          updatedAt: true,
+        },
       });
 
       return NextResponse.json({ user: updated }, { status: 200 });
@@ -153,15 +174,22 @@ export async function PATCH(req: NextRequest) {
     // -------- JSON: name/email (password required) --------
     const body = (await req.json()) as JsonPayload;
     const wantName = typeof body.name === "string" && body.name.trim() !== "";
-    const wantEmail = typeof body.email === "string" && body.email.trim() !== "";
+    const wantEmail =
+      typeof body.email === "string" && body.email.trim() !== "";
     const wantsIdentityChange = wantName || wantEmail;
 
     if (!wantsIdentityChange) {
-      return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Nothing to update." },
+        { status: 400 }
+      );
     }
 
     if (!body.password || !me.password) {
-      return NextResponse.json({ error: "Password required to update profile." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Password required to update profile." },
+        { status: 400 }
+      );
     }
 
     const ok = await bcrypt.compare(body.password, me.password);
@@ -175,13 +203,22 @@ export async function PATCH(req: NextRequest) {
         name: wantName ? body.name!.trim() : undefined,
         email: wantEmail ? body.email!.trim() : undefined,
       },
-      select: { id: true, name: true, email: true, avatarUrl: true, updatedAt: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatarUrl: true,
+        updatedAt: true,
+      },
     });
 
     return NextResponse.json({ user: updated }, { status: 200 });
   } catch (e: any) {
     if (e?.code === "P2002") {
-      return NextResponse.json({ error: "Email is already in use." }, { status: 409 });
+      return NextResponse.json(
+        { error: "Email is already in use." },
+        { status: 409 }
+      );
     }
     console.error("PATCH /auth/profile error:", e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -195,8 +232,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const site = "ZILEDIGITAL";
+
+    const cartItemsCountPromise = (async () => {
+      const cart = await prisma.cart.findFirst({
+        where: { site, userId: String(userId) },
+        select: { id: true },
+      });
+      if (!cart) return 0;
+
+      return prisma.cartItem.count({
+        where: { cartId: cart.id },
+      });
+    })();
+
     // Pull user + light related info
-    const [user, entAgg] = await Promise.all([
+    const [user, entAgg, cartItemsCount] = await Promise.all([
       prisma.user.findUnique({
         where: { id: String(userId) },
         select: {
@@ -215,12 +266,6 @@ export async function GET(req: NextRequest) {
               reviews: true,
               designs: true,
               purchasedDesigns: true,
-            },
-          },
-          cart: {
-            select: {
-              id: true,
-              _count: { select: { items: true } },
             },
           },
           orders: {
@@ -250,6 +295,7 @@ export async function GET(req: NextRequest) {
           editsUsed: true,
         },
       }),
+      cartItemsCountPromise,
     ]);
 
     if (!user) {
@@ -278,7 +324,7 @@ export async function GET(req: NextRequest) {
         reviews: user._count.reviews,
         designs: user._count.designs,
         purchasedDesigns: user._count.purchasedDesigns,
-        cartItems: user.cart?._count.items ?? 0,
+        cartItems: cartItemsCount ?? 0,
       },
       lastOrder,
       addresses: user.addresses,

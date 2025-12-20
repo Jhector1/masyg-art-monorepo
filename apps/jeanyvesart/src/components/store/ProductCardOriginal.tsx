@@ -15,37 +15,40 @@ import {
 } from "@/lib/products";
 import { useFavorites } from "@acme/core/contexts/FavoriteContext";
 
-
 type Props = {
   product: Product;
-  href?: string;                  // optional details page
-  isFavorite?: boolean;
+  href?: string;
   busy?: boolean;
-  // onToggleFavorite?: (id: string) => void; // if provided, shows the heart
+  onBusyChange?: (id: string | null) => void; // ✅ add this
 };
 
 export default function ProductCardOriginal({
   product: p,
   href,
-  // isFavorite = false,
   busy = false,
-  // onToggleFavorite,
+  onBusyChange,
 }: Props) {
   const img = p.thumbnails?.[0] ?? "";
   const v = originalVariant(p);
   const price = v?.listPrice ?? p.price;
   const { label, tone } = availability(v);
-  const { isFavorite, toggleFavorite } = useFavorites();
- const liked = isFavorite(p.id);
-  const handleLikeClick = (id: string) => {
-    // if (!isLoggedIn) {
-    //   // setModalOpen(true);
-    //   return;
-    // }
-    const liked = !isFavorite(id);
-    toggleFavorite(id);
-    // onLikeToggle?.(id, liked);
-  };
+
+  const { isFavorite, toggleFavorite, ready } = useFavorites();
+  const liked = isFavorite(p.id);
+// const v = originalVariant(p);
+const isUnavailable = v?.status === "SOLD" || v?.status === "RESERVED";
+ const handleLikeClick = async (id: string) => {
+  if (isUnavailable) return;
+  if (!ready) return;
+  onBusyChange?.(id);
+  try {
+    await toggleFavorite(id);
+  } finally {
+    onBusyChange?.(null);
+  }
+};
+
+
   const CardInner = (
     <div
       className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50
@@ -71,26 +74,33 @@ export default function ProductCardOriginal({
         <span className="rounded-full bg-white/90 border border-neutral-200 text-[11px] px-2.5 py-1 tracking-wide text-neutral-700">
           Original
         </span>
-        <span className={`rounded-full bg-white/90 border border-neutral-200 text-[11px] px-2.5 py-1 tracking-wide ${tone}`}>
+        <span
+          className={`rounded-full bg-white/90 border border-neutral-200 text-[11px] px-2.5 py-1 tracking-wide ${tone}`}
+        >
           {label}
         </span>
       </div>
 
-      {/* heart (optional) */}
-      {/* {onToggleFavorite && ( */}
-        <button
-          aria-label={liked ? "Remove from favorites" : "Add to favorites"}
-          onClick={(e) => { e.preventDefault(); handleLikeClick(p.id); }}
-          disabled={busy}
-          className="absolute right-[12px] top-[12px] rounded-full bg-white/85 backdrop-blur px-2.5 py-2 border border-neutral-200 hover:bg-white transition"
-        >
-          {liked ? (
-            <HeartSolid className="h-5 w-5 text-neutral-900" />
-          ) : (
-            <HeartOutline className="h-5 w-5 text-neutral-900" />
-          )}
-        </button>
-      {/* )} */}
+      {/* heart */}
+     {/* heart */}
+{!isUnavailable && (
+  <button
+    aria-label={liked ? "Remove from favorites" : "Add to favorites"}
+    onClick={(e) => {
+      e.preventDefault();
+      handleLikeClick(p.id);
+    }}
+    disabled={busy || !ready}
+    className="absolute right-[12px] top-[12px] rounded-full bg-white/85 backdrop-blur px-2.5 py-2 border border-neutral-200 hover:bg-white transition disabled:opacity-60"
+  >
+    {liked ? (
+      <HeartSolid className="h-5 w-5 text-neutral-900" />
+    ) : (
+      <HeartOutline className="h-5 w-5 text-neutral-900" />
+    )}
+  </button>
+)}
+
     </div>
   );
 
@@ -105,8 +115,12 @@ export default function ProductCardOriginal({
       )}
 
       <div className="mt-3">
-        <h3 className="text-[15px] md:text-[16px] text-neutral-900 tracking-tight">{p.title}</h3>
-        {dims(v) && <div className="mt-1 text-[12px] text-neutral-500">{dims(v)}</div>}
+        <h3 className="text-[15px] md:text-[16px] text-neutral-900 tracking-tight">
+          {p.title}
+        </h3>
+        {dims(v) && (
+          <div className="mt-1 text-[12px] text-neutral-500">{dims(v)}</div>
+        )}
         <div className="mt-2 text-[14px] text-neutral-900">{money(price)}</div>
       </div>
     </article>

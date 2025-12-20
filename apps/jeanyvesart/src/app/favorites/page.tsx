@@ -16,7 +16,7 @@ export default function FavoritePage() {
     if (!isLoggedIn) return;
 
     const fetchFavorites = async () => {
-      const res = await fetch(`/api/favorite`, {
+      const res = await fetch(`/api/favorite?types=[ORIGINAL]`, {
         credentials: "include",
         cache: "no-store",
         headers: { "Cache-Control": "no-store" },

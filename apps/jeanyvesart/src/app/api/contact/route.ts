@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendMail } from "@acme/core/lib/email";
 import { z } from "zod";
 
-const CONTACT_TO = process.env.CONTACT_INBOX || "info@ziledigital.com";
-const SITE_NAME = "Ziledigital";
+const CONTACT_TO = process.env.CONTACT_INBOX || "myart@jeanyveshector.com";
+const SITE_NAME = "Jean Yves Hector";
 
 // Basic schema & sanitization
 const ContactSchema = z.object({

@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./services/*": "./src/services/*.ts"
+    "./services/*": "./src/services/*.ts",
+        "./cart/*": "./src/cart/*.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

@@ -19,7 +19,8 @@ import AuthenticationForm from "../authenticate/AuthenticationFom";
 import { navLinks } from "@acme/core/data/helpers";
 import MobileDrawer from "./MobileDrawer";
 
-function Logo() {
+function Logo({appName = "Zile Digital"}:{appName?: string}) {
+  
   return (
     <Link
       href="/"
@@ -27,9 +28,9 @@ function Logo() {
       className="inline-flex items-center gap-2 font-bold tracking-tight"
     >
       <span className="text-xl sm:text-2xl bg-gradient-to-r from-indigo-600 via-sky-600 to-rose-600 bg-clip-text text-transparent">
-        Zile
+       {appName.split(" ")[0]}
       </span>
-      <span className="text-xl sm:text-2xl text-gray-900">Digital</span>
+      <span className="text-xl sm:text-2xl text-gray-900">{appName.split(" ").slice(1).join(" ")}</span>
     </Link>
   );
 }
@@ -102,7 +103,7 @@ function DesktopNav({ pathname }: { pathname: string }) {
   );
 }
 
-export default function Header() {
+export default function Header({ appName = "Zile Digital" }: { appName?: string }) {
   // prevent context menu if you want
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();
@@ -176,7 +177,7 @@ const menuAvatarSrc =
             >
               <Bars3Icon className="h-6 w-6" />
             </button>
-            <Logo />
+            <Logo appName={appName} />
           </div>
 
           {/* Center: Desktop nav */}

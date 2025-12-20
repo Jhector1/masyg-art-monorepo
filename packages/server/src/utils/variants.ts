@@ -10,12 +10,30 @@ const NON_ORIGINAL: Variant[] = ["DIGITAL", "PRINT"];
  * - missing/empty/etc. -> ["DIGITAL","PRINT"]
  * - "ALL"              -> "ALL"
  */
-export function normalizeTypes(types: TypesParam): Variant[] | "ALL" {
+// packages/server/src/utils/variants.ts
+
+export function normalizeTypes(types: unknown): Variant[] | "ALL" {
+  // Support passing "ALL" either as a string or inside an array
   if (types === "ALL") return "ALL";
-  if (!types || (Array.isArray(types) && types.length === 0)) return NON_ORIGINAL;
-  const filtered = (types as Variant[]).filter(t => VALID.has(t));
+  if (Array.isArray(types) && types.map(String).includes("ALL")) return "ALL";
+
+  if (types == null) return NON_ORIGINAL;
+
+  // Coerce to string[]
+  const raw: string[] = Array.isArray(types)
+    ? (types as unknown[]).map(String)
+    : typeof types === "string"
+      ? types.split(",") // supports "DIGITAL,PRINT"
+      : [String(types)];
+
+  const filtered = raw
+    .map((t) => t.trim().toUpperCase())
+    .filter(Boolean)
+    .filter((t): t is Variant => VALID.has(t as Variant));
+
   return filtered.includes("ORIGINAL") ? (["ORIGINAL"] as Variant[]) : NON_ORIGINAL;
 }
+
 
 /** Product WHERE by normalized types.
  * - ORIGINAL path: strictly ORIGINAL variants
