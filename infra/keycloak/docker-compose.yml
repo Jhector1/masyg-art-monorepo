@@ -2,6 +2,9 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     command: ["start"]
+    networks:
+      - keycloak_default
+      - public
     environment:
       # Admin user for Keycloak UI
       KEYCLOAK_ADMIN: admin
@@ -35,6 +38,8 @@ services:
     restart: unless-stopped
 
   keycloak-db:
+    networks:
+        - keycloak_default
     image: postgres:16
     environment:
       POSTGRES_DB: keycloak
@@ -43,6 +48,11 @@ services:
     volumes:
       - keycloak_pg:/var/lib/postgresql/data
     restart: unless-stopped
+networks:
+  keycloak_default:
+  public:
+    external: true
 
 volumes:
   keycloak_pg:
+
