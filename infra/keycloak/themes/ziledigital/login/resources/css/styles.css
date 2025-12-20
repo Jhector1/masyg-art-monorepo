@@ -147,3 +147,31 @@ body{
 .a-row-center{
   justify-content:center;
 }
+
+
+.a-row-tight { margin-top: 8px; }
+
+.a-check{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:13px;
+  color: rgba(240,240,255,0.9);
+  user-select:none;
+}
+.a-check__box{
+  width:16px;
+  height:16px;
+  accent-color: var(--accent);
+}
+.a-check__text{ transform: translateY(-0.5px); }
+
+.a-ok{
+  margin:10px 0 0;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(80,255,160,0.22);
+  background: rgba(80,255,160,0.10);
+  font-size:13px;
+}
+
