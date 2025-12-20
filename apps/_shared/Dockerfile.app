@@ -32,6 +32,7 @@ COPY packages/ui/package.json            packages/ui/
 COPY packages/core/package.json          packages/core/
 COPY packages/server/package.json        packages/server/
 COPY packages/db/package.json            packages/db/
+COPY packages/auth/package.json            packages/auth/
 COPY packages/tailwind-preset/package.json packages/tailwind-preset/
 
 # 3) if a .npmrc tries to disable lockfiles, force-enable them (prevents EUSAGE)
