@@ -40,6 +40,8 @@ services:
     environment:
       NODE_ENV: production
       RUN_MIGRATIONS: "0"        # ❌ do not run migrations
+      NEXT_TELEMETRY_DISABLED: "1"
+      NODE_OPTIONS: "--enable-source-maps --trace-uncaught --trace-warnings"
     expose: ["3005"]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3005/"]
