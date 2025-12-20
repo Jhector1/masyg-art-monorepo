@@ -4,7 +4,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>${title?html}</title>
+  <title>${title?esc}</title>
+
   <link rel="stylesheet" href="${url.resourcesPath}/css/styles.css" />
 </head>
 <body>
