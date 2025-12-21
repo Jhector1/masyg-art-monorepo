@@ -91,7 +91,9 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
       <div className="hidden md:block">
         <UserMenu
           userName={user?.name || "Account"}
-          userImage={user?.image || user?.avatarUrl || "/placeholder.png" || null}
+          userImage={
+            user?.image || user?.avatarUrl || "/placeholder.png" || null
+          }
           userEmail={user?.email || null}
           userRole={user?.isAdmin ? "Admin" : "Member"}
           menuItems={menuItems}
@@ -123,7 +125,8 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
           <nav className="hidden md:flex items-center gap-8">
             {NAV.map(({ href, label }) => {
               const active =
-                pathname === href || (href !== "/" && pathname.startsWith(href));
+                pathname === href ||
+                (href !== "/" && pathname.startsWith(href));
               return (
                 <Link
                   key={href}
@@ -225,11 +228,7 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
                 <div className="rounded-2xl border border-neutral-200 p-3">
                   <div className="flex items-center gap-3">
                     <img
-                      src={
-                        user?.image ||
-                        user?.avatarUrl ||
-                        "/placeholder.png"
-                      }
+                      src={user?.image || user?.avatarUrl || "/placeholder.png"}
                       alt="Profile"
                       className="h-10 w-10 rounded-full object-cover border border-neutral-200"
                     />
@@ -257,13 +256,13 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
                         {it.label}
                       </Link>
                     ))}
-                    <button
+                    {/* <button
                       type="button"
                       className="col-span-2 rounded-xl bg-neutral-900 px-3 py-2 text-sm text-white hover:opacity-90"
                       onClick={() => signOut({ callbackUrl: "/" })}
                     >
                       Sign out
-                    </button>
+                    </button> */}
                   </div>
                 </div>
               )}
@@ -316,6 +315,23 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
                 >
                   Cart{cartCount ? ` (${cartCount})` : ""}
                 </Link>
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <Link
+                  href="/profile"
+                  className="text-xs pt-4 text-neutral-500 hover:text-neutral-900"
+                  onClick={() => setOpen(false)}
+                >
+                  Account settings
+                </Link>
+
+                <button
+                  type="button"
+                  className="text-xs text-red-600 hover:text-red-700"
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                >
+                  Sign out
+                </button>
               </div>
             </nav>
           </div>
