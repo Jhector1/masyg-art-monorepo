@@ -4,6 +4,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="${url.resourcesPath}/img/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="${url.resourcesPath}/img/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="${url.resourcesPath}/img/favicon-16.png" />
+
   <title>${title?esc}</title>
 
   <link rel="stylesheet" href="${url.resourcesPath}/css/styles.css" />
