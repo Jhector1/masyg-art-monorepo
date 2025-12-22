@@ -56,18 +56,20 @@ const isUnavailable = v?.status === "SOLD" || v?.status === "RESERVED";
                  group-hover:-translate-y-0.5"
       style={{ padding: "14px" }}
     >
-      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl">
-        <div className="absolute inset-0 animate-pulse bg-neutral-100" />
-        {img && (
-          <Image
-            src={img}
-            alt={p.title}
-            fill
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-          />
-        )}
-      </div>
+      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-white">
+  <div className="absolute inset-0 animate-pulse bg-neutral-100" />
+  {img && (
+    <Image
+      src={img}
+      alt={p.title}
+      fill
+      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+      className="object-contain"
+      // optional: a little padding so frames/edges don't touch
+      // style={{ padding: 8 }}
+    />
+  )}
+</div>
 
       {/* chips */}
       <div className="absolute left-[14px] bottom-[14px] flex items-center gap-2">

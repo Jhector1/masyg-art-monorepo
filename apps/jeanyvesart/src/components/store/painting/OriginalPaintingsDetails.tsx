@@ -196,7 +196,7 @@ export default function OriginalPaintingDetails({
     () => pickOriginalVariant(data?.variants),
     [data?.variants]
   );
-const isUnavailable = ov?.status === "SOLD" || ov?.status === "RESERVED";
+  const isUnavailable = ov?.status === "SOLD" || ov?.status === "RESERVED";
 
   const avgRating = React.useMemo(() => {
     if (!reviews.length) return 0;
@@ -215,7 +215,7 @@ const isUnavailable = ov?.status === "SOLD" || ov?.status === "RESERVED";
 
   const handleToggleLike = async () => {
     if (!data?.id || likeBusy) return;
-     if (isUnavailable) return;
+    if (isUnavailable) return;
     setLikeBusy(true);
     const willLike = !liked;
 
@@ -285,7 +285,6 @@ const isUnavailable = ov?.status === "SOLD" || ov?.status === "RESERVED";
     return typeof createdId === "string" ? createdId : null;
   }
 
-
   async function removeOriginalFromCart() {
     if (!data || !ov?.id) throw new Error("Missing product/original variant");
     const res = await fetch(`/api/cart`, {
@@ -303,7 +302,7 @@ const isUnavailable = ov?.status === "SOLD" || ov?.status === "RESERVED";
 
   const handleCartToggle = async () => {
     if (!data || !ov?.id || cartBusy) return;
-     if (isUnavailable) return;
+    if (isUnavailable) return;
 
     setCartBusy(true);
     const willAdd = !inCart;
@@ -318,39 +317,39 @@ const isUnavailable = ov?.status === "SOLD" || ov?.status === "RESERVED";
       setCartBusy(false);
     }
   };
- const handleCheckoutNow = async () => {
-  if (!data || !ov?.id || checkoutBusy) return;
+  const handleCheckoutNow = async () => {
+    if (!data || !ov?.id || checkoutBusy) return;
 
-  if (isUnavailable) return;
+    if (isUnavailable) return;
 
-  setCheckoutBusy(true);
-  try {
-    const res = await fetch("/api/checkout", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        cartProductList: [
-          {
-            productId: data.id,
-            originalVariantId: ov.id,
-            quantity: 1,
-          },
-        ],
-      }),
-    });
+    setCheckoutBusy(true);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          cartProductList: [
+            {
+              productId: data.id,
+              originalVariantId: ov.id,
+              quantity: 1,
+            },
+          ],
+        }),
+      });
 
-    const out = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(out?.message ?? out?.error ?? "Checkout failed");
+      const out = await res.json().catch(() => null);
+      if (!res.ok)
+        throw new Error(out?.message ?? out?.error ?? "Checkout failed");
 
-    window.location.href = out.url;
-  } catch (e: any) {
-    console.error(e);
-    setError(e?.message ?? "Checkout failed");
-  } finally {
-    setCheckoutBusy(false);
-  }
-};
-
+      window.location.href = out.url;
+    } catch (e: any) {
+      console.error(e);
+      setError(e?.message ?? "Checkout failed");
+    } finally {
+      setCheckoutBusy(false);
+    }
+  };
 
   // ✅ submit review using client service (POST expects {rating, text})
   const submitReview = async (e: React.FormEvent) => {
@@ -407,32 +406,31 @@ const isUnavailable = ov?.status === "SOLD" || ov?.status === "RESERVED";
           </h1>
         </div>
 
-       <div className="flex items-center gap-2">
-  {!isUnavailable && (
-    <button
-      onClick={handleToggleLike}
-      disabled={likeBusy || !data?.id}
-      className="rounded-full border border-neutral-200 bg-white/90 px-3 py-2 transition hover:bg-white"
-      aria-label={liked ? "Remove from favorites" : "Add to favorites"}
-    >
-      {liked ? (
-        <HeartSolid className="h-5 w-5 text-neutral-900" />
-      ) : (
-        <HeartOutline className="h-5 w-5 text-neutral-900" />
-      )}
-    </button>
-  )}
+        <div className="flex items-center gap-2">
+          {!isUnavailable && (
+            <button
+              onClick={handleToggleLike}
+              disabled={likeBusy || !data?.id}
+              className="rounded-full border border-neutral-200 bg-white/90 px-3 py-2 transition hover:bg-white"
+              aria-label={liked ? "Remove from favorites" : "Add to favorites"}
+            >
+              {liked ? (
+                <HeartSolid className="h-5 w-5 text-neutral-900" />
+              ) : (
+                <HeartOutline className="h-5 w-5 text-neutral-900" />
+              )}
+            </button>
+          )}
 
-  {onClose && (
-    <button
-      onClick={onClose}
-      className="rounded-full border border-neutral-200 px-3 py-2 text-sm hover:bg-neutral-50"
-    >
-      Close
-    </button>
-  )}
-</div>
-
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="rounded-full border border-neutral-200 px-3 py-2 text-sm hover:bg-neutral-50"
+            >
+              Close
+            </button>
+          )}
+        </div>
       </div>
 
       {loading && (
@@ -459,7 +457,7 @@ const isUnavailable = ov?.status === "SOLD" || ov?.status === "RESERVED";
                   src={activeImg}
                   alt={data.title}
                   fill
-                  className="object-cover"
+                  className="object-contain"
                   sizes="(max-width: 768px) 100vw, 50vw"
                   priority
                 />
@@ -501,38 +499,42 @@ const isUnavailable = ov?.status === "SOLD" || ov?.status === "RESERVED";
             <PaintingSpecs variants={data.variants} />
 
             {/* Cart + Checkout CTA */}
-           <div className="mt-6 flex flex-wrap items-center gap-3">
-  {!isUnavailable ? (
-    <>
-      <button
-        onClick={handleCartToggle}
-        disabled={cartBusy}
-        className={`rounded-xl px-4 py-2 text-sm font-medium transition border ${
-          inCart
-            ? "border-neutral-300 bg-neutral-50 hover:bg-neutral-100"
-            : "border-neutral-900 bg-neutral-900 text-white hover:opacity-90"
-        }`}
-      >
-        {cartBusy ? "Please wait…" : inCart ? "Remove from Cart" : "Add to Cart"}
-      </button>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              {!isUnavailable ? (
+                <>
+                  <button
+                    onClick={handleCartToggle}
+                    disabled={cartBusy}
+                    className={`rounded-xl px-4 py-2 text-sm font-medium transition border ${
+                      inCart
+                        ? "border-neutral-300 bg-neutral-50 hover:bg-neutral-100"
+                        : "border-neutral-900 bg-neutral-900 text-white hover:opacity-90"
+                    }`}
+                  >
+                    {cartBusy
+                      ? "Please wait…"
+                      : inCart
+                        ? "Remove from Cart"
+                        : "Add to Cart"}
+                  </button>
 
-      <button
-        onClick={handleCheckoutNow}
-        disabled={checkoutBusy}
-        className="rounded-xl border border-neutral-900 bg-white px-4 py-2 text-sm font-medium text-neutral-900 transition hover:bg-neutral-50"
-      >
-        {checkoutBusy ? "Starting checkout…" : "Checkout now"}
-      </button>
-    </>
-  ) : (
-    <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
-      This piece is currently <b>{ov?.status?.toLowerCase()}</b> and can’t be purchased right now.
-    </div>
-  )}
+                  <button
+                    onClick={handleCheckoutNow}
+                    disabled={checkoutBusy}
+                    className="rounded-xl border border-neutral-900 bg-white px-4 py-2 text-sm font-medium text-neutral-900 transition hover:bg-neutral-50"
+                  >
+                    {checkoutBusy ? "Starting checkout…" : "Checkout now"}
+                  </button>
+                </>
+              ) : (
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
+                  This piece is currently <b>{ov?.status?.toLowerCase()}</b> and
+                  can’t be purchased right now.
+                </div>
+              )}
 
-  <AvailabilityEcho variants={data.variants} />
-</div>
-
+              <AvailabilityEcho variants={data.variants} />
+            </div>
 
             {/* ✅ Reviews (from service) */}
             <div className="mt-6 rounded-xl border border-neutral-200 p-4">
