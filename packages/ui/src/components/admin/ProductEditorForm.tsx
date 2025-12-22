@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import type { Product, Category } from "@prisma/client";
+import type { Product, Category, ProductKind, Storefront } from "@prisma/client";
 import ReplaceMediaPanel from "./ReplaceMediaPanel";
 import { Field } from "./shared/Field";
 import {
@@ -100,6 +100,9 @@ export default function ProductEditorForm({ product, categories }: Props) {
   const [salePercent, setSalePercent] = React.useState<number | undefined>(
     product.salePercent ?? undefined
   );
+    const [kind, setKind] = React.useState<ProductKind>(product.kind);
+  const [site, setSite] = React.useState<Storefront>(product.site);
+
   const [salePrice, setSalePrice] = React.useState<number | undefined>(
     product.salePrice ?? undefined
   );
@@ -222,6 +225,9 @@ export default function ProductEditorForm({ product, categories }: Props) {
       salePrice: saleMode === "price" ? (salePrice ?? null) : null,
       saleStartsAt: toIsoOrNull(saleStartsAt),
       saleEndsAt: toIsoOrNull(saleEndsAt),
+        // ✅ NEW
+      kind,
+      site,
     } as const;
 
     const res = await fetch(`/api/admin/products/${product.id}`, {
@@ -422,6 +428,50 @@ export default function ProductEditorForm({ product, categories }: Props) {
               onChange={(e) => setDescription(e.target.value)}
             />
           </Field>
+        </section>
+        {/* Classification */}
+        <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm md:p-6">
+          <h2 className="mb-4 text-base font-semibold">Classification</h2>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field
+              label="Site (Storefront)"
+              help="Controls which storefront this product belongs to."
+            >
+              <select
+                className={inputBase}
+                value={site}
+                onChange={(e) => setSite(e.target.value as any)}
+              >
+                <option value="ZILEDIGITAL">ZileDigital</option>
+                <option value="JEANYVES">JeanYves</option>
+              </select>
+            </Field>
+
+            <Field
+              label="Kind"
+              help="Used for filtering, merchandising, and product-specific UI."
+            >
+              <select
+                className={inputBase}
+                value={kind}
+                onChange={(e) => setKind(e.target.value as any)}
+              >
+                <option value="ART">Art</option>
+                <option value="STICKER">Sticker</option>
+                <option value="MUG">Mug</option>
+                <option value="CARD">Card</option>
+                <option value="BOOK_DIGITAL">Digital Book</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="mt-3 text-xs text-neutral-500">
+            Tip: changing <span className="font-medium">Site</span> can affect where the
+            product shows up. Changing <span className="font-medium">Kind</span> may
+            affect which editor panels/features apply.
+          </div>
         </section>
 
         {/* Media URLs */}

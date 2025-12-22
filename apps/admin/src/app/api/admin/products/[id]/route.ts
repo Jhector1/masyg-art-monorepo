@@ -46,6 +46,8 @@ export async function PATCH(req: NextRequest) {
   if (d.description !== undefined) data.description = d.description;
   if (d.price !== undefined) data.price = d.price;
   if (d.publicId !== undefined) data.publicId = d.publicId;
+  if (d.kind !== undefined) data.kind = d.kind;
+  if (d.site !== undefined) data.site = d.site;
 
   if (d.sizes !== undefined) data.sizes = d.sizes;
   if (d.thumbnails !== undefined) data.thumbnails = d.thumbnails;
