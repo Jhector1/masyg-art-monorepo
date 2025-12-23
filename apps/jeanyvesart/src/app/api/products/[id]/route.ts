@@ -1,7 +1,8 @@
 // src/app/api/products/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient,  } from "@prisma/client";
-import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+ import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 
 export const runtime = "nodejs";
 const db = new PrismaClient();
