@@ -10,7 +10,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
+ const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
   const { id } = await params;
 
   // enforce ownership

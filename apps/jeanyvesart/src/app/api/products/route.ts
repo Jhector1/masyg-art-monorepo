@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listProductsCore } from "@acme/server/services/products";
-import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
+ const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
   const t = req.nextUrl.searchParams.get("type");
   const types =
     !t || !t.trim()

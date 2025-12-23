@@ -5,8 +5,9 @@ export const revalidate = 0;
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@acme/core/lib/prisma";
-import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
-
+// import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 function noCache() {
   return {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -16,7 +17,7 @@ function noCache() {
 }
 
 export async function GET(req: NextRequest) {
-  const { userId } = await getCustomerIdFromRequest(req);
+const { userId } = await getPrincipalFromRequest(req, authOptions);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: noCache() });
 
   const addresses = await prisma.address.findMany({
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await getCustomerIdFromRequest(req);
+const { userId } = await getPrincipalFromRequest(req, authOptions);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: noCache() });
 
   const body = await req.json().catch(() => ({}));

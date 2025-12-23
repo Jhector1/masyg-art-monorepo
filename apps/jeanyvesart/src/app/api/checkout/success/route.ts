@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 const prisma = new PrismaClient();
 
 export async function GET(req: NextRequest) {
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
+ const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
   if (!userId && !guestId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }

@@ -252,7 +252,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: productId } = await params;
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
+ const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
 
   // ⬇️ update the local type to match Prisma (defs is JSON now)
   function defsToString(v: Prisma.JsonValue | null): string | null {

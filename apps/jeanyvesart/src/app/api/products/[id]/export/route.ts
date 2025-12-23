@@ -255,7 +255,7 @@ export async function POST(
     const { id: productId } = await params;
 
     // Require signed-in user (old behavior)
-    const { userId } = await getCustomerIdFromRequest(req);
+   const { userId } = await getPrincipalFromRequest(req, authOptions);
     if (!userId) {
       return NextResponse.json({ error: "Please sign in to export." }, { status: 401 });
     }

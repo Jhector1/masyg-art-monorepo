@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 import {
   listFavoritesForUser,
   addFavorite,
@@ -29,7 +30,7 @@ async function assertOriginalLikeAllowed(site: Storefront, productId: string) {
 }
 export async function GET(req: NextRequest) {
   const site = "JEANYVES"// resolveSite(req);
-  const { userId } = await getCustomerIdFromRequest(req);
+const { userId } = await getPrincipalFromRequest(req, authOptions);
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const site = "JEANYVES"// resolveSite(req);
-const { userId } = await getCustomerIdFromRequest(req);
+const { userId } = await getPrincipalFromRequest(req, authOptions);
 
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -64,7 +65,7 @@ const { userId } = await getCustomerIdFromRequest(req);
 
 export async function DELETE(req: NextRequest) {
   const site = "JEANYVES"// resolveSite(req);
-  const { userId } = await getCustomerIdFromRequest(req);
+const { userId } = await getPrincipalFromRequest(req, authOptions);
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

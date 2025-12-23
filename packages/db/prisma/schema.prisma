@@ -161,6 +161,10 @@ model ProductVariant {
   year           Int?
   uploadType     VariantType?
 
+  reservedAt      DateTime?
+reservedUntil   DateTime?
+reservedOrderId String?
+
   // NEW flexible knobs
   attributes       Json?
   barcode          String?  @unique
@@ -182,6 +186,8 @@ model ProductVariant {
   // (optionally add: @@index([status]), @@index([sku]) is not needed since it's unique)
 
   // indexes
+    @@index([reservedOrderId])
+  @@index([reservedUntil])
   @@index([productId])
   @@index([status])
   @@index([listPrice])
@@ -274,6 +280,8 @@ model Order {
   updatedAt           DateTime          @updatedAt
   shippingId          String?
   stripeSessionId     String?           @unique
+  stripeSessionUrl String?
+  checkoutExpiresAt DateTime?
   guestId             String?
   claimTokenExpiresAt DateTime?
   claimTokenHash      String?           @unique

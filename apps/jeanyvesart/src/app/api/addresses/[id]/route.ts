@@ -5,7 +5,9 @@ export const revalidate = 0;
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@acme/core/lib/prisma";
-import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+// import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 
 function noCache() {
   return {
@@ -19,7 +21,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   const params = await ctx.params;
   const id = String(params.id || "");
 
-  const { userId } = await getCustomerIdFromRequest(req);
+const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: noCache() });
 
   // enforce ownership

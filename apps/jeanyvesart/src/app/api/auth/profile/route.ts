@@ -8,7 +8,10 @@ import bcrypt from "bcryptjs";
 import sharp from "sharp";
 import { prisma } from "@acme/core/lib/prisma";
 import { cloudinary } from "@acme/core/lib/cloudinary";
-import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
+
+// import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
 
 type JsonPayload = {
   name?: string;
@@ -109,7 +112,7 @@ async function uploadAvatar(opts: {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const { userId } = await getCustomerIdFromRequest(req);
+const { userId } = await getPrincipalFromRequest(req, authOptions);
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -227,7 +230,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId } = await getCustomerIdFromRequest(req);
+const { userId } = await getPrincipalFromRequest(req, authOptions);
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

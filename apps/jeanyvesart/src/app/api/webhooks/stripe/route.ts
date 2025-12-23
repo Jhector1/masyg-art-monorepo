@@ -16,10 +16,11 @@ async function loadOrderFromSession(session: Stripe.Checkout.Session) {
   const orderId = session.metadata?.orderId || undefined;
 
   if (orderId) {
-    return prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true },
-    });
+  return prisma.order.findFirst({
+  where: { stripeSessionId: session.id },
+  include: { items: true },
+});
+
   }
 
   // fallback if metadata was missing
@@ -52,11 +53,9 @@ async function finalizePaidOrder(session: Stripe.Checkout.Session) {
 
       // ---------- Create shipping address only if missing ----------
       let shippingId = order.shippingId ?? null;
-     
 
       const ship = session.shipping_details;
       const addr = ship?.address;
-      
 
       if (!shippingId && addr) {
         const created = await tx.address.create({
@@ -80,7 +79,7 @@ async function finalizePaidOrder(session: Stripe.Checkout.Session) {
       const paymentIntentId =
         typeof session.payment_intent === "string"
           ? session.payment_intent
-          : session.payment_intent?.id ?? session.id;
+          : (session.payment_intent?.id ?? session.id);
 
       await tx.payment.upsert({
         where: { orderId: order.id },
@@ -101,13 +100,10 @@ async function finalizePaidOrder(session: Stripe.Checkout.Session) {
       // ---------- Tx-safe idempotency / race protection ----------
       // If another webhook already marked it paid, this will be count=0 and we stop.
       const paidUpdate = await tx.order.updateMany({
-        where: { id: order.id, status: { not: "PAID" } },
-        data: {
-          status: "PAID",
-          shippingId: shippingId ?? undefined,
-        },
+        where: { id: order.id, status: "PENDING" }, // ✅ only PENDING becomes PAID
+        data: { status: "PAID", shippingId: shippingId ?? undefined },
       });
-      if (paidUpdate.count === 0) return; // already handled by another process
+      if (paidUpdate.count === 0) return;
 
       // ---------- Mark originals SOLD ----------
       if (originalIds.length) {
@@ -120,6 +116,13 @@ async function finalizePaidOrder(session: Stripe.Checkout.Session) {
           },
           data: { status: "SOLD", soldAt: new Date() },
         });
+
+        // await tx.cartItem.deleteMany({
+        //   where: {
+        //     originalVariantId: { in: originalIds },
+        //     cart: { site: order.site },
+        //   },
+        // });
 
         // ✅ IMPORTANT: remove from ALL carts on this site (not just buyer)
         await tx.cartItem.deleteMany({
@@ -138,7 +141,6 @@ async function finalizePaidOrder(session: Stripe.Checkout.Session) {
   );
 }
 
-
 async function releaseReservedOrder(session: Stripe.Checkout.Session) {
   const order = await loadOrderFromSession(session);
   if (!order) return;
@@ -154,13 +156,18 @@ async function releaseReservedOrder(session: Stripe.Checkout.Session) {
 
     if (originalIds.length) {
       await tx.productVariant.updateMany({
-        where: {
-          id: { in: originalIds },
-          type: "ORIGINAL",
-          status: "RESERVED",
-        },
-        data: { status: "ACTIVE" },
-      });
+  where: {
+    status: "RESERVED",
+    reservedOrderId: order.id,
+  },
+  data: {
+    status: "ACTIVE",
+    reservedAt: null,
+    reservedUntil: null,
+    reservedOrderId: null,
+  },
+});
+
     }
 
     await tx.order.update({
@@ -172,7 +179,9 @@ async function releaseReservedOrder(session: Stripe.Checkout.Session) {
 
 export async function POST(req: NextRequest) {
   const sig = req.headers.get("stripe-signature");
-  if (!sig) return NextResponse.json({ error: "Missing stripe-signature" }, { status: 400 });
+  if (!sig) {
+    return NextResponse.json({ error: "Missing stripe-signature" }, { status: 400 });
+  }
 
   const rawBody = Buffer.from(await req.arrayBuffer());
 
@@ -181,6 +190,7 @@ export async function POST(req: NextRequest) {
     event = stripe.webhooks.constructEvent(
       rawBody,
       sig,
+      // Make sure this matches the CLI "whsec_..." you are currently running with
       process.env.NEXT_STRIPE_WEBHOOK_SECRET!
     );
   } catch (err: any) {
@@ -188,32 +198,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  // Idempotency guard (your schema has WebhookEvent { id })
+  // ✅ idempotency: if already successfully processed, ACK
   const already = await prisma.webhookEvent.findUnique({ where: { id: event.id } });
   if (already) return NextResponse.json({ received: true });
 
-  await prisma.webhookEvent.create({ data: { id: event.id } });
-
   try {
+    const session = event.data.object as Stripe.Checkout.Session;
+
     switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
+      case "checkout.session.completed":
         await finalizePaidOrder(session);
         break;
-      }
-      case "checkout.session.expired": {
-        const session = event.data.object as Stripe.Checkout.Session;
+
+      case "checkout.session.expired":
         await releaseReservedOrder(session);
         break;
-      }
+
       default:
+        // ✅ ACK unknown events so Stripe doesn't retry forever
         break;
     }
+
+    // ✅ record ONLY after success
+    await prisma.webhookEvent.create({ data: { id: event.id } });
+
+    return NextResponse.json({ received: true });
   } catch (err: any) {
     console.error("[STRIPE_WEBHOOK_HANDLER_ERROR]", event.type, err?.message || err);
-    // Return 200 so Stripe doesn't retry forever if the failure is non-recoverable,
-    // BUT if you prefer retries, change to 500.
-  }
 
-  return NextResponse.json({ received: true });
+    // ✅ let Stripe retry
+    return NextResponse.json({ error: "handler_failed" }, { status: 500 });
+  }
 }

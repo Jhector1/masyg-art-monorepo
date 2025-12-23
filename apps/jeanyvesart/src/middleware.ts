@@ -6,6 +6,8 @@ export const config = {
     "/favorites",
     "/profile",
     "/api/orders/:path*",
+        "/api/favorites",
+
     "/account/:path*",
     "/orders/:path*",
   ],

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: productId } = await params;
 
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
+ const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
   const signedIn = !!userId; // ← match OLD behavior
 
   // Build "who" (prefer user; otherwise guest)

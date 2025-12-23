@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+// import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
 import type { Storefront } from "@prisma/client";
-import { getOrCreateGuestId } from "@acme/auth";
+import { getOrCreateGuestId, getPrincipalFromRequest } from "@acme/auth";
+import { prisma } from "@acme/core/lib/prisma";
 
-
-// IMPORTANT: these service functions must keep the OLD contracts
 import {
   getCart,
   isInCart,
   addToCart,
-  patchCart,      // must match old PATCH semantics (variants), not quantity-only
+  patchCart,
   deleteFromCart,
 } from "@acme/server/cart/cart.service";
+import { authOptions } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,9 +24,26 @@ function resolveSite(req: NextRequest): Storefront {
   return raw === "JEANYVES" ? "JEANYVES" : "ZILEDIGITAL";
 }
 
+async function requireCustomer(req: NextRequest) {
+let { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
+
+  // Always ensure some identity exists for cart operations
+  if (!userId && !guestId) {
+    guestId = getOrCreateGuestId();
+  }
+
+  return { userId, guestId: guestId! };
+}
+
+function cartOwnerWhere(site: Storefront, userId?: string | null, guestId?: string | null) {
+  return userId
+    ? { cart: { userId, site } }
+    : { cart: { guestId: guestId!, site } };
+}
+
 export async function GET(req: NextRequest) {
-  const site = "JEANYVES"; //resolveSite(req);
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
+  const site: Storefront = "JEANYVES"; // resolveSite(req);
+  const { userId, guestId } = await requireCustomer(req);
 
   const sp = req.nextUrl.searchParams;
   const productId = sp.get("productId");
@@ -35,14 +52,13 @@ export async function GET(req: NextRequest) {
   const originalVariantId = sp.get("originalVariantId");
   const live = sp.get("liveDesignPreview") === "1";
 
-  // ✅ keep the old "inCart" probe contract
+  // old inCart probe contract
   if (productId && (digitalVariantId || printVariantId || originalVariantId)) {
-    const out = await isInCart(site, { userId, guestId }, {
-      productId,
-      digitalVariantId,
-      printVariantId,
-      originalVariantId,
-    });
+    const out = await isInCart(
+      site,
+      { userId, guestId },
+      { productId, digitalVariantId, printVariantId, originalVariantId }
+    );
     return NextResponse.json(out, { headers: { "Cache-Control": "no-store" } });
   }
 
@@ -51,38 +67,53 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const site ="JEANYVES"; //resolveSite(req);
-  let { userId, guestId } = await getCustomerIdFromRequest(req);
-  if (!userId && !guestId) {
-    guestId=getOrCreateGuestId();
-  }
-  const body = await req.json();
+  const site: Storefront = "JEANYVES"; // resolveSite(req);
+  const { userId, guestId } = await requireCustomer(req);
 
-  // ✅ must return { message, result } like before
+  const body = await req.json();
   const out = await addToCart(site, { userId, guestId }, body);
   return NextResponse.json(out);
 }
 
 export async function PATCH(req: NextRequest) {
-  const site = "JEANYVES"; //resolveSite(req);
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
-  const body = await req.json();
+  const site: Storefront = "JEANYVES"; // resolveSite(req);
+  const { userId, guestId } = await requireCustomer(req);
 
-  // ✅ must accept { productId, digitalVariantId, printVariantId, updates }
-  // ✅ must return { message, digitalVariantId, printVariantId, price, originalPrice }
+  const body = await req.json();
   const out = await patchCart(site, { userId, guestId }, body);
   return NextResponse.json(out);
 }
 
 export async function DELETE(req: NextRequest) {
-  const site = "JEANYVES"; //resolveSite(req);
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
-   if (!userId && !guestId) {
-    getOrCreateGuestId();
-  }
-  const { productId } = await req.json();
+  const site: Storefront = "JEANYVES"; // resolveSite(req);
+  const { userId, guestId } = await requireCustomer(req);
 
-  const out = await deleteFromCart(site, { userId, guestId }, productId);
-  // ✅ must return { message } like before
-  return NextResponse.json(out);
+  const body = await req.json().catch(() => ({}));
+  const cartItemId = body?.cartItemId ? String(body.cartItemId) : null;
+  const productId = body?.productId ? String(body.productId) : null;
+
+  // ✅ NEW: support deleting by cartItemId (matches your UI)
+  if (cartItemId) {
+    const where = {
+      id: cartItemId,
+      ...cartOwnerWhere(site, userId, guestId),
+    };
+
+    const del = await prisma.cartItem.deleteMany({ where });
+
+    return NextResponse.json({
+      message: del.count ? "Removed" : "Item not found",
+    });
+  }
+
+  // ✅ OLD: keep legacy contract { productId }
+  if (productId) {
+    const out = await deleteFromCart(site, { userId, guestId }, productId);
+    return NextResponse.json(out);
+  }
+
+  return NextResponse.json(
+    { message: "Missing cartItemId or productId" },
+    { status: 400 }
+  );
 }

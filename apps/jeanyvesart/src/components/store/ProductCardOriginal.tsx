@@ -35,19 +35,18 @@ export default function ProductCardOriginal({
 
   const { isFavorite, toggleFavorite, ready } = useFavorites();
   const liked = isFavorite(p.id);
-// const v = originalVariant(p);
-const isUnavailable = v?.status === "SOLD" || v?.status === "RESERVED";
- const handleLikeClick = async (id: string) => {
-  if (isUnavailable) return;
-  if (!ready) return;
-  onBusyChange?.(id);
-  try {
-    await toggleFavorite(id);
-  } finally {
-    onBusyChange?.(null);
-  }
-};
-
+  // const v = originalVariant(p);
+  const isUnavailable = v?.status === "SOLD" || v?.status === "RESERVED";
+  const handleLikeClick = async (id: string) => {
+    if (isUnavailable) return;
+    if (!ready) return;
+    onBusyChange?.(id);
+    try {
+      await toggleFavorite(id);
+    } finally {
+      onBusyChange?.(null);
+    }
+  };
 
   const CardInner = (
     <div
@@ -57,19 +56,19 @@ const isUnavailable = v?.status === "SOLD" || v?.status === "RESERVED";
       style={{ padding: "14px" }}
     >
       <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-white">
-  <div className="absolute inset-0 animate-pulse bg-neutral-100" />
-  {img && (
-    <Image
-      src={img}
-      alt={p.title}
-      fill
-      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-      className="object-contain"
-      // optional: a little padding so frames/edges don't touch
-      // style={{ padding: 8 }}
-    />
-  )}
-</div>
+        <div className="absolute inset-0 animate-pulse bg-neutral-100" />
+        {img && (
+          <Image
+            src={img}
+            alt={p.title}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-contain"
+            // optional: a little padding so frames/edges don't touch
+            // style={{ padding: 8 }}
+          />
+        )}
+      </div>
 
       {/* chips */}
       <div className="absolute left-[14px] bottom-[14px] flex items-center gap-2">
@@ -84,25 +83,24 @@ const isUnavailable = v?.status === "SOLD" || v?.status === "RESERVED";
       </div>
 
       {/* heart */}
-     {/* heart */}
-{!isUnavailable && (
-  <button
-    aria-label={liked ? "Remove from favorites" : "Add to favorites"}
-    onClick={(e) => {
-      e.preventDefault();
-      handleLikeClick(p.id);
-    }}
-    disabled={busy || !ready}
-    className="absolute right-[12px] top-[12px] rounded-full bg-white/85 backdrop-blur px-2.5 py-2 border border-neutral-200 hover:bg-white transition disabled:opacity-60"
-  >
-    {liked ? (
-      <HeartSolid className="h-5 w-5 text-neutral-900" />
-    ) : (
-      <HeartOutline className="h-5 w-5 text-neutral-900" />
-    )}
-  </button>
-)}
-
+      {/* heart */}
+      {!isUnavailable && (
+        <button
+          aria-label={liked ? "Remove from favorites" : "Add to favorites"}
+          onClick={(e) => {
+            e.preventDefault();
+            handleLikeClick(p.id);
+          }}
+          disabled={busy || !ready}
+          className="absolute right-[12px] top-[12px] rounded-full bg-white/85 backdrop-blur px-2.5 py-2 border border-neutral-200 hover:bg-white transition disabled:opacity-60"
+        >
+          {liked ? (
+            <HeartSolid className="h-5 w-5 text-neutral-900" />
+          ) : (
+            <HeartOutline className="h-5 w-5 text-neutral-900" />
+          )}
+        </button>
+      )}
     </div>
   );
 

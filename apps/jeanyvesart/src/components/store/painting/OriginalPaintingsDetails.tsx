@@ -15,6 +15,12 @@ import {
   addProductReview,
   deleteProductReview, // (optional if you add a delete button in UI)
 } from "@acme/core/utils/reviewsClient";
+import { useCheckout } from "@/lib/checkout/useCheckout"; // adjust path if needed
+import { useResumeCheckout } from "@/lib/checkout/useResumeCheckout";
+import {
+  getReservationOwner,
+  formatReservedUntil,
+} from "@/lib/checkout/reservation";
 
 type VariantType = "DIGITAL" | "PRINT" | "ORIGINAL";
 type InventoryStatus = "ACTIVE" | "RESERVED" | "SOLD";
@@ -36,6 +42,10 @@ type Variant = {
   framed?: boolean | null;
   originalSerial?: string | null;
   soldAt?: string | null;
+
+  reservedOrderId?: string | null;
+  reservedUntil?: string | null;
+  reservedAt?: string | null;
 
   inUserCart?: boolean;
 };
@@ -129,7 +139,7 @@ export default function OriginalPaintingDetails({
   const { isFavorite, toggleFavorite } = useFavorites();
   const [likeBusy, setLikeBusy] = React.useState(false);
   const [cartBusy, setCartBusy] = React.useState(false);
-  const [checkoutBusy, setCheckoutBusy] = React.useState(false);
+  // const [checkoutBusy, setCheckoutBusy] = React.useState(false);
   const [inCart, setInCart] = React.useState<boolean>(false);
 
   // ✅ REVIEWS (from client service)
@@ -144,7 +154,13 @@ export default function OriginalPaintingDetails({
   const { user } = useUser(); // assumes user?.id exists
 
   const [deleteBusyId, setDeleteBusyId] = React.useState<string | null>(null);
-
+  const {
+    checkout,
+    busy: checkoutBusy,
+    error: checkoutError,
+  } = useCheckout({
+    onError: (msg) => setError(msg), // reuse your existing error display
+  });
   React.useEffect(() => {
     if (!open) return;
     let alive = true;
@@ -198,6 +214,32 @@ export default function OriginalPaintingDetails({
   );
   const isUnavailable = ov?.status === "SOLD" || ov?.status === "RESERVED";
 
+  const needsResume = ov?.status === "RESERVED";
+  const { resume, state: resumeState } = useResumeCheckout(!!needsResume);
+  const owner = React.useMemo(() => {
+    return getReservationOwner({
+      status: ov?.status ?? null,
+      reservedOrderId: ov?.reservedOrderId ?? null,
+      resume,
+      resumeState,
+    });
+  }, [ov?.status, ov?.reservedOrderId, resume, resumeState]);
+  const isChecking = owner === "CHECKING";
+  const reservedByMe = owner === "YOU";
+  const reservedByOther = owner === "OTHER";
+  const isSold = owner === "SOLD";
+
+  // ✅ block purchase only when SOLD or RESERVED by someone else
+  const blockPurchase = isSold || reservedByOther;
+
+  // ✅ resume only when reserved by you + url exists
+  const canResume = reservedByMe && !!resume?.url;
+
+  const reservedUntilLabel =
+    ov?.status === "RESERVED"
+      ? formatReservedUntil(ov?.reservedUntil ?? null)
+      : null;
+
   const avgRating = React.useMemo(() => {
     if (!reviews.length) return 0;
     const sum = reviews.reduce((a, r) => a + (Number(r.rating) || 0), 0);
@@ -215,7 +257,7 @@ export default function OriginalPaintingDetails({
 
   const handleToggleLike = async () => {
     if (!data?.id || likeBusy) return;
-    if (isUnavailable) return;
+    if (isSold) return; // optional: only block if sold
     setLikeBusy(true);
     const willLike = !liked;
 
@@ -302,7 +344,7 @@ export default function OriginalPaintingDetails({
 
   const handleCartToggle = async () => {
     if (!data || !ov?.id || cartBusy) return;
-    if (isUnavailable) return;
+    if (blockPurchase || reservedByMe || isChecking) return;
 
     setCartBusy(true);
     const willAdd = !inCart;
@@ -320,35 +362,18 @@ export default function OriginalPaintingDetails({
   const handleCheckoutNow = async () => {
     if (!data || !ov?.id || checkoutBusy) return;
 
-    if (isUnavailable) return;
+    if (isChecking) return;
 
-    setCheckoutBusy(true);
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          cartProductList: [
-            {
-              productId: data.id,
-              originalVariantId: ov.id,
-              quantity: 1,
-            },
-          ],
-        }),
-      });
-
-      const out = await res.json().catch(() => null);
-      if (!res.ok)
-        throw new Error(out?.message ?? out?.error ?? "Checkout failed");
-
-      window.location.href = out.url;
-    } catch (e: any) {
-      console.error(e);
-      setError(e?.message ?? "Checkout failed");
-    } finally {
-      setCheckoutBusy(false);
+    // ✅ If it’s reserved by you, resume
+    if (canResume && resume?.url) {
+      window.location.assign(resume.url);
+      return;
     }
+
+    // ✅ Block if sold or reserved by someone else
+    if (blockPurchase) return;
+
+    await checkout([{ productId: data.id, originalVariantId: ov.id }]);
   };
 
   // ✅ submit review using client service (POST expects {rating, text})
@@ -382,6 +407,8 @@ export default function OriginalPaintingDetails({
     }
   };
 
+  // const ov = React.useMemo(() => pickOriginalVariant(data?.variants), [data?.variants]);
+
   if (!open) return null;
 
   return (
@@ -394,6 +421,12 @@ export default function OriginalPaintingDetails({
               Original
             </span>
             {data?.variants && <StatusChip variants={data.variants} />}
+            {reservedByMe && (
+              <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-0.5 text-[11px] tracking-wide">
+                Reserved (you)
+              </span>
+            )}
+
             {data?.category && (
               <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-0.5 text-[11px] tracking-wide">
                 {data.category}
@@ -500,7 +533,26 @@ export default function OriginalPaintingDetails({
 
             {/* Cart + Checkout CTA */}
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              {!isUnavailable ? (
+              {isChecking ? (
+                <div className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-700">
+                  Checking reservation…
+                </div>
+              ) : canResume ? (
+                <>
+                  <button
+                    onClick={() => window.location.assign(resume!.url)}
+                    className="rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                  >
+                    Resume checkout
+                  </button>
+
+                  {reservedUntilLabel ? (
+                    <span className="text-xs text-neutral-500">
+                      Reserved until {reservedUntilLabel}
+                    </span>
+                  ) : null}
+                </>
+              ) : !blockPurchase ? (
                 <>
                   <button
                     onClick={handleCartToggle}
@@ -528,8 +580,13 @@ export default function OriginalPaintingDetails({
                 </>
               ) : (
                 <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
-                  This piece is currently <b>{ov?.status?.toLowerCase()}</b> and
-                  can’t be purchased right now.
+                  This piece is currently <b>{isSold ? "sold" : "reserved"}</b>{" "}
+                  and can’t be purchased right now.
+                  {reservedUntilLabel ? (
+                    <span className="ml-2 text-xs text-neutral-500">
+                      (until {reservedUntilLabel})
+                    </span>
+                  ) : null}
                 </div>
               )}
 

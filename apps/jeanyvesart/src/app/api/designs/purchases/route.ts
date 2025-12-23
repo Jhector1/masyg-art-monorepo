@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 const PAGE_SIZE_DEFAULT = 24;
 
 export async function GET(req: NextRequest) {
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
+ const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
   if (!userId && !guestId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

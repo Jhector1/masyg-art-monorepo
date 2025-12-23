@@ -25,7 +25,7 @@ function noCache() {
 
 export async function GET(req: NextRequest) {
   const site = "JEANYVES";
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
+ const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
 
   if (!userId && !guestId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: noCache() });

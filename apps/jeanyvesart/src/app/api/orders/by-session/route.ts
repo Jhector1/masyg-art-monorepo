@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "missing_session_id" }, { status: 400 });
     }
 
-    const { userId, guestId } = await getCustomerIdFromRequest(req);
+   const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
 
     const order = await prisma.order.findUnique({
       where: { stripeSessionId: sessionId },

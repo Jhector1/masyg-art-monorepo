@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const productId = url.pathname.split("/").pop()!;
 
   // Identify caller
-  const { userId, guestId } = await getCustomerIdFromRequest(req);
+ const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
 
   const product = await db.product.findUnique({
     where: { id: productId },
@@ -42,6 +42,9 @@ export async function GET(req: NextRequest) {
           surface: true,
           framed: true,
           sku: true,
+          reservedOrderId: true,
+          reservedUntil: true,
+          reservedAt: true,
         },
       },
     },

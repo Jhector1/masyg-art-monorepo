@@ -7,10 +7,10 @@ import crypto from "crypto";
 
 import { stripe } from "@acme/core/lib/stripe";
 import { prisma } from "@acme/core/lib/prisma";
-import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 import { getEffectiveSale, roundMoney } from "@acme/core/lib/pricing";
 import { getOrCreateGuestId } from "@acme/auth";
-
 
 const SITE = "JEANYVES" as const;
 
@@ -24,9 +24,9 @@ type CheckoutEntry =
 
 export async function POST(req: NextRequest) {
   try {
-    let { userId, guestId } = await getCustomerIdFromRequest(req);
+let { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
     if (!userId && !guestId) {
-      guestId=getOrCreateGuestId();
+      guestId = getOrCreateGuestId();
     }
 
     const body = (await req.json().catch(() => null)) as any;
@@ -245,57 +245,63 @@ export async function POST(req: NextRequest) {
     const total = items.reduce((sum, i) => sum + i.unitPrice, 0);
 
     // guest claim token computed OUTSIDE tx too (you already do)
-  const order = await prisma.$transaction(async (tx) => {
-  const originalIds = items.map((i) => i.originalVariantId);
+    const RESERVE_MINUTES = 31;
+    const now = new Date();
+    const reservedUntil = new Date(now.getTime() + RESERVE_MINUTES * 60 * 1000);
 
-  // 1) reserve originals
-  const reserved = await tx.productVariant.updateMany({
-    where: { id: { in: originalIds }, type: "ORIGINAL", status: "ACTIVE" },
-    data: { status: "RESERVED" },
-  });
+    const order = await prisma.$transaction(async (tx) => {
+      const originalIds = items.map((i) => i.originalVariantId);
 
-  if (reserved.count !== originalIds.length) {
-    throw new Error("One or more originals were just taken. Please refresh.");
-  }
+      // 1) create order first (so we have id)
+      const createdOrder = await tx.order.create({
+        data: {
+          userId: userId ?? undefined,
+          guestId: guestId ?? undefined,
+          total,
+          status: "PENDING",
+          site: SITE,
+          claimTokenHash: claimTokenHash ?? undefined,
+          claimTokenExpiresAt: claimTokenExpiresAt ?? undefined,
+        },
+        select: { id: true, site: true },
+      });
 
-  // 2) remove those originals from EVERYONE’S carts (same site)
-  await tx.cartItem.deleteMany({
-    where: {
-      originalVariantId: { in: originalIds },
-      cart: { site: SITE }, // ✅ relation filter
-    },
-  });
+      // 2) reserve originals (ACTIVE -> RESERVED)
+      const reserved = await tx.productVariant.updateMany({
+        where: {
+          id: { in: originalIds },
+          type: "ORIGINAL",
+          status: "ACTIVE",
+        },
+        data: {
+          status: "RESERVED",
+          reservedAt: now,
+          reservedUntil,
+          reservedOrderId: createdOrder.id,
+        },
+      });
 
-  // 3) create order
-  const createdOrder = await tx.order.create({
-    data: {
-      userId: userId ?? undefined,
-      guestId: guestId ?? undefined,
-      total,
-      status: "PENDING",
-      site: SITE,
-      claimTokenHash: claimTokenHash ?? undefined,
-      claimTokenExpiresAt: claimTokenExpiresAt ?? undefined,
-    },
-    select: { id: true, site: true },
-  });
+      if (reserved.count !== originalIds.length) {
+        throw new Error(
+          "One or more originals were just taken. Please refresh."
+        );
+      }
 
-  // 4) create order items
-  await tx.orderItem.createMany({
-    data: items.map((i) => ({
-      orderId: createdOrder.id,
-      productId: i.productId,
-      type: "ORIGINAL",
-      price: i.unitPrice,
-      quantity: 1,
-      previewUrlSnapshot: i.imageUrl ?? null,
-      originalVariantId: i.originalVariantId,
-    })),
-  });
+      // 3) order items
+      await tx.orderItem.createMany({
+        data: items.map((i) => ({
+          orderId: createdOrder.id,
+          productId: i.productId,
+          type: "ORIGINAL",
+          price: i.unitPrice,
+          quantity: 1,
+          previewUrlSnapshot: i.imageUrl ?? null,
+          originalVariantId: i.originalVariantId,
+        })),
+      });
 
-  return createdOrder;
-}, { timeout: 20000, maxWait: 10000 });
-
+      return createdOrder;
+    });
 
     const CLIENT_URL =
       process.env.NEXT_PUBLIC_CLIENT_URL ??
@@ -321,6 +327,8 @@ export async function POST(req: NextRequest) {
           },
         },
       }));
+    // const RESERVE_MINUTES = 20;
+    const expires_at = Math.floor(reservedUntil.getTime() / 1000);
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -331,6 +339,7 @@ export async function POST(req: NextRequest) {
 
       consent_collection: { terms_of_service: "required" },
       automatic_tax: { enabled: true },
+      expires_at: expires_at, // ✅ required for `checkout.session.expired`
 
       metadata: {
         kind: "order",
@@ -346,12 +355,14 @@ export async function POST(req: NextRequest) {
       cancel_url: `${CLIENT_URL}/cart`,
       client_reference_id: `order:${userId ?? guestId ?? "guest"}`,
     });
-
     await prisma.order.update({
       where: { id: order.id },
-      data: { stripeSessionId: session.id },
+      data: {
+        stripeSessionId: session.id,
+        stripeSessionUrl: session.url, // ✅ store this (add field)
+        checkoutExpiresAt: reservedUntil, // ✅ store this too (optional)
+      },
     });
-
     return NextResponse.json({
       flow: "redirect",
       url: session.url,
