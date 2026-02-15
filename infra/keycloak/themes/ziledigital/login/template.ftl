@@ -11,7 +11,6 @@
   <link rel="icon" type="image/png" sizes="16x16" href="${url.resourcesPath}/img/favicon-16.png" />
 
   <title>${title?esc}</title>
-
   <link rel="stylesheet" href="${url.resourcesPath}/css/styles.css" />
 </head>
 <body>
@@ -43,9 +42,10 @@
   bodyClass=""
   displayInfo=false
   displayMessage=true
-  displayRequiredFields=false
+  displayRequiredFields=false;
+  section
 >
-  <#-- default title -->
+  <#-- title -->
   <#assign _title = "ZileDigital Accounts">
   <#attempt>
     <#assign _t><#nested "title"></#assign>
@@ -56,7 +56,7 @@
   </#attempt>
 
   <@page title=_title>
-    <#-- messages section (some templates use it) -->
+    <#-- optional messages block some templates provide -->
     <#attempt><#nested "messages"><#recover></#attempt>
 
     <#-- optional global message -->
