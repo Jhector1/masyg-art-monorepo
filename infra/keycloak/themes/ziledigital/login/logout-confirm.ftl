@@ -2,7 +2,13 @@
 
 <@t.page title="Confirm logout">
   <h1 class="a-title">Log out?</h1>
-  <p class="a-sub">You’re about to sign out of ZileDigital Accounts (SSO).</p>
+  <#assign appName = (client?? && client.name?has_content)
+  ?then(client.name, (client?? && client.clientId?has_content)?then(client.clientId, "your app"))>
+
+<p class="a-sub">
+  You’re about to sign out of ZileDigital Accounts (SSO).
+  This will also sign you out of <b>${appName?html}</b>.
+</p>
 
   <#if message?has_content>
     <#if message.type == "error">
