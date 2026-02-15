@@ -1,4 +1,4 @@
-// File: src/app/api/downloads/archive/route.ts
+// File: src/app/api/private/downloads/archive/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,7 +8,7 @@ import { zipAllAssets, type ZipAsset } from "@acme/core/lib/zipAllAssets";
 const db = new PrismaClient();
 
 /**
- * GET /api/downloads/archive?order=<id> or ?session_id=<stripe_session_id>
+ * GET /api/private/downloads/archive?order=<id> or ?session_id=<stripe_session_id>
  * Also supports POST with { assets: ZipAsset[] } if you want to pass assets directly.
  */
 

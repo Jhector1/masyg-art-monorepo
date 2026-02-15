@@ -1,4 +1,4 @@
-// src/app/api/products/[id]/saveUserDesign/status/route.ts
+// src/app/api/user/products/[id]/saveUserDesign/status/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
 import { getEntitlementSummary, getPurchasedFlag, getPurchasedKinds } from "@acme/core/helpers/stripe/webhook/entitlements";

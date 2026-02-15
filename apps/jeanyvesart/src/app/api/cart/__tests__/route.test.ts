@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  *
- * Extended coverage for src/app/api/cart/route.ts
+ * Extended coverage for src/app/api/private/cart/route.ts
  */
 
 import { NextResponse } from "next/server";
@@ -67,7 +67,7 @@ const resetPrisma = () => {
 
 /* ── 3. TESTS ─────────────────────────────────────────────────────── */
 
-describe("API /api/cart", () => {
+describe("API /api/private/cart", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetPrisma();
@@ -83,7 +83,7 @@ describe("API /api/cart", () => {
 
       await GET(
         fakeReq(
-          "https://x/api/cart?productId=px&digitalVariantId=dv&printVariantId="
+          "https://x/api/private/cart?productId=px&digitalVariantId=dv&printVariantId="
         )
       );
 
@@ -95,7 +95,7 @@ describe("API /api/cart", () => {
 
   describe("POST", () => {
     it("400s if price missing", async () => {
-      await POST(fakeReq("https://x/api/cart", { productId: "p1" }));
+      await POST(fakeReq("https://x/api/private/cart", { productId: "p1" }));
 
       expect(jsonSpy).toHaveBeenCalledWith(
         { error: "Missing required fields." },
@@ -113,7 +113,7 @@ describe("API /api/cart", () => {
       prismaMock.cartItem.create.mockResolvedValue({});
 
       await POST(
-        fakeReq("https://x/api/cart", {
+        fakeReq("https://x/api/private/cart", {
           productId: "p2",
           price: 15,
           digitalType: "JPG",
@@ -141,7 +141,7 @@ describe("API /api/cart", () => {
         { digitalVariantId: null, printVariantId: null },
       ]);
 
-      await DELETE(fakeReq("https://x/api/cart", { productId: "pDel" }));
+      await DELETE(fakeReq("https://x/api/private/cart", { productId: "pDel" }));
 
       expect(prismaMock.productVariant.deleteMany).not.toHaveBeenCalled();
       expect(jsonSpy).toHaveBeenCalledWith({
@@ -169,7 +169,7 @@ describe("API /api/cart", () => {
       prismaMock.cart.findFirst.mockResolvedValue(baseCart);
 
       await PATCH(
-        fakeReq("https://x/api/cart", {
+        fakeReq("https://x/api/private/cart", {
           productId: "pPatch",
           digitalVariantId: "ADD",
           updates: { price: "oops" },
@@ -196,7 +196,7 @@ describe("API /api/cart", () => {
       });
 
       await PATCH(
-        fakeReq("https://x/api/cart", {
+        fakeReq("https://x/api/private/cart", {
           productId: "pPatch",
           digitalVariantId: "ADD",
           printVariantId: null,
@@ -238,7 +238,7 @@ describe("API /api/cart", () => {
       });
 
       await PATCH(
-        fakeReq("https://x/api/cart", {
+        fakeReq("https://x/api/private/cart", {
           productId: "p3",
           digitalVariantId: null,
           printVariantId: "REMOVE",
@@ -276,7 +276,7 @@ describe("API /api/cart", () => {
       prismaMock.cartItem.create.mockResolvedValue({});
 
       await POST(
-        fakeReq("https://x/api/cart", {
+        fakeReq("https://x/api/private/cart", {
           productId: "pG",
           price: 5,
           digitalType: "PNG",

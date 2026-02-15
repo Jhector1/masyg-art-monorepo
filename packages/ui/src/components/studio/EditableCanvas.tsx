@@ -347,7 +347,7 @@ function EditableCanvasInner({ productId }: { productId: string }) {
       await fetchInitialExportStatus();
 
       try {
-        const s = await fetch(`/api/products/${productId}/saveUserDesign`, {
+        const s = await fetch(`/api/user/products/${productId}/saveUserDesign`, {
           cache: "no-store",
         });
         if (s.ok) {
@@ -373,7 +373,7 @@ function EditableCanvasInner({ productId }: { productId: string }) {
         }
       } catch {}
       try {
-        const res = await fetch(`/api/products/${productId}/live-preview`, {
+        const res = await fetch(`/api/user/products/${productId}/live-preview`, {
           cache: "no-store",
         });
         if (!res.ok) throw new Error("Failed to load preview");
@@ -572,7 +572,7 @@ function EditableCanvasInner({ productId }: { productId: string }) {
           print,
           design,
         }) => {
-          const res = await fetch("/api/checkout", {
+          const res = await fetch("/api/private/checkout", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -666,7 +666,7 @@ export default function EditableCanvas({ productId }: { productId: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/products/${productId}/saveUserDesign`, {
+        const res = await fetch(`/api/user/products/${productId}/saveUserDesign`, {
           cache: "no-store",
         });
         if (res.ok) {

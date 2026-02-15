@@ -1,5 +1,5 @@
 /**
- * POST /api/checkout — tests (ESM-safe mocks, no spyOn on named exports)
+ * POST /api/private/checkout — tests (ESM-safe mocks, no spyOn on named exports)
  *
  * Adjust the sample payloads in makeDigitalItem/makePrintItem
  * if your route expects different field names.
@@ -38,7 +38,7 @@ const asJson = async (res: any) => ({
 });
 
 const makeReq = (body: any) =>
-  new Request('http://localhost/api/checkout', {
+  new Request('http://localhost/api/private/checkoutcheckout', {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'content-type': 'application/json' },
@@ -84,7 +84,7 @@ afterEach(() => {
 });
 
 // ---- Tests ------------------------------------------------------------------
-describe('POST /api/checkout', () => {
+describe('POST /api/private/checkoutcheckout', () => {
   test('400 when body missing cartProductList', async () => {
     mockGetCustomer.mockResolvedValue({ userId: null, guestId: 'guest_123' });
     const res = await POST(makeReq({}) as any);

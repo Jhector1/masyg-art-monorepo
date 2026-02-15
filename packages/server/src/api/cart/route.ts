@@ -1,4 +1,4 @@
-// File: src/app/api/cart/route.ts
+// File: src/app/api/private/cart/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
@@ -21,11 +21,11 @@ cloudinary.config({
 });
 
 /* ────────────────────────────────────────────────────────────────────
-   GET /api/cart
+   GET /api/private/cart
    Returns cart lines with server-computed prices and sale metadata
    ──────────────────────────────────────────────────────────────────── */
 /* ────────────────────────────────────────────────────────────────────
-   GET /api/cart
+   GET /api/private/cart
    Returns cart lines with server-computed prices and sale metadata
    ──────────────────────────────────────────────────────────────────── */
 export async function GET(req: NextRequest) {
@@ -173,7 +173,7 @@ export async function GET(req: NextRequest) {
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   POST /api/cart
+   POST /api/private/cart
    Creates a cart line; ignores any client-sent price; computes sale server-side
    ──────────────────────────────────────────────────────────────────── */
 export async function POST(req: NextRequest) {
@@ -406,7 +406,7 @@ const finalUnitPrice  = roundMoney(Math.min(priceWithSale, priceWithBundle));
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   DELETE /api/cart
+   DELETE /api/private/cart
    Removes all lines for productId (and cleans up variants)
    ──────────────────────────────────────────────────────────────────── */
 export async function DELETE(req: NextRequest) {
@@ -448,7 +448,7 @@ export async function DELETE(req: NextRequest) {
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   PATCH /api/cart
+   PATCH /api/private/cart
    Updates variants and server-recomputes price; no client price allowed
    ──────────────────────────────────────────────────────────────────── */
 export async function PATCH(req: NextRequest) {

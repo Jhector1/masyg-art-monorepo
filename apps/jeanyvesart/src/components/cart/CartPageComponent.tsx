@@ -73,7 +73,7 @@ export default function CartPage() {
     (async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/cart", { cache: "no-store" });
+        const res = await fetch("/api/private/cart", { cache: "no-store" });
         if (!res.ok) throw new Error(`Fetch cart failed: ${res.status}`);
         const data: CartResponse = await res.json();
         if (!alive) return;
@@ -139,7 +139,7 @@ export default function CartPage() {
     if (nextQty < 1) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/cart", {
+      const res = await fetch("/api/private/cart", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId, quantity: nextQty }),
@@ -157,7 +157,7 @@ export default function CartPage() {
   async function removeItem(itemId: string) {
     setSaving(true);
     try {
-      const res = await fetch("/api/cart", {
+      const res = await fetch("/api/private/cart", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId }),

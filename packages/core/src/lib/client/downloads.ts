@@ -17,34 +17,51 @@ export function safeFilename(title: string, ext?: string) {
 type ProgressCb = (fraction: number) => void;
 
 /** Stream-fetch with progress; returns a Blob. */
-async function fetchBlobWithProgress(url: string, onProgress?: ProgressCb) {
-  const res = await fetch(url, { credentials: "include", cache: "no-store" });
+// type ProgressCb = (fraction: number) => void;
+
+async function fetchBlobWithProgress(
+  url: string,
+  onProgress?: ProgressCb,
+  opts?: { credentials?: RequestCredentials }
+) {
+  const res = await fetch(url, {
+    credentials: opts?.credentials ?? "omit", // ✅ default omit (important for Cloudinary)
+    cache: "no-store",
+  });
+
+  console.log("fetchBlobWithProgress", url, res.status);
+
   if (!res.ok || !res.body) throw new Error(`Fetch failed (${res.status})`);
 
   const total = Number(res.headers.get("content-length") || 0);
   const reader = res.body.getReader();
- const chunks: ArrayBuffer[] = []
+  const chunks: ArrayBuffer[] = [];
   let received = 0;
 
-  // ReadableStream reader loop
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
+
     if (value) {
-          const ab = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
-    chunks.push(ab);
+      const ab = value.buffer.slice(
+        value.byteOffset,
+        value.byteOffset + value.byteLength
+      );
+      chunks.push(ab);
+
       received += value.length;
       if (onProgress && total > 0) onProgress(received / total);
     }
   }
 
-const blob = new Blob(chunks, {
-  type: res.headers.get("content-type") || "application/octet-stream",
-});
+  const blob = new Blob(chunks, {
+    type: res.headers.get("content-type") || "application/octet-stream",
+  });
+
   if (onProgress) onProgress(1);
   return blob;
 }
+
 
 /**
  * Download with progress. If CORS blocks, use same-origin proxy route.
@@ -68,16 +85,29 @@ export async function downloadFile(
     URL.revokeObjectURL(blobUrl);
   }
 
-  async function tryDirect() {
-    const blob = await fetchBlobWithProgress(url, onProgress);
-    await save(blob);
-  }
+async function tryDirect() {
+  // ✅ Cloudinary / external: NEVER include cookies
+  const blob = await fetchBlobWithProgress(url, onProgress, {
+    credentials: "omit",
+  });
+  await save(blob);
+}
 
-  async function viaProxy() {
-    const proxy = `/api/downloads/proxy?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
-    const blob = await fetchBlobWithProgress(proxy, onProgress);
-    await save(blob);
-  }
+async function viaProxy() {
+  // ✅ Same-origin proxy: include cookies (guest_id, etc.)
+  const proxy = `/api/private/downloads/proxy?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
+  const blob = await fetchBlobWithProgress(proxy, onProgress, {
+    credentials: "include",
+  });
+  await save(blob);
+}
+
+
+  // async function viaProxy() {
+  //   const proxy = `/api/private/downloads/proxy?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
+  //   const blob = await fetchBlobWithProgress(proxy, onProgress);
+  //   await save(blob);
+  // }
 
   try {
     if (forceProxy) throw new Error("force-proxy");
@@ -88,7 +118,7 @@ export async function downloadFile(
   }
 
   // fire-and-forget tracking
-  fetch("/api/downloads", { method: "POST", credentials: "include" }).catch(() => {});
+  fetch("/api/private/downloads", { method: "POST", credentials: "include" }).catch(() => {});
 }
 
 /** Shared hook: track which id is downloading + progress (0..1) */

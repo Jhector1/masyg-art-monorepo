@@ -1,4 +1,4 @@
-// File: src/app/api/orders/[orderId]/route.ts
+// File: src/app/api/user/orders/[orderId]/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

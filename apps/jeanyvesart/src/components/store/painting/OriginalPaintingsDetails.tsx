@@ -301,7 +301,7 @@ export default function OriginalPaintingDetails({
   async function addOriginalToCart(): Promise<string | null> {
     if (!data || !ov?.id) throw new Error("Missing product/original variant");
 
-    const res = await fetch("/api/cart", {
+    const res = await fetch("/api/private/cart", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -329,7 +329,7 @@ export default function OriginalPaintingDetails({
 
   async function removeOriginalFromCart() {
     if (!data || !ov?.id) throw new Error("Missing product/original variant");
-    const res = await fetch(`/api/cart`, {
+    const res = await fetch(`/api/private/cart`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

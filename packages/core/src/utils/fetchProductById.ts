@@ -9,7 +9,7 @@ import {  ProductDetailResult } from "../types";
  * Fetch one product from `/api/products/[id]`.
  */
 export async function fetchProductById(productId: string, userId: string): Promise<ProductDetailResult> {
-  const res = await fetch(`/api/products/${productId}?userId=${userId}`, {
+  const res = await fetch(`/api/public/products/${productId}?userId=${userId}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
     // no-store forces always-fresh data; remove if you want ISR/caching

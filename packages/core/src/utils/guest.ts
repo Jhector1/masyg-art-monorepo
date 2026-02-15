@@ -1,42 +1,24 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "../lib/auth";
-// import { cookies } from "next/headers";
-// import { v4 as uuidv4 } from "uuid";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-// export async function getCustomerId(): Promise<{ userId?: string; guestId?: string }> {
-//   const session = await getServerSession(authOptions);
+/**
+ * Returns { userId } if authenticated, otherwise { guestId } if guest cookie exists.
+ * IMPORTANT: relies on cookie name "guest_id" consistently.
+ */
+export async function getCustomerIdFromRequest(
+  req: NextRequest
+): Promise<{ userId?: string; guestId?: string }> {
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-//   if (session?.user?.id) {
-//     return { userId: session.user.id };
-//   }
+  // token.sub is usually the user id
+  const userId =
+    (token?.sub as string | undefined) ||
+    ((token as any)?.id as string | undefined);
 
-//   // ✅ Await the cookies() call
-//   const cookieStore =  cookies(); // 🧠 fix is here
-
-//   const guestId = cookieStore.get("guest_id")?.value;
-
-// //   if (!guestId) {
-// //     // guestId = uuidv4();
-// //     // cookieStore.set("guest_id", guestId, {
-// //     //   httpOnly: true,
-// //     //   maxAge: 60 * 60 * 24 * 30, // 30 days
-// //     //   sameSite: "lax",
-// //     // });
-// //     return;
-// //   }
-
-//   return { guestId };
-// }
-
-
-
-import { NextRequest } from "next/server";
-
-export async function getCustomerIdFromRequest(req: NextRequest): Promise<{ userId?: string; guestId?: string }> {
-  const session = await getServerSession(authOptions);
-
-  if (session?.user?.id) return { userId: session.user.id };
+  if (userId) return { userId };
 
   const guestId = req.cookies.get("guest_id")?.value;
-  return { guestId };
+  if (guestId) return { guestId };
+
+  return {};
 }

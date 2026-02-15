@@ -1,4 +1,4 @@
-// File: src/app/api/dashboard/route.ts
+// File: src/app/api/user/dashboard/route.ts
 import {  NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { PrismaClient } from "@prisma/client";

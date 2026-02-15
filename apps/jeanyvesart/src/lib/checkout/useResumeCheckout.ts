@@ -11,7 +11,7 @@ export function useResumeCheckout(enabled: boolean) {
   const refresh = React.useCallback(async () => {
     setState("loading");
     try {
-      const res = await fetch("/api/checkout/resume", {
+      const res = await fetch("/api/private/checkout/resume", {
         cache: "no-store",
         credentials: "include",
       });

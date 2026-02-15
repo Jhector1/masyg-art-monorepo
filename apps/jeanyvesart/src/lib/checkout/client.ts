@@ -33,7 +33,7 @@ export async function createCheckoutSession(
     })),
   };
 
-  const res = await fetch("/api/checkout", {
+  const res = await fetch("/api/private/checkout", {
     method: "POST",
     headers: { "content-type": "application/json" },
     credentials: "include",

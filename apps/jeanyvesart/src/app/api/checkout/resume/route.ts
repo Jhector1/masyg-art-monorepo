@@ -36,6 +36,7 @@ const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
       checkoutExpiresAt: true,
     },
   });
+  console.log("Found order for resume:", order); // DEBUG
   if (!order) {
     return NextResponse.json({ url: null, reason: "none" }, { status: 404 });
   }

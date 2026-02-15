@@ -1,4 +1,4 @@
-// src/app/api/products/[id]/saveUserDesign/route.ts
+// src/app/api/user/products/[id]/saveUserDesign/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@acme/core/lib/prisma";
 import sharp from "sharp";

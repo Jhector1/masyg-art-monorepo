@@ -1,4 +1,4 @@
-// File: src/app/api/downloads/proxy/route.ts
+// File: src/app/api/private/downloads/proxy/route.ts
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";

@@ -1,13 +1,26 @@
 "use client";
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useUser } from "./UserContext";
-import {
+import type {
   AddToCartResponse,
   CartSelectedItem,
   CartUpdates,
   DesignPayload,
 } from "../types";
 import { usePathname } from "next/navigation";
+
+/** Read JSON safely: avoids "Unexpected end of JSON input" */
+async function readJsonSafe<T = any>(res: Response): Promise<T | null> {
+  const text = await res.text(); // read once
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // In case something returns HTML/text
+    return null;
+  }
+}
 
 export type CartContextType = {
   cart: CartSelectedItem[];
@@ -16,7 +29,6 @@ export type CartContextType = {
   totalPrice: number;
   refreshCart: () => Promise<void>;
 
-  // ✅ no price/originalPrice here anymore; server computes
   addToCart: (
     productId: string,
     digitalType: string | null,
@@ -29,7 +41,6 @@ export type CartContextType = {
     quantity?: number
   ) => Promise<AddToCartResponse>;
 
-  // ✅ same here; include design/snapshot when needed
   addToCartWithDesign: (args: {
     productId: string;
     digitalType: string | null;
@@ -54,7 +65,7 @@ export type CartContextType = {
     productId: string;
     printVariantId?: string;
     digitalVariantId?: string;
-    updates: CartUpdates; // ⚠️ do not include price in updates
+    updates: CartUpdates;
   }) => Promise<void>;
 };
 
@@ -83,14 +94,24 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const fetchCart = async () => {
     setLoadingCart(true);
     try {
-      const res = await fetch("/api/cart?liveDesignPreview=1", {
+      const res = await fetch("/api/private/cart?liveDesignPreview=1", {
         method: "GET",
         cache: "no-store",
         credentials: "include",
         headers: { "Cache-Control": "no-store" },
       });
-      const data = await res.json();
-      setCart(Array.isArray(data) ? data : []);
+
+      // ✅ SAFE parse
+      const data = await readJsonSafe(res);
+
+      if (!res.ok) {
+        // data might be null (empty body). Still no crash.
+        console.error("Failed to fetch cart:", res.status, data);
+        setCart([]);
+        return;
+      }
+
+      setCart(Array.isArray(data) ? (data as CartSelectedItem[]) : []);
     } catch (err) {
       console.error("Failed to fetch cart:", err);
       setCart([]);
@@ -99,19 +120,14 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // On auth change, refresh cart
   useEffect(() => {
     void fetchCart();
   }, [isLoggedIn]);
 
-  // When navigating to /cart (SPA), refresh cart
   useEffect(() => {
-    if (pathname?.startsWith("/cart")) {
-      void fetchCart();
-    }
+    if (pathname?.startsWith("/cart")) void fetchCart();
   }, [pathname]);
 
-  // Refresh when window regains focus / becomes visible
   useEffect(() => {
     const onFocus = () => void fetchCart();
     const onVis = () => {
@@ -125,23 +141,22 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  const addToCart = async (
-    productId: string,
-    digitalType: string | null,
-    printType: string | null,
-    format: string,
-    size: string | null,
-    material: string | null,
-    frame: string | null,
-    license: string,
-    quantity: number = 1
-  ): Promise<AddToCartResponse> => {
-    // Only block if neither user nor guest
+  const addToCart: CartContextType["addToCart"] = async (
+    productId,
+    digitalType,
+    printType,
+    format,
+    size,
+    material,
+    frame,
+    license,
+    quantity = 1
+  ) => {
     if (!isLoggedIn && !guestId) return { result: undefined };
 
     setLoadingAdd(true);
     try {
-      const res = await fetch("/api/cart", {
+      const res = await fetch("/api/private/cart", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -155,19 +170,24 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           material,
           frame,
           license,
-          // server derives user/guest from cookies; no need to send guestId
         }),
       });
 
-      const data = await res.json();
+      const data = await readJsonSafe(res);
+
+      if (!res.ok) {
+        console.error("Failed to add to cart:", res.status, data);
+        return { result: undefined };
+      }
+
       await fetchCart();
 
       return {
-        result: data?.result
+        result: (data as any)?.result
           ? {
-              cartItemId: data.result.cartItemId,
-              digitalVariantId: data.result.digitalVariantId ?? null,
-              printVariantId: data.result.printVariantId ?? null,
+              cartItemId: (data as any).result.cartItemId,
+              digitalVariantId: (data as any).result.digitalVariantId ?? null,
+              printVariantId: (data as any).result.printVariantId ?? null,
             }
           : undefined,
       };
@@ -196,7 +216,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
     setLoadingAdd(true);
     try {
-      const res = await fetch("/api/cart", {
+      const res = await fetch("/api/private/cart", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -210,22 +230,28 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           material,
           frame,
           license,
-          design,   // server will validate/own and snapshot
-          snapshot, // freeze preview/style at add time
+          design,
+          snapshot,
         }),
       });
 
-      const data = await res.json();
+      const data = await readJsonSafe(res);
+
+      if (!res.ok) {
+        console.error("Failed to add to cart (with design):", res.status, data);
+        return { result: undefined };
+      }
+
       await fetchCart();
 
       return {
-        result: data?.result
+        result: (data as any)?.result
           ? {
-              cartItemId: data.result.cartItemId,
-              digitalVariantId: data.result.digitalVariantId ?? null,
-              printVariantId: data.result.printVariantId ?? null,
-              designId: data.result.designId ?? null,
-              previewUrl: data.result.previewUrl ?? null,
+              cartItemId: (data as any).result.cartItemId,
+              digitalVariantId: (data as any).result.digitalVariantId ?? null,
+              printVariantId: (data as any).result.printVariantId ?? null,
+              designId: (data as any).result.designId ?? null,
+              previewUrl: (data as any).result.previewUrl ?? null,
             }
           : undefined,
       };
@@ -237,20 +263,28 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const removeFromCart = async (
-    productId: string,
-    _digitalVariantId: string,
-    _printVariantId: string
+  const removeFromCart: CartContextType["removeFromCart"] = async (
+    productId
+    // digitalVariantId, printVariantId not needed server-side
   ) => {
     if (!isLoggedIn && !guestId) return;
+
     setLoadingAdd(true);
     try {
-      await fetch("/api/cart", {
+      const res = await fetch("/api/private/cart", {
         method: "DELETE",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId }), // server only needs productId
+        body: JSON.stringify({ productId }),
       });
+
+      const data = await readJsonSafe(res);
+
+      if (!res.ok) {
+        console.error("Failed to remove from cart:", res.status, data);
+        return;
+      }
+
       await fetchCart();
     } catch (err) {
       console.error("Failed to remove from cart:", err);
@@ -259,20 +293,16 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const updateCart = async ({
+  const updateCart: CartContextType["updateCart"] = async ({
     productId,
     printVariantId,
     digitalVariantId,
     updates,
-  }: {
-    productId: string;
-    printVariantId?: string;
-    digitalVariantId?: string;
-    updates: CartUpdates;
   }) => {
     if (!isLoggedIn && !guestId) return;
+
     try {
-      const res = await fetch("/api/cart", {
+      const res = await fetch("/api/private/cart", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -280,15 +310,19 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           productId,
           printVariantId,
           digitalVariantId,
-          updates, // ✅ do NOT include price; server recomputes
+          updates,
         }),
       });
+
+      // ✅ SAFE parse (may be null if empty)
+      const data = await readJsonSafe(res);
+
       if (!res.ok) {
-        const data = await res.json();
-        console.error("Failed to update cart:", data.error);
-      } else {
-        await fetchCart();
+        console.error("Failed to update cart:", res.status, data);
+        return; // ✅ no crash
       }
+
+      await fetchCart();
     } catch (err) {
       console.error("Error updating cart:", err);
     }

@@ -15,7 +15,7 @@ export default function useAddToCart(userId: string, product: { id: string; pric
       for (const item of items) {
 
 
-        await fetch('/api/cart/add', {
+        await fetch('/api/private/cart/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

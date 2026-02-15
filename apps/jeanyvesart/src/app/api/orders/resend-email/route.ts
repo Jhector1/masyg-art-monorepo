@@ -1,4 +1,4 @@
-// File: src/app/api/orders/resend-email/route.ts
+// File: src/app/api/private/checkout/resend-email/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient, VariantType } from "@prisma/client";
 import { sendMail } from "@acme/core/lib/email";
@@ -118,12 +118,12 @@ export async function POST(req: Request) {
         ext,
         size,
         px,
-        href: `${BASE_URL}/api/downloads/${t.id}`,
+        href: `${BASE_URL}/api/private/downloads/${t.id}`,
       };
     });
 
 // AFTER  ✅ (recommended)
-const zipHref = `${BASE_URL}/api/downloads/archive?order=${order.id}`;
+const zipHref = `${BASE_URL}/api/private/downloads/archive?order=${order.id}`;
     const html = renderEmailHtml(items, zipHref);
     const text = renderEmailText(items, zipHref);
 

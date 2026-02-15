@@ -5,7 +5,7 @@ export const config = {
   matcher: [
     "/favorites",
     "/profile",
-    "/api/orders/:path*",
+    "/api/user/orders/:path*",
         "/api/favorites",
 
     "/account/:path*",

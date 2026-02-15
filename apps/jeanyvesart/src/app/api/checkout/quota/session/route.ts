@@ -1,4 +1,4 @@
-// app/api/checkout/quota/session/route.ts
+// app/api/private/checkout/quota/session/route.ts
 import { NextResponse } from "next/server";
 import { stripe } from "@acme/core/lib/stripe";
 import { requireUser } from "@acme/core/utils/requireUser";

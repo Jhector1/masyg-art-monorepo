@@ -1,4 +1,4 @@
-// File: src/app/api/orders/route.ts
+// File: src/app/api/user/orders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
@@ -7,7 +7,7 @@ import { CollectionDigitalAsset, CollectionItem } from "@acme/core/types";
 const prisma = new PrismaClient();
 
 /**
- * GET /api/orders?type=ALL|DIGITAL|PRINT
+ * GET /api/user/orders?type=ALL|DIGITAL|PRINT
  * Returns groups of order items keyed by YYYY-MM-DD date with download-ready metadata.
  */
 export async function GET(req: NextRequest) {

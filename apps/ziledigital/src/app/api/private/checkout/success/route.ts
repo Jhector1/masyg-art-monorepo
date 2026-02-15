@@ -1,4 +1,4 @@
-// File: src/app/api/checkout/success/route.ts
+// File: src/app/api/private/checkout/success/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient, Prisma, VariantType } from "@prisma/client";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";

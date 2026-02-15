@@ -1,4 +1,4 @@
-// app/api/checkout/apply-edit-credits/route.ts
+// app/api/private/checkout/apply-edit-credits/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@acme/core/lib/prisma";
 // Prefer your shared client so the version is centralized:

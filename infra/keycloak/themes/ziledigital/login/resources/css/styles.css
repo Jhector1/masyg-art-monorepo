@@ -175,3 +175,53 @@ body{
   font-size:13px;
 }
 
+
+
+
+/* ---- Keycloak page compatibility helpers ---- */
+
+.a-btn-secondary{
+  width:100%;
+  padding:11px 12px;
+  border-radius:12px;
+  cursor:pointer;
+  border:1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: rgba(240,240,255,0.92);
+  font-weight:700;
+}
+.a-btn-secondary:hover{ filter:brightness(1.06); }
+
+.a-divider{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin:14px 0;
+  color: var(--muted);
+  font-size:12px;
+}
+.a-divider:before,
+.a-divider:after{
+  content:"";
+  height:1px;
+  flex:1;
+  background: var(--border);
+}
+
+.a-list{
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: rgba(240,240,255,0.92);
+  font-size: 13px;
+}
+.a-list li{ margin: 6px 0; }
+
+.a-kbd{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: rgba(240,240,255,0.92);
+}

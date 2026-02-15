@@ -23,7 +23,7 @@ export default function SaveOrderCta({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`/api/orders/is-claimed?session_id=${sessionId}`, { credentials: "include" });
+        const r = await fetch(`/api/private/checkout/is-claimed?session_id=${sessionId}`, { credentials: "include" });
         const d = await r.json();
         if (d.claimed) setClaimed(true);
       } catch {}
@@ -33,7 +33,7 @@ export default function SaveOrderCta({ sessionId }: { sessionId: string }) {
   const finishClaim = async () => {
     if (!tokenRef.current) return;
     try {
-      const res = await fetch("/api/orders/claim", {
+      const res = await fetch("/api/private/checkout/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -55,7 +55,7 @@ export default function SaveOrderCta({ sessionId }: { sessionId: string }) {
   const startClaim = async () => {
     try {
       setBusy(true);
-      const res = await fetch("/api/orders/prepare-claim", {
+      const res = await fetch("/api/private/checkout/prepare-claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

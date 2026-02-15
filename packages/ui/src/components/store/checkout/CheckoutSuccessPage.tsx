@@ -8,7 +8,7 @@ import { useUser } from "@acme/core/contexts/UserContext";
 import { OrderSuccessHeader } from "../../orders/OrderSuccessHeader";
 import { downloadFile } from "@acme/core/lib/client/downloads";
 
-/* ------------ Types from /api/checkout/success ------------- */
+/* ------------ Types from /api/private/checkout/success ------------- */
 type ProductKind = "STICKER" | "MUG" | "CARD" | "BOOK_DIGITAL" | "ART" | "OTHER";
 
 interface PurchasedArtwork {
@@ -205,7 +205,7 @@ export default function CheckoutSuccessPage() {
     (async () => {
       try {
         const res = await fetch(
-          `/api/checkout/success?session_id=${sessionId}`,
+          `/api/private/checkout/success?session_id=${sessionId}`,
           {
             credentials: "include",
             cache: "no-store",
@@ -717,7 +717,7 @@ export default function CheckoutSuccessPage() {
                   setDownloadingId("zip");
                   setProgress((p) => ({ ...p, zip: 0 }));
 
-                  const url = `/api/downloads/archive?session_id=${sessionId}`;
+                  const url = `/api/private/downloads/archive?session_id=${sessionId}`;
                   await downloadFile(url, safeFilename("artworks", "zip"), {
                     onProgress: (p: number) => {
                       const pct =
@@ -769,7 +769,7 @@ export default function CheckoutSuccessPage() {
                 onClick={async () => {
                   try {
                     const res = await fetch(
-                      `/api/orders/resend-email?session_id=${sessionId}`,
+                      `/api/private/checkout/resend-email?session_id=${sessionId}`,
                       {
                         method: "POST",
                       }

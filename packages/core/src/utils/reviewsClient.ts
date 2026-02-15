@@ -30,7 +30,7 @@ export async function getProductReviews(
 ): Promise<ProductReviewDTO[]> {
   if (!productId) throw new Error("Missing productId");
 
-  const res = await fetch(`/api/products/${productId}/reviews`, {
+  const res = await fetch(`/api/public/products/${productId}/reviews`, {
     method: "GET",
     cache: "no-store",
     credentials: "include",
@@ -48,7 +48,7 @@ export async function addProductReview(
 ): Promise<ProductReviewDTO> {
   if (!productId) throw new Error("Missing productId");
 
-  const res = await fetch(`/api/products/${productId}/reviews`, {
+  const res = await fetch(`/api/user/products/${productId}/reviews`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -71,7 +71,7 @@ export async function deleteProductReview(
   if (!productId) throw new Error("Missing productId");
   if (!reviewId) throw new Error("Missing reviewId");
 
-  const res = await fetch(`/api/products/${productId}/reviews`, {
+  const res = await fetch(`/api/user/products/${productId}/reviews`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     credentials: "include",

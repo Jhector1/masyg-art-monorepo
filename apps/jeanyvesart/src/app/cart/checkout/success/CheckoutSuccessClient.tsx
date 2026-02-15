@@ -64,7 +64,7 @@ export default function CheckoutSuccessClient() {
     const qs = new URLSearchParams({ session_id: sessionId });
     if (claim) qs.set("claim", claim);
 
-    const res = await fetch(`/api/orders/by-session?${qs.toString()}`, {
+    const res = await fetch(`/api/user/orders/by-session?${qs.toString()}`, {
       cache: "no-store",
     });
 

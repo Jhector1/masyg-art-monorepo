@@ -1,4 +1,4 @@
-// File: src/app/api/downloads/zip/cloudinary/route.ts
+// File: src/app/api/private/downloads/zip/cloudinary/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { v2 as cloudinary } from "cloudinary";
@@ -54,7 +54,7 @@ export async function GET(req: Request) {
 
   if (!hasImages && !hasRaws) {
     // No Cloudinary-backed files — fall back to local archiver
-    return NextResponse.redirect(`/api/downloads/zip?${orderId ? `order=${orderId}` : `session_id=${sessionId}`}`, { status: 302 });
+    return NextResponse.redirect(`/api/private/downloads/zip?${orderId ? `order=${orderId}` : `session_id=${sessionId}`}`, { status: 302 });
   }
 
   try {
@@ -81,5 +81,5 @@ export async function GET(req: Request) {
   }
 
   // Mixed resource types → fall back to local archiver (single unified zip)
-  return NextResponse.redirect(`/api/downloads/zip?${orderId ? `order=${orderId}` : `session_id=${sessionId}`}`, { status: 302 });
+  return NextResponse.redirect(`/api/private/downloads/zip?${orderId ? `order=${orderId}` : `session_id=${sessionId}`}`, { status: 302 });
 }

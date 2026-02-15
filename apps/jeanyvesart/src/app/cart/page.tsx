@@ -255,7 +255,7 @@ export default function CartArtworksPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/cart", {
+      const res = await fetch("/api/private/cart", {
         method: "GET",
         cache: "no-store",
         credentials: "include",
@@ -273,7 +273,7 @@ export default function CartArtworksPage() {
   // const fetchResume = React.useCallback(async () => {
   //   setResumeState("loading");
   //   try {
-  //     const res = await fetch("/api/checkout/resume", {
+  //     const res = await fetch("/api/private/checkout/resume", {
   //       cache: "no-store",
   //       credentials: "include",
   //     });
@@ -331,7 +331,7 @@ export default function CartArtworksPage() {
         };
 
     try {
-      const res = await fetch("/api/cart", {
+      const res = await fetch("/api/private/cart", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

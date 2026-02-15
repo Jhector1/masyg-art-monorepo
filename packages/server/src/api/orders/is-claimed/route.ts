@@ -1,4 +1,4 @@
-// src/app/api/orders/is-claimed/route.ts
+// src/app/api/private/checkout/is-claimed/route.ts
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";

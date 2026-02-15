@@ -44,7 +44,7 @@ const refreshFavorites = async (args: { types?: string } = {}) => {
   // ✅ (optional but recommended) set site per app
   // qs.set("site", process.env.NEXT_PUBLIC_SITE ?? "Storefront");
 
-  const url = qs.toString() ? `/api/favorite?${qs}` : "/api/favorite";
+  const url = qs.toString() ? `/api/user/favorite?${qs}` : "/api/user/favorite";
 
   try {
     const res = await fetch(url, {
@@ -93,7 +93,7 @@ const refreshFavorites = async (args: { types?: string } = {}) => {
 
 const addFavorite = async (productId: string) => {
   if (!isLoggedIn) return;
-  const res = await fetch("/api/favorite", {
+  const res = await fetch("/api/user/favorite", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -104,7 +104,7 @@ const addFavorite = async (productId: string) => {
 
 const removeFavorite = async (productId: string) => {
   if (!isLoggedIn) return;
-  const res = await fetch("/api/favorite", {
+  const res = await fetch("/api/user/favorite", {
     method: "DELETE",
     credentials: "include",
     headers: { "Content-Type": "application/json" },

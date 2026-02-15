@@ -106,7 +106,7 @@ export async function deriveInitialStyle(productId: string): Promise<StyleState>
   } catch {}
 
   // 2) Fallback to the current live preview
-  const res = await fetch(`/api/products/${productId}/live-preview`, { cache: "no-store" });
+  const res = await fetch(`/api/user/products/${productId}/live-preview`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to load preview for style derivation");
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

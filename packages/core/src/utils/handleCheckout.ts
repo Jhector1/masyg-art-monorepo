@@ -151,12 +151,15 @@ export async function handleCheckout({
     cartItemId,
   };
 
-  const res = await fetch("/api/checkout", {
+  const res = await fetch("/api/private/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cartProductList: [productItem] }),
   });
-
+// const text = await res.text();
+// console.log("CHECKOUT status", res.status);
+// console.log("CHECKOUT content-type", res.headers.get("content-type"));
+// console.log("CHECKOUT body (first 300)", text.slice(0, 300));
   const payload: CheckoutApiPayload = await res.json();
   if (!res.ok) {
     const message = payload.error || "Checkout session failed";

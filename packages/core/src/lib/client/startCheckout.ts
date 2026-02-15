@@ -7,12 +7,12 @@ type StartCheckoutOptions = {
 };
 
 /**
- * Calls /api/checkout with { cartProductList: [...] }.
+ * Calls /api/private/checkout with { cartProductList: [...] }.
  * If the server returns embedded flow, it dispatches "open-checkout" with clientSecret.
  * Else, it redirects to the hosted checkout URL.
  */
 export async function startCheckout(orderList: any, opts?: StartCheckoutOptions) {
-  const res = await fetch("/api/checkout", {
+  const res = await fetch("/api/private/checkoutcheckout", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },

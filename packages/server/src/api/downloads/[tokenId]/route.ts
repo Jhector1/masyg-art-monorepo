@@ -1,4 +1,4 @@
-// File: src/app/api/downloads/[tokenId]/route.ts
+// File: src/app/api/private/downloads/[tokenId]/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 

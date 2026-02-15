@@ -16,7 +16,7 @@ export function useExportArtwork(productId: string) {
   const refreshExportStatus = useCallback(async (): Promise<boolean> => {
   try {
     const res = await fetch(
-      `/api/products/${productId}/saveUserDesign/status`,
+      `/api/user/products/${productId}/saveUserDesign/status`,
       { cache: "no-store" }
     );
     if (!res.ok) return false;
@@ -73,7 +73,7 @@ export function useExportArtwork(productId: string) {
         sizePayload.print = { unit: options.unit, width: options.printW, height: options.printH, dpi: options.dpi };
       }
 
-      const res = await fetch(`/api/products/${productId}/export`, {
+      const res = await fetch(`/api/user/products/${productId}/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -128,7 +128,7 @@ export function useExportArtwork(productId: string) {
 
   const fetchInitialExportStatus = useCallback(async () => {
     try {
-      const res = await fetch(`/api/products/${productId}/saveUserDesign/status`, { cache: "no-store" });
+      const res = await fetch(`/api/user/products/${productId}/saveUserDesign/status`, { cache: "no-store" });
       if (!res.ok) return;
       const j = await res.json();
      

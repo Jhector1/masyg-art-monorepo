@@ -20,7 +20,7 @@ export function useDashboard() {
     async function fetchDashboard() {
       setLoading(true);
       try {
-        const res = await fetch("/api/dashboard");
+        const res = await fetch("/api/user/dashboard");
         const json = await res.json();
         if (!res.ok)
           throw new Error(json.error || "Failed to fetch dashboard data");

@@ -41,7 +41,7 @@ export default function EmbeddedQuotaCheckout({
           async (stripe) =>
             await stripe.initEmbeddedCheckout({
               async fetchClientSecret() {
-                const res = await fetch("/api/checkout/quota/session", {
+                const res = await fetch("/api/private/checkout/quota/session", {
                   method: "POST",
                   headers: { "content-type": "application/json" },
                   body: JSON.stringify({ quota, productId, packKey, quantity }),
@@ -56,7 +56,7 @@ export default function EmbeddedQuotaCheckout({
               },
               onComplete: async () => {
                 try {
-                  const r = await fetch("/api/checkout/apply-quota", {
+                  const r = await fetch("/api/private/checkoutcheckout/apply-quota", {
                     method: "POST",
                     headers: { "content-type": "application/json" },
                     body: JSON.stringify({ sessionId: sessionIdRef.current }),

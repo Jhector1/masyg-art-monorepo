@@ -18,7 +18,7 @@ export default function SmartCheckout({ cartProductList }: { cartProductList: an
 
     (async () => {
       try {
-        const res = await fetch("/api/checkout", {
+        const res = await fetch("/api/private/checkout", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ cartProductList }),

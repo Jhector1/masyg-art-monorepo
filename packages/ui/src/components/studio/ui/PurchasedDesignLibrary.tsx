@@ -18,7 +18,7 @@ export type PurchasedDesignDTO = {
 
 // Server is expected to return { items: PurchasedDesignDTO[], nextCursor?: string }
 async function fetchPurchasedDesigns(cursor?: string) {
-  const url = cursor ? `/api/designs/purchases?cursor=${encodeURIComponent(cursor)}` : "/api/designs/purchases";
+  const url = cursor ? `/api/private/designs/purchases?cursor=${encodeURIComponent(cursor)}` : "/api/private/designs/purchases";
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to load purchases");
   return (await res.json()) as { items: PurchasedDesignDTO[]; nextCursor?: string };

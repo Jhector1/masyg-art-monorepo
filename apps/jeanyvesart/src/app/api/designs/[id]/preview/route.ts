@@ -1,4 +1,4 @@
-// file: src/app/api/designs/[id]/preview/route.ts
+// file: src/app/api/private/designs/[id]/preview/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import sharp from "sharp";

@@ -1,4 +1,4 @@
-// File: src/app/api/checkout/route.ts
+// File: src/app/api/private/checkout/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";

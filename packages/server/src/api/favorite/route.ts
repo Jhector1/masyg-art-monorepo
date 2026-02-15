@@ -1,4 +1,4 @@
-// File: src/app/api/favorite/route.ts
+// File: src/app/api/user/favorite/route.ts
 import { NextRequest, NextResponse } from "next/server";
 // import { getToken } from "next-auth/jwt";
 import { PrismaClient } from "@prisma/client";

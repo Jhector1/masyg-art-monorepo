@@ -24,7 +24,7 @@ export function useLivePreview(productId: string) {
 
     try {
       setLoading(true);
-      const res = await fetch(`/api/products/${productId}/saveUserDesign`, {
+      const res = await fetch(`/api/user/products/${productId}/saveUserDesign`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -51,7 +51,7 @@ export function useLivePreview(productId: string) {
     async (style: StyleState, defs: string) => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/products/${productId}/live-preview`, {
+        const res = await fetch(`/api/user/products/${productId}/live-preview`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...style, defs }),

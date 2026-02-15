@@ -93,7 +93,7 @@ export default function OrderDetailPage(props: { params: Promise<{ orderId: stri
       setLoading(true);
       setErr(null);
       try {
-        const res = await fetch(`/api/orders/${params.orderId}?site=${SITE}`, { cache: "no-store" });
+        const res = await fetch(`/api/user/orders/${params.orderId}?site=${SITE}`, { cache: "no-store" });
         const json = await res.json().catch(() => null);
         if (!res.ok) throw new Error(json?.error || "Failed to load order");
         if (!alive) return;

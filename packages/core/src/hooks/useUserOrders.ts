@@ -26,7 +26,7 @@ export function useUserOrdersData() {
     setLoading(true);
     setError(null);
 
-    fetch(`/api/orders?userId=${user.id}`, { cache: 'no-store' })
+    fetch(`/api/user/orders?userId=${user.id}`, { cache: 'no-store' })
       .then((res) => {
         if (!res.ok) throw new Error(res.statusText || 'Failed to load orders');
         return res.json();
