@@ -23,6 +23,11 @@ docker compose build --no-cache admin-app
 docker compose up -d admin-app
 docker logs -f admin-app
 
+cd /opt/masyg-art-monorepo/infra/keycloak
+git pull --ff-only
+docker compose build --no-cache keycloak
+docker compose up -d keycloak
+docker logs -f keycloak
 
 #add admin
 
