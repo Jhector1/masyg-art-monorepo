@@ -37,29 +37,29 @@
 </html>
 </#macro>
 
-<#-- Compatibility macro used by many Keycloak templates -->
-<#macro registrationLayout
-  bodyClass=""
-  displayInfo=false
-  displayMessage=true
-  displayRequiredFields=false;
-  section
->
-  <#-- title -->
-  <#assign _title = "ZileDigital Accounts">
-  <#attempt>
-    <#assign _t><#nested "title"></#assign>
-    <#if _t?has_content>
-      <#assign _title = _t?trim>
-    </#if>
-  <#recover>
-  </#attempt>
+<#--
+  Keycloak templates call:
+    <#import "template.ftl" as layout>
+    <@layout.registrationLayout; section> ... </@layout.registrationLayout>
 
-  <@page title=_title>
-    <#-- optional messages block some templates provide -->
-    <#attempt><#nested "messages"><#recover></#attempt>
+  So the macro MUST have "; section" in the signature.
+-->
+<#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false; section>
 
-    <#-- optional global message -->
+  <#-- 1) Title: render nested content in section="title" -->
+  <#assign section = "title">
+  <#assign _title><#nested></#assign>
+  <#if !_title?has_content>
+    <#assign _title = "ZileDigital Accounts">
+  </#if>
+
+  <@page title=_title?trim>
+
+    <#-- 2) Header -->
+    <#assign section = "header">
+    <#nested>
+
+    <#-- 3) Global message (optional; keep it once) -->
     <#if displayMessage && message?has_content>
       <#if message.type == "error">
         <div class="a-err">${message.summary?no_esc}</div>
@@ -68,11 +68,15 @@
       </#if>
     </#if>
 
-    <#attempt><#nested "header"><#recover></#attempt>
-    <#attempt><#nested "form"><#recover></#attempt>
+    <#-- 4) Form -->
+    <#assign section = "form">
+    <#nested>
 
+    <#-- 5) Info -->
     <#if displayInfo>
-      <#attempt><#nested "info"><#recover></#attempt>
+      <#assign section = "info">
+      <#nested>
     </#if>
+
   </@page>
 </#macro>
