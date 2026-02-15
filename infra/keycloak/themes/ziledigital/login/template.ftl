@@ -77,7 +77,6 @@
   displayInfo=false
   displayMessage=true
   displayRequiredFields=false
-  ; section
 >
   <#-- Capture "title" section safely (Keycloak templates usually provide it) -->
   <#assign _title = "ZileDigital Accounts">
