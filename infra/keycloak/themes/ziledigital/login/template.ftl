@@ -38,28 +38,23 @@
 </#macro>
 
 <#--
-  Keycloak templates call:
-    <#import "template.ftl" as layout>
+  IMPORTANT:
+  Keycloak built-in templates call:
     <@layout.registrationLayout; section> ... </@layout.registrationLayout>
 
-  So the macro MUST have "; section" in the signature.
+  So the macro MUST declare:  ; section
+  AND the directive MUST end with '>' on the same line.
 -->
-<#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false; section>
-
-  <#-- 1 Title: render nested content in section="title" -->
-  <#assign section = "title">
-  <#assign _title><#nested></#assign>
+<#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false ; section>
+  <#-- Capture nested title -->
+  <#assign _title><#nested "title"></#assign>
   <#if !_title?has_content>
     <#assign _title = "ZileDigital Accounts">
   </#if>
 
   <@page title=_title?trim>
 
-    <#-- 2 Header -->
-    <#assign section = "header">
-    <#nested>
-
-    <#-- 3 Global message (optional; keep it once) -->
+    <#-- optional global message -->
     <#if displayMessage && message?has_content>
       <#if message.type == "error">
         <div class="a-err">${message.summary?no_esc}</div>
@@ -68,14 +63,12 @@
       </#if>
     </#if>
 
-    <#-- 4 Form -->
-    <#assign section = "form">
-    <#nested>
+    <#-- render nested blocks -->
+    <#nested "header">
+    <#nested "form">
 
-    <#-- 5 Info -->
     <#if displayInfo>
-      <#assign section = "info">
-      <#nested>
+      <#nested "info">
     </#if>
 
   </@page>
