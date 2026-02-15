@@ -46,7 +46,7 @@
 -->
 <#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false; section>
 
-  <#-- 1) Title: render nested content in section="title" -->
+  <#-- 1 Title: render nested content in section="title" -->
   <#assign section = "title">
   <#assign _title><#nested></#assign>
   <#if !_title?has_content>
@@ -55,11 +55,11 @@
 
   <@page title=_title?trim>
 
-    <#-- 2) Header -->
+    <#-- 2 Header -->
     <#assign section = "header">
     <#nested>
 
-    <#-- 3) Global message (optional; keep it once) -->
+    <#-- 3 Global message (optional; keep it once) -->
     <#if displayMessage && message?has_content>
       <#if message.type == "error">
         <div class="a-err">${message.summary?no_esc}</div>
@@ -68,11 +68,11 @@
       </#if>
     </#if>
 
-    <#-- 4) Form -->
+    <#-- 4 Form -->
     <#assign section = "form">
     <#nested>
 
-    <#-- 5) Info -->
+    <#-- 5 Info -->
     <#if displayInfo>
       <#assign section = "info">
       <#nested>
