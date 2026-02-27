@@ -4,15 +4,14 @@
   <h1 class="a-title">Something went wrong</h1>
   <p class="a-sub">An unexpected error occurred. Please try again.</p>
 
+  <#-- ✅ DO NOT use ?html in Keycloak 26 (auto-escaping is already on) -->
   <#if message?has_content>
-    <div class="a-err">${message.summary?no_esc}</div>
+    <div class="a-err">${message.summary}</div>
   <#else>
     <div class="a-err">Unexpected error.</div>
   </#if>
 
-  <#-- ✅ Always send the user back to YOUR APP (client), not back into Keycloak error flow.
-      Prefer: client.rootUrl -> client.homeUrl -> client.baseUrl
-      Fallback: url.loginRestartFlowUrl -> "/" -->
+  <#-- ✅ Prefer sending the user BACK to the app to restart auth -->
   <#assign appBase = "">
   <#if client??>
     <#if client.rootUrl?has_content>
@@ -30,13 +29,14 @@
     <#assign appBaseNorm = appBaseNorm?substring(0, appBaseNorm?length - 1)>
   </#if>
 
-  <#-- 🔁 Your app route that restarts login -->
+  <#-- your app login start route -->
   <#assign appLoginPath = "/authenticate">
 
   <#assign backHref = "">
   <#if appBaseNorm?has_content>
     <#assign backHref = appBaseNorm + appLoginPath>
   <#elseif url?? && url.loginRestartFlowUrl?? && url.loginRestartFlowUrl?has_content>
+    <#-- fallback (keeps user in KC; use only if app base missing) -->
     <#assign backHref = url.loginRestartFlowUrl>
   <#else>
     <#assign backHref = "/">
@@ -47,6 +47,6 @@
   </div>
 
   <p class="a-sub" style="margin-top:10px;">
-    An error occurred, please log in again through your application.
+    An error occurred, please login again through your application.
   </p>
 </@t.page>
