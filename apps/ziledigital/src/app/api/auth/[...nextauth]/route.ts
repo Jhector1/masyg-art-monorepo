@@ -1,8 +1,3 @@
-import NextAuth from "next-auth";
-import { authOptions } from "@acme/core/lib/auth";
-
-// ✅ Correct r route file usage
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
-
-
+// Canonical implementation lives in @acme/server.
+// Keep route-segment config literal in this app file when required by Next.js.
+export { GET, POST } from "@acme/server/api/auth/[...nextauth]/route";

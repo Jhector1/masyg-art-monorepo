@@ -1,15 +1,5 @@
-// src/app/api/private/checkout/is-claimed/route.ts
+// Canonical implementation lives in @acme/server.
+// Keep route-segment config literal in this app file when required by Next.js.
 export const runtime = "nodejs";
-import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-const db = new PrismaClient();
 
-export async function GET(req: NextRequest) {
-  const sessionId = new URL(req.url).searchParams.get("session_id");
-  if (!sessionId) return NextResponse.json({ claimed: false }, { status: 400 });
-  const order = await db.order.findUnique({
-    where: { stripeSessionId: sessionId },
-    select: { userId: true },
-  });
-  return NextResponse.json({ claimed: !!order?.userId });
-}
+export { GET } from "@acme/server/api/orders/is-claimed/route";
