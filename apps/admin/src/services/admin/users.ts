@@ -2,6 +2,7 @@
 "use server";
 
 import { prisma } from "@acme/core/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 export type ListUsersInput = {
   q?: string;
@@ -10,7 +11,7 @@ export type ListUsersInput = {
 };
 
 export async function listUsers({ q = "", page = 1, pageSize = 20 }: ListUsersInput) {
-  const where = q
+  const where: Prisma.UserWhereInput = q
     ? {
         OR: [
           { email: { contains: q, mode: "insensitive" } },

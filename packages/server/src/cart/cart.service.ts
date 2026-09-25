@@ -5,7 +5,7 @@ import {
   FulfillmentProvider,
   Prisma,
 } from "@prisma/client";
-import type { CartSelectedItem, AddToCartBody } from "@acme/core/types";
+import type { CartSelectedItem } from "@acme/core/types";
 import { productListSelect } from "@acme/core/types";
 import {
   applyBundleIfBoth,
@@ -262,7 +262,8 @@ export async function isInCart(
 
 export async function getCart(
   site: Storefront,
-  owner: Owner
+  owner: Owner,
+  _options?: { live?: boolean }
 ): Promise<CartSelectedItem[]> {
 //   assertOwner(owner);
     if (!owner.userId && !owner.guestId)  return [] ;
@@ -335,10 +336,26 @@ export async function getCart(
  * ✅ POST contract:
  * returns { message, result: { cartItemId, cartId, productId, digitalVariantId, printVariantId, originalVariantId, price, originalPrice, quantity, ... } }
  */
+type AddToCartInput = {
+  productId: string;
+  digitalType?: string | null;
+  printType?: string | null;
+  price?: number;
+  quantity?: number;
+  format?: string;
+  size?: string | null;
+  material?: string | null;
+  frame?: string | null;
+  license?: string;
+  design?: unknown;
+  snapshot?: boolean;
+  originalType?: boolean;
+};
+
 export async function addToCart(
   site: Storefront,
   owner: Owner,
-  body: AddToCartBody & { originalType?: boolean }
+  body: AddToCartInput
 ) {
   assertOwner(owner);
 

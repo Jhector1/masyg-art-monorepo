@@ -86,7 +86,7 @@ afterEach(() => {
 // ---- Tests ------------------------------------------------------------------
 describe('POST /api/private/checkoutcheckout', () => {
   test('400 when body missing cartProductList', async () => {
-    mockGetCustomer.mockResolvedValue({ userId: null, guestId: 'guest_123' });
+    mockGetCustomer.mockResolvedValue({ userId: undefined, guestId: 'guest_123' });
     const res = await POST(makeReq({}) as any);
     const { status, json } = await asJson(res);
 
@@ -96,7 +96,7 @@ describe('POST /api/private/checkoutcheckout', () => {
   });
 
   test('creates Stripe session with digital item metadata and session-level CSV', async () => {
-    mockGetCustomer.mockResolvedValue({ userId: 'user_123', guestId: null });
+    mockGetCustomer.mockResolvedValue({ userId: 'user_123', guestId: undefined });
     mockStripeCreate.mockResolvedValue(stripeOk);
 
     const body = {
@@ -159,7 +159,7 @@ describe('POST /api/private/checkoutcheckout', () => {
   });
 
   test('creates Stripe session with print item metadata', async () => {
-    mockGetCustomer.mockResolvedValue({ userId: null, guestId: 'guest_789' });
+    mockGetCustomer.mockResolvedValue({ userId: undefined, guestId: 'guest_789' });
     mockStripeCreate.mockResolvedValue(stripeOk);
 
     const body = {
@@ -200,7 +200,7 @@ describe('POST /api/private/checkoutcheckout', () => {
   });
 
   test('500 path bubbles Stripe errors', async () => {
-    mockGetCustomer.mockResolvedValue({ userId: 'user_fail', guestId: null });
+    mockGetCustomer.mockResolvedValue({ userId: 'user_fail', guestId: undefined });
     mockStripeCreate.mockRejectedValue(new Error('Stripe is down'));
 
     const body = {

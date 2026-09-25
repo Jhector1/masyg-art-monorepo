@@ -29,7 +29,7 @@ let { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
 
   // Always ensure some identity exists for cart operations
   if (!userId && !guestId) {
-    guestId = getOrCreateGuestId();
+    guestId = await getOrCreateGuestId();
   }
 
   return { userId, guestId: guestId! };

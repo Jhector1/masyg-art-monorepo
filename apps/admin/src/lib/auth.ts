@@ -54,7 +54,7 @@ export const authOptions: NextAuthOptions = {
         });
         const email = dbUser?.email?.toLowerCase();
         token.isAdmin =
-          dbUser?.isAdmin === true || (email && ADMIN_EMAILS.includes(email));
+          dbUser?.isAdmin === true || (!!email && ADMIN_EMAILS.includes(email));
         token.sub = (user as any).id;
         return token;
       }
@@ -66,7 +66,7 @@ export const authOptions: NextAuthOptions = {
         });
         const email = dbUser?.email?.toLowerCase();
         token.isAdmin =
-          dbUser?.isAdmin === true || (email && ADMIN_EMAILS.includes(email));
+          dbUser?.isAdmin === true || (!!email && ADMIN_EMAILS.includes(email));
       }
       return token;
     },
@@ -89,7 +89,6 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
-  trustHost: true,
 };
 
 export async function auth() {

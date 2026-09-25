@@ -5,19 +5,30 @@
   "exports": {
     ".": "./src/index.ts",
     "./services/*": "./src/services/*.ts",
-        "./cart/*": "./src/cart/*.ts"
+    "./cart/*": "./src/cart/*.ts",
+    "./api/*": "./src/api/*.ts",
+    "./utils": "./src/utils/index.ts",
+    "./utils/*": "./src/utils/*.ts"
   },
   "dependencies": {
+    "@acme/core": "*",
+    "archiver": "^7.0.1",
     "bcryptjs": "^3.0.2",
-    "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^6.10.1",
+    "cheerio": "^1.1.2",
     "cloudinary": "^2.7.0",
     "formidable": "^3.5.4",
+    "jsonwebtoken": "^9.0.2",
     "micro": "^10.0.1",
+    "nodemailer": "^6.10.1",
     "probe-image-size": "^7.2.3",
     "sanitize-html": "^2.17.0",
-    "archiver": "^7.0.1",
-    "cheerio": "^1.1.2",
     "stripe": "^18.3.0"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "@types/jsonwebtoken": "^9.0.10"
   }
 }

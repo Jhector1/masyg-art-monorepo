@@ -19,9 +19,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   providers: [
     Keycloak({
-      issuer: process.env.KEYCLOAK_ISSUER, // https://accounts.ziledigital.com/realms/<realm>
-      clientId: process.env.KEYCLOAK_CLIENT_ID,
-      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
+      issuer: process.env.KEYCLOAK_ISSUER!, // https://accounts.ziledigital.com/realms/<realm>
+      clientId: process.env.KEYCLOAK_CLIENT_ID!,
+      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
     }),
   ],
 
@@ -65,9 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
     async session({ session, token }) {
       if (session.user) {
-        // @ts-expect-error - augmented types below
-        session.user.id = token.userId as string;
-        // @ts-expect-error - augmented types below
+        session.user.id = String(token.userId ?? token.sub ?? "");
         session.user.isAdmin = token.isAdmin === true;
       }
       return session;

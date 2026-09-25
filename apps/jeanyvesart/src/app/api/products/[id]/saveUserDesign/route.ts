@@ -7,6 +7,8 @@ import { requireUser } from "@acme/core/utils/requireUser";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
 import { getEntitlementSummary } from "@acme/core/helpers/stripe/webhook/entitlements";
 import { Prisma } from "@prisma/client";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

@@ -27,6 +27,7 @@ export type User = {
   updatedAt?: string;
   image?: string | null;        // NextAuth session image
   avatarUrl?: string | null;    // DB avatar (Cloudinary)
+  isAdmin?: boolean;
 };
 
 type LoginCredsArgs = { email: string; password: string; callbackUrl?: string };

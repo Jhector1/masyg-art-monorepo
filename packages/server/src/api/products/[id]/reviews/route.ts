@@ -10,13 +10,14 @@ const prisma = new PrismaClient();
 // ─── Helper: require a valid session and return userId ────────────────
 async function requireUser() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  if (!userId) {
     throw new NextResponse(
       JSON.stringify({ error: "Not authenticated" }),
       { status: 401 }
     );
   }
-  return session.user.id;
+  return userId;
 }
 
 // ─── GET /api/products/[id]/reviews ───────────────────────────────────

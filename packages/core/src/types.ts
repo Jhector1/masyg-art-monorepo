@@ -1,4 +1,21 @@
 import { ProductVariant, Prisma } from "@acme/db";
+
+export type SizeOption = {
+  label: string;
+  multiplier?: number;
+};
+
+export type StyleState = {
+  fillColor: string;
+  fillOpacity?: number;
+  strokeColor: string;
+  strokeOpacity?: number;
+  strokeWidth: number;
+  backgroundColor: string;
+  backgroundOpacity?: number;
+  defs?: string;
+};
+
 // import ProductDetail from "@/app/store/[id]/page";
 
 export type MaterialOption = {
@@ -173,7 +190,6 @@ export type ProductReview = Prisma.ReviewGetPayload<{
 
 // src/types/product.ts
 import type { ProductKind, Review } from "@acme/db";
-import { StyleState } from "../../ui/src/components/studio/types";
 
 export type VariantWithInCart = ProductVariant & {
   /** true if this variant’s id was found in the user’s cart */

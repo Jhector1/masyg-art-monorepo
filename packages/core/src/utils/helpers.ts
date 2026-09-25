@@ -34,16 +34,12 @@ const parseWh = (s: string): [number, number] | null => {
     .trim()
     .toLowerCase();
 
-  // 1) strict pattern: WxH with optional inch tokens
-  let m =
+  // Accept only an explicit WxH separator. Arbitrary text between two
+  // numbers (for example `12" foo 9"`) is not a valid size.
+  const m =
     normalized.match(
-      /(\d+(?:\.\d+)?)\s*(?:in|inch|inches|")?\s*x\s*(\d+(?:\.\d+)?)\s*(?:in|inch|inches|")?/
+      /^(\d+(?:\.\d+)?)\s*(?:in|inch|inches|")?\s*x\s*(\d+(?:\.\d+)?)\s*(?:in|inch|inches|")?$/
     );
-
-  // 2) fallback: any two numbers separated by non-number stuff
-  if (!m) {
-    m = normalized.match(/(\d+(?:\.\d+)?)[^\d.]+(\d+(?:\.\d+)?)/);
-  }
 
   if (!m) return null;
   const w = parseFloat(m[1]);

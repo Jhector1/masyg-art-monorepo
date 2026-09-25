@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   }
 
   const token = await signMfaCookie(u.id, !!rememberDevice);
-  const jar = cookies();
+  const jar = await cookies();
 
   const maxAge = rememberDevice ? MFA_REMEMBER_COOKIE_TTL_SEC : MFA_COOKIE_TTL_SEC;
 

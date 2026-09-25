@@ -17,7 +17,10 @@
     "db:migrate:dev": "npm -w @acme/db run migrate:dev",
     "db:migrate:deploy": "npm -w @acme/db run migrate:deploy",
     "db:studio": "npm -w @acme/db run studio",
-    "postinstall": "node -e \"process.exit(require('fs').existsSync('packages/tailwind-preset/tsconfig.json')?0:0)\""
+    "postinstall": "npm run db:generate",
+    "prebuild": "npm run db:generate",
+    "precheck-types": "npm run db:generate",
+    "pretest": "npm run db:generate"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

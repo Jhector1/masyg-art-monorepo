@@ -61,8 +61,15 @@ const fakeReq = (url: string, body?: any): NextRequest =>
   ({ url, json: body ? async () => body : undefined } as unknown as NextRequest);
 
 const resetPrisma = () => {
-  for (const group of Object.values(prismaMock))
-    for (const fn of Object.values(group)) (fn as jest.Mock).mockReset();
+  for (const group of Object.values(prismaMock as Record<string, unknown>)) {
+    if (!group || typeof group !== "object") continue;
+
+    for (const fn of Object.values(group as Record<string, unknown>)) {
+      if (typeof fn === "function" && "mockReset" in fn) {
+        (fn as jest.Mock).mockReset();
+      }
+    }
+  }
 };
 
 /* ── 3. TESTS ─────────────────────────────────────────────────────── */

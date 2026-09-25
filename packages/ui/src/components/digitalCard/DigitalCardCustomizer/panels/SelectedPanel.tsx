@@ -5,7 +5,7 @@
 "use client";
 import React from "react";
 import { DesignEl, EmojiEl, ImageEl, TextEl } from "../types";
-import { SketchPicker } from "react-color";
+import { SketchPicker, type ColorResult } from "react-color";
 
 interface SelectedPanelProps {
   selected: DesignEl | null;
@@ -79,7 +79,7 @@ export function SelectedPanel({ selected, bringFwd, sendBack, deleteSel, updateS
             </label>
             <div className="rc-field">
               <span>Color</span>
-              <SketchPicker color={(selected as TextEl).color} onChangeComplete={(c) => updateSelectedText("color", c.hex)} />
+              <SketchPicker color={(selected as TextEl).color} onChangeComplete={(c: ColorResult) => updateSelectedText("color", c.hex)} />
             </div>
             <div className="rc-row">
               <button className={`rc-btn ${(selected as TextEl).fontWeight >= 600 ? "is-on" : ""}`} onClick={() => updateSelectedText("fontWeight", (selected as TextEl).fontWeight >= 600 ? 400 : 700)}>B</button>

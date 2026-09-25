@@ -1,5 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "noEmit": true },
-  "include": ["src", "../server/src/utils/variants.ts"]
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src"
+  ]
 }

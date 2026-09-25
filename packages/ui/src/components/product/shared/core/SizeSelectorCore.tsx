@@ -1,8 +1,9 @@
 // src/components/shared/core/SizeSelectorCore.tsx
 "use client";
 import React from "react";
+import type { SizeOption } from "@acme/core/types";
 
-export type SizeOption = { label: string; multiplier?: number };
+export type { SizeOption } from "@acme/core/types";
 
 export default function SizeSelectorCore({
   options,

@@ -172,7 +172,6 @@ describe("cleanSizes (area-based multipliers with baseline rules)", () => {
   });
 
   test("empty or undefined input returns []", () => {
-    // @ts-expect-error testing undefined pathway
     expect(cleanSizes(undefined)).toEqual([]);
     expect(cleanSizes([])).toEqual([]);
   });
@@ -203,12 +202,10 @@ describe("getSizeMultiplier", () => {
   });
 
   test("no size passed returns 1", () => {
-    // @ts-expect-error testing nullable path
     expect(getSizeMultiplier(null, sizes)).toBe(1);
   });
 
   test("no list passed returns 1", () => {
-    // @ts-expect-error testing missing list
     expect(getSizeMultiplier("8x10", undefined)).toBe(1);
   });
 });
@@ -226,9 +223,7 @@ describe("date util: toDate", () => {
   });
 
   test("null/undefined returns null", () => {
-    // @ts-expect-error test null path
     expect(toDate(null)).toBeNull();
-    // @ts-expect-error test undefined path
     expect(toDate(undefined)).toBeNull();
   });
 });

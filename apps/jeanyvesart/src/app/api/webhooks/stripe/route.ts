@@ -54,7 +54,7 @@ async function finalizePaidOrder(session: Stripe.Checkout.Session) {
       // ---------- Create shipping address only if missing ----------
       let shippingId = order.shippingId ?? null;
 
-      const ship = session.shipping_details;
+      const ship = session.collected_information?.shipping_details;
       const addr = ship?.address;
 
       if (!shippingId && addr) {

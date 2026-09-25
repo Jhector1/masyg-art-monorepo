@@ -122,6 +122,10 @@ interface ProductConfiguratorProps {
   previewImageSrc?: string;
 
   showFormat?: boolean;
+  hidden?: Partial<
+    Record<"format" | "license" | "size" | "material" | "frame", boolean>
+  >;
+  disabledOptions?: Partial<Record<"digital" | "print", boolean>>;
   product: ProductDetailResult;
   inCart: CartSelectedItem | null;
 
@@ -164,6 +168,8 @@ interface ProductConfiguratorProps {
 export default function ProductConfigurator(props: ProductConfiguratorProps) {
   const {
     showFormat = true,
+    hidden,
+    disabledOptions,
     product,
     inCart,
     materials,
@@ -177,7 +183,18 @@ export default function ProductConfigurator(props: ProductConfiguratorProps) {
     selection,
   } = props;
 
-  const policy = getKindPolicy(product);
+  const basePolicy = getKindPolicy(product);
+  const policy: KindPolicy = {
+    ...basePolicy,
+    allow: {
+      digital: basePolicy.allow.digital && !disabledOptions?.digital,
+      print: basePolicy.allow.print && !disabledOptions?.print,
+    },
+    hide: {
+      ...basePolicy.hide,
+      ...hidden,
+    },
+  };
   const availableSizes = cleanSizes(product.sizes);
   const { updateCart } = useCart();
   console.log("license data",licenseData.license);

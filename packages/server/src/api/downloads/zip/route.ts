@@ -43,8 +43,8 @@ export async function GET(req: Request) {
   // Node stream via PassThrough + archiver
   const pass = new PassThrough();
   const archive = archiver("zip", { zlib: { level: 9 } });
-  archive.on("warning", (err) => console.warn("zip warn:", err));
-  archive.on("error", (err) => {
+  archive.on("warning", (err: Error) => console.warn("zip warn:", err));
+  archive.on("error", (err: Error) => {
     console.error("zip error:", err);
     pass.destroy(err as any);
   });

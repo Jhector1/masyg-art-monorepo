@@ -2,9 +2,7 @@ import { prisma } from "@acme/core/lib/prisma";
 
 
 
-import { normalizeTypes, } from "../utils/variants";
-import { VariantType } from "packages/core/src/types";
-
+import { normalizeTypes, type Variant } from "../utils/variants";
 /** Minimal price computation: prefer variant.listPrice else product.price; apply salePrice if present. */
 
 
@@ -17,7 +15,7 @@ async function getActiveCart(identity: Identity) {
   });
 }
 
-function whereByTypes(types?: VariantType[]) {
+function whereByTypes(types?: Variant[]) {
   if (!types || types.length === 0) return {};
   const ors: any[] = [];
   if (types.includes("DIGITAL")) ors.push({ digitalVariantId: { not: null } });
@@ -31,7 +29,7 @@ function whereByTypes(types?: VariantType[]) {
 /** List cart items with optional type filter and optional live design preview override. */
 export async function listCartItemsForCustomer(
   identity: Identity & {
-    types?: VariantType[] | string | null | undefined;
+    types?: Variant[] | string | null | undefined;
     liveDesignPreview?: boolean;
   }
 ) {
@@ -39,7 +37,7 @@ export async function listCartItemsForCustomer(
   if (!cart) return [];
 
   const normalized = normalizeTypes(identity.types);
-  const typeWhere = whereByTypes(normalized);
+  const typeWhere = normalized === "ALL" ? {} : whereByTypes(normalized);
 
   const items = await prisma.cartItem.findMany({
     where: { cartId: cart.id, ...(typeWhere as any) },
@@ -126,7 +124,7 @@ export async function listCartItemsForCustomer(
       productId: it.product.id,
       title: it.product.title,
       // which kind:
-      kind: (selected?.type ?? null) as VariantType | null,
+      kind: selected?.type ?? null,
       variantId: selected?.id ?? null,
       quantity: it.quantity,
       // server-computed price (unit and extended)

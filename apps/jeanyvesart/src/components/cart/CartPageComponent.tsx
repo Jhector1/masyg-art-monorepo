@@ -50,8 +50,8 @@ function effectiveUnitPrice(p: CartProduct, fallback?: number | null) {
     price: p.price,
     salePrice: p.salePrice ?? undefined,
     salePercent: p.salePercent ?? undefined,
-    saleStartsAt: p.saleStartsAt ?? undefined,
-    saleEndsAt: p.saleEndsAt ?? undefined
+    saleStartsAt: p.saleStartsAt ? new Date(p.saleStartsAt) : undefined,
+    saleEndsAt: p.saleEndsAt ? new Date(p.saleEndsAt) : undefined
   });
   return roundMoney(fallback ?? sale.price);
 }
@@ -116,12 +116,9 @@ export default function CartPage() {
       const hasPrint   = arr.some(a => a.type === "PRINT");
       const groupSum   = arr.reduce((s, x) => s + x.line, 0);
       if (hasDigital && hasPrint) {
-        const bundle = applyBundleIfBoth({
-          printTotal: arr.filter(a => a.type === "PRINT").reduce((s, x) => s + x.line, 0),
-          digitalTotal: arr.filter(a => a.type === "DIGITAL").reduce((s, x) => s + x.line, 0),
-        });
-        rawSubtotal += bundle.total;
-        rawDiscount += roundMoney(groupSum - bundle.total);
+        const bundleTotal = applyBundleIfBoth(groupSum, hasDigital, hasPrint);
+        rawSubtotal += bundleTotal;
+        rawDiscount += roundMoney(groupSum - bundleTotal);
       } else {
         rawSubtotal += groupSum;
       }

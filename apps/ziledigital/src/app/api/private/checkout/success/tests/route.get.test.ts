@@ -1,117 +1,78 @@
-/**
- * Tests for GET /api/private/checkout/success/route.ts
- */
-import { makeNextRequest } from '@acme/core/test/helpers/next';
-import { GET } from '../route';
-import { getCustomerIdFromRequest } from '@acme/core/utils/guest';
-import { PrismaClient } from '@prisma/client';
+import { makeNextRequest } from "@acme/core/test/helpers/next";
+import { GET } from "../route";
+import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+import { prisma } from "@acme/core/lib/prisma";
 
-jest.mock('@/utils/guest');
-jest.mock('@prisma/client');
+jest.mock("@acme/core/utils/guest", () => ({ getCustomerIdFromRequest: jest.fn() }));
+jest.mock("@acme/core/lib/prisma", () => ({ prisma: { order: { findFirst: jest.fn() } } }));
 
-const asJson = async (res: any) => ({ status: res.status, json: await res.json() });
+const mockIdentity = getCustomerIdFromRequest as jest.Mock;
+const mockFind = (prisma as any).order.findFirst as jest.Mock;
 
-const prisma = new PrismaClient() as any;
+describe("ZileDigital checkout success", () => {
+  beforeEach(() => { jest.clearAllMocks(); });
 
-describe('GET /api/private/checkoutcheckout/success', () => {
-  beforeEach(() => {
-    jest.resetAllMocks();
+  test("401 when not authenticated", async () => {
+    mockIdentity.mockResolvedValue({});
+    const res = await GET(makeNextRequest("https://x/api/success?session_id=cs1") as any);
+    expect(res.status).toBe(401);
   });
 
-  test('401 when not authenticated', async () => {
-    (getCustomerIdFromRequest as jest.Mock).mockResolvedValue({ userId: null, guestId: null });
-
-    const req = makeNextRequest('https://api/private/checkoutcheckout/success?session_id=cs_X', { method: 'GET' });
-    const res = await GET(req as any);
-    const data = await asJson(res);
-
-    expect(data.status).toBe(401);
-    expect(data.json.error).toMatch(/Not authenticated/);
+  test("returns empty state without session_id", async () => {
+    mockIdentity.mockResolvedValue({ userId: "u1" });
+    const res = await GET(makeNextRequest("https://x/api/success") as any);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(expect.objectContaining({ order: null, digitalDownloads: [] }));
   });
 
-  test('empty list when no session_id', async () => {
-    (getCustomerIdFromRequest as jest.Mock).mockResolvedValue({ userId: 'u', guestId: null });
-
-    const req = makeNextRequest('https://api/private/checkoutcheckout/success', { method: 'GET' });
-    const res = await GET(req as any);
-    const data = await asJson(res);
-
-    expect(data.status).toBe(200);
-    expect(data.json.digitalDownloads).toEqual([]);
+  test("returns empty state when order is not found", async () => {
+    mockIdentity.mockResolvedValue({ userId: "u1" });
+    mockFind.mockResolvedValue(null);
+    const res = await GET(makeNextRequest("https://x/api/success?session_id=cs1") as any);
+    expect(res.status).toBe(200);
+    expect((await res.json()).order).toBeNull();
   });
 
-  test('empty list when order not found', async () => {
-    (getCustomerIdFromRequest as jest.Mock).mockResolvedValue({ userId: 'u_5', guestId: null });
-    prisma.order.findFirst.mockResolvedValue(null);
+  test("maps token-backed digital downloads", async () => {
+    mockIdentity.mockResolvedValue({ guestId: "g1" });
 
-    const req = makeNextRequest('https://api/private/checkoutcheckout/success?session_id=cs_1', { method: 'GET' });
-    const res = await GET(req as any);
-    const data = await asJson(res);
-
-    expect(prisma.order.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ stripeSessionId: 'cs_1', OR: [{ userId: 'u_5' }] }),
-      include: expect.any(Object),
-    }));
-    expect(data.json.digitalDownloads).toEqual([]);
-  });
-
-  test('returns ALL product.formats for each DIGITAL order item with correct ext and thumb', async () => {
-    (getCustomerIdFromRequest as jest.Mock).mockResolvedValue({ userId: null, guestId: 'g_9' });
-
-    prisma.order.findFirst.mockResolvedValue({
-      id: 'ord_1',
-      items: [
-        {
-          id: 'oi_1',
-          productId: 'prod_1',
-          product: {
-            id: 'prod_1',
-            title: 'Sky',
-            thumbnails: ['https://cdn/t1.jpg?x=1'],
-            formats: [
-              'https://f/s1.png?sig=1',
-              'https://f/s2.SVG',
-              'https://f/s3', // no ext
-            ],
-          },
-          digitalVariant: { id: 'dv_1', format: 'png' },
-        },
-      ],
-    });
-
-    const req = makeNextRequest('https://api/private/checkoutcheckout/success?session_id=cs_ok', { method: 'GET' });
-    const res = await GET(req as any);
-    const data = await asJson(res);
-
-    expect(data.status).toBe(200);
-    expect(data.json.digitalDownloads).toEqual([
-      {
-        id: 'oi_1-0',
-        orderItemId: 'oi_1',
-        productId: 'prod_1',
-        title: 'Sky',
-        format: 'png',
-        downloadUrl: 'https://f/s1.png?sig=1',
-        thumbnail: 'https://cdn/t1.jpg?x=1',
+  const order = {
+    id: "ord1",
+    placedAt: new Date("2026-01-02T03:04:05Z"),
+    total: 12,
+    items: [{
+      id: "oi1",
+      type: "DIGITAL",
+      price: 12,
+      quantity: 1,
+      productId: "p1",
+      product: { id: "p1", title: "Sky", thumbnails: ["https://cdn.test/p1.jpg"], kind: "DIGITAL" },
+      digitalVariant: { id: "dv1", license: "Personal", format: "png" },
+      printVariant: null,
+    }],
+    downloadTokens: [{
+      licenseSnapshot: "Personal",
+      signedUrl: "https://download.test/token",
+      expiresAt: new Date("2026-01-03T03:04:05Z"),
+      remainingUses: 2,
+      asset: {
+        id: "a1", productId: "p1", ext: "png", previewUrl: "https://cdn.test/preview.jpg",
+        width: 100, height: 100, dpi: 300, colorProfile: "sRGB", sizeBytes: 123,
+        isVector: false, checksum: "abc",
       },
-      {
-        id: 'oi_1-1',
-        orderItemId: 'oi_1',
-        productId: 'prod_1',
-        title: 'Sky',
-        format: 'svg',
-        downloadUrl: 'https://f/s2.SVG',
-        thumbnail: 'https://cdn/t1.jpg?x=1',
-      },
-      {
-        id: 'oi_1-2',
-        orderItemId: 'oi_1',
-        productId: 'prod_1',
-        title: 'Sky',
-        format: '',
-        downloadUrl: 'https://f/s3',
-        thumbnail: 'https://cdn/t1.jpg?x=1',
-      },
+    }],
+  };
+
+    mockFind.mockResolvedValue(order);
+    const res = await GET(makeNextRequest("https://x/api/success?session_id=cs1") as any);
+    const body = await res.json();
+    expect(body.hasDigital).toBe(true);
+    expect(body.hasPrint).toBe(false);
+    expect(body.digitalDownloads).toEqual([
+      expect.objectContaining({
+        id: "a1", title: "Sky", format: "png", downloadUrl: "https://download.test/token",
+        license: "Personal", remainingUses: 2,
+      }),
     ]);
   });
 });

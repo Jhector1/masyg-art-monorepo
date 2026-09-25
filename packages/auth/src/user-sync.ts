@@ -1,4 +1,4 @@
-import {prisma} from "@acme/core/lib/prisma";
+import {prisma} from "@acme/db";
 
 type SyncUserArgs = {
   email: string;

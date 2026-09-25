@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
 import { getEntitlementSummary, getPurchasedFlag, getPurchasedKinds } from "@acme/core/helpers/stripe/webhook/entitlements";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 

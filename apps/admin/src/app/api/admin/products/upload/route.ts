@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 // import { PrismaClient, ProductKind, VariantType } from "@prisma/client";
 import { PrismaClient, ProductKind, VariantType, Storefront } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 
 import { v2 as cloudinary } from "cloudinary";
@@ -58,7 +59,7 @@ function parseSite(v: FormDataEntryValue | null): Storefront {
 
 
 async function createVariantsForKind(args: {
-  tx: PrismaClient;
+  tx: Prisma.TransactionClient;
   productId: string;
   kind: ProductKind;
   variantType: VariantType;

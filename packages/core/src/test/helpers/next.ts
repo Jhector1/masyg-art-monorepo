@@ -35,6 +35,7 @@ export function makeNextRequest(
     url,
     nextUrl: new URL(url),
     headers,
+    text: async () => asString,
     json: async () => {
       if (!asString) return undefined;
       try { return JSON.parse(asString); } catch { return asString; }

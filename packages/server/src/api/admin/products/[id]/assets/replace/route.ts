@@ -15,7 +15,7 @@ import {
   isVectorExt,
 } from "@acme/core/lib/productAssets";
 import type {  UploadApiResponse } from "cloudinary";
-import { deleteByPrefix, getFiles, getStr, isNonEmptyFile, uploadFile } from "packages/server/src/utils";
+import { deleteByPrefix, getFiles, getStr, isNonEmptyFile, uploadFile } from "../../../../../../utils";
 
 
 export async function replaceProductAssets(

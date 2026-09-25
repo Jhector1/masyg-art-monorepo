@@ -6,9 +6,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest --verbose",
+    "test": "jest --verbose --passWithNoTests",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "check-types": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
@@ -18,9 +19,14 @@
     "next-auth": "^4.24.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "swr": "^2.3.4"
+    "swr": "^2.3.4",
+    "@acme/core": "*",
+    "@acme/server": "*",
+    "@acme/tailwind-preset": "*",
+    "@acme/ui": "*"
   },
   "devDependencies": {
+    "@acme/config": "*",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/node": "^20",
     "@types/react": "^19",

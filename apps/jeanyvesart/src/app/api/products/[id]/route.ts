@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
 
   // Cart lookup (only current caller’s cart)
-  const cartWhere = userId ? { userId, site: "JEANYVES" } : guestId ? { guestId, site: "JEANYVES" } : { id: "__nope__" };
+  const cartWhere = userId ? { userId, site: "JEANYVES" as const } : guestId ? { guestId, site: "JEANYVES" as const } : { id: "__nope__" };
   const cart = await db.cart.findFirst({
     where: cartWhere,
     include: {

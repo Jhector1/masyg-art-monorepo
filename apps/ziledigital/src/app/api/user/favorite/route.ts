@@ -6,6 +6,7 @@ import {
   removeFavorite,
 } from "@acme/server/services/favorites";
 import type { Storefront } from "@prisma/client";
+import { normalizeTypes } from "@acme/server/utils/variants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const types = req.nextUrl.searchParams.get("types") ?? undefined;
+  const types = normalizeTypes(req.nextUrl.searchParams.get("types"));
 
   const payload = await listFavoritesForUser({ userId: String(userId), site, types });
   return NextResponse.json(payload, { status: 200, headers: noCache() });

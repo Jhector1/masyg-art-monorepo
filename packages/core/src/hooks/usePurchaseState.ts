@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LicenseOption, MaterialOption, FrameOption } from "../types";
-import type { SizeOption } from "@acme/ui/components/product/shared/core/SizeSelectorCore";
+import type { SizeOption } from "../types";
 import { loadPurchaseState, savePurchaseState } from "../utils/persistence";
 import { computeDigitalPrice, computePrintPrice } from "../utils/pricing";
 

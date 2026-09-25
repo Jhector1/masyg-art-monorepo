@@ -7,7 +7,7 @@ import type {
   ProfileOk,
   ProfileError,
   UserProfile,
-} from "@acme/ui/components/profile/types";
+} from "../profile-types";
 
 type UseProfileOptions = {
   disabled?: boolean;

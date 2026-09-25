@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@acme/core/lib/prisma";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
 import type { Storefront } from "@prisma/client";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 
 function resolveSite(req: NextRequest): Storefront {
   const fromHeader = req.headers.get("x-storefront")?.toUpperCase();
@@ -23,7 +25,7 @@ function noCache() {
   };
 }
 
-export async function GET(req: NextRequest, ctx: { params: { orderId: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
   const site = "JEANYVES";
  const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
 
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest, ctx: { params: { orderId: string } }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: noCache() });
   }
 
-  const orderId = String(ctx.params.orderId);
+  const orderId = String((await ctx.params).orderId);
 
   const ownerWhere = userId
     ? { userId: String(userId) }

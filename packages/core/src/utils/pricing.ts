@@ -1,6 +1,6 @@
 // src/components/shared/purchase/pricing.ts
 import type { LicenseOption, MaterialOption, FrameOption } from "../types";
-import type { SizeOption } from "@acme/ui/components/product/shared/core/SizeSelectorCore";
+import type { SizeOption } from "../types";
 import { areaInSqIn, RATE_PER_SQIN } from "./helpers";
 
 export function computeDigitalPrice(baseDigitalPrice: number, lic: LicenseOption) {

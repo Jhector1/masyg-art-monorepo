@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@acme/core/lib/prisma";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 // import cloudinary from "@/lib/cloudinary"; // if you have a client
 
 export const runtime = "nodejs";

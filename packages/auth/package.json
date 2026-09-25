@@ -4,10 +4,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
-    
-
   },
   "dependencies": {
+    "@acme/db": "*",
     "next-auth": "^4.24.11"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit -p tsconfig.json"
   }
 }

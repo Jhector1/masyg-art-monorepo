@@ -36,3 +36,12 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# IDE metadata
+.idea/
+
+# Generated Prisma client artifacts
+packages/db/prisma/src/generated/
+
+# Local migration backup snapshots
+packages/db/prisma/migrations_backup_*/

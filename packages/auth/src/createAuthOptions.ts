@@ -5,7 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { compare, hash } from "bcryptjs";
 import crypto from "crypto";
 
-import { prisma } from "@acme/core/lib/prisma"; // ✅ use your singleton
+import { prisma } from "@acme/db"; // ✅ use your singleton
 import { syncUserToDb } from "./user-sync";
 import { claimGuestData } from "./lib/claimGuestData";
 import { getGuestId, clearGuestId } from "./lib/guest";
@@ -188,10 +188,10 @@ export function createAuthOptions(cfg: AuthFactoryConfig = {}): NextAuthOptions 
 
           // ✅ claim guest data once (server-only helper should read cookies())
           if (enableGuestClaim) {
-            const guestId = getGuestId();
+            const guestId = await getGuestId();
             if (guestId && !(token as any).guestClaimed) {
               await claimGuestData({ guestId, userId: String(dbUser.id) });
-              clearGuestId();
+              await await clearGuestId();
               (token as any).guestClaimed = true;
             }
           }

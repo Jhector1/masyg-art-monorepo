@@ -1,10 +1,10 @@
 // File: src/app/api/private/checkout/success/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient, Prisma, VariantType } from "@prisma/client";
+import { Prisma, VariantType } from "@prisma/client";
+import { prisma } from "@acme/core/lib/prisma";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
 
 export const runtime = "nodejs";
-const prisma = new PrismaClient();
 
 export async function GET(req: NextRequest) {
   const { userId, guestId } = await getCustomerIdFromRequest(req);

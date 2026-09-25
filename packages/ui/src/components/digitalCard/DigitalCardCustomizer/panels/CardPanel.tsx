@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 "use client";
 import React from "react";
-import { SketchPicker } from "react-color";
+import { SketchPicker, type ColorResult } from "react-color";
 
 interface CardPanelProps {
   bgColor: string; setBgColor: (hex: string) => void;
@@ -17,7 +17,7 @@ export function CardPanel({ bgColor, setBgColor, openAngle, setOpenAngle, bookTi
       <div className="rc-card">
         <label className="rc-field">
           <span>Card Stock Color</span>
-          <SketchPicker color={bgColor} onChangeComplete={(c) => setBgColor(c.hex)} />
+          <SketchPicker color={bgColor} onChangeComplete={(c: ColorResult) => setBgColor(c.hex)} />
         </label>
       </div>
       <div className="rc-card">

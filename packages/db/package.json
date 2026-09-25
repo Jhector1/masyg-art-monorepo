@@ -2,7 +2,7 @@
   "name": "@acme/db",
   "private": true,
   "type": "module",
- "exports": {
+  "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
@@ -12,11 +12,13 @@
     "prisma": "^6.10.1"
   },
   "scripts": {
-      "build": "tsc -p tsconfig.build.json",
-
+    "build": "tsc --noEmit -p tsconfig.json",
     "generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "studio": "prisma studio"
+    "studio": "prisma studio",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "prebuild": "prisma generate",
+    "precheck-types": "prisma generate"
   }
 }

@@ -1,13 +1,4 @@
-export type StyleState = {
-  fillColor: string;
-  fillOpacity?: number; // 0..1
-  strokeColor: string;
-  strokeOpacity?: number; // 0..1
-  strokeWidth: number;
-  backgroundColor: string;
-  backgroundOpacity?: number; // 0..1
-  defs?: string;
-};
+export type { StyleState } from "@acme/core/types";
 
 export type LinearStop = { offset: number; color: string; opacity?: number };
 

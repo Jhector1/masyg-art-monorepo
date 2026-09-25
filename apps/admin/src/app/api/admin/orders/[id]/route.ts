@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/require-admin";
 type Params = { params:Promise< { id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
-     await requireAdmin(_req);
+     await requireAdmin();
        const { id } = await params; // ✅
 
     const row = await getOrder(id);
@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-         await requireAdmin(req);
+         await requireAdmin();
   const { id } = await params; // ✅
 
     const body = await req.json(); // { status: "PAID" | ... }

@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { CameraIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import type { UserProfile } from "./types";
-import { useUser } from "packages/core/src/contexts/UserContext";
+import { useUser } from "@acme/core/contexts/UserContext";
 
 type HeaderUser = {
   name?: string | null;

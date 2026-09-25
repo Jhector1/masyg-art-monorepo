@@ -2,7 +2,7 @@
 import Link from "next/link";
 // import { serverFetchJSON } from "./lib/server/api";
 import ProductCardOriginal from "@/components/store/ProductCardOriginal";
-import type { Product } from "./lib/products";
+import type { Product } from "@/lib/products";
 import { serverFetchJSON } from "../lib/server/api";
 
 export const dynamic = "force-dynamic";

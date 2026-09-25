@@ -11,6 +11,8 @@ import {
   consumeOneExportCredit,
 } from "@acme/core/helpers/stripe/webhook/entitlements";
 import { randomUUID } from "crypto";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

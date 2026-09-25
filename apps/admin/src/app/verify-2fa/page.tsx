@@ -236,7 +236,7 @@ function handlePaste(i: number, e: React.ClipboardEvent<HTMLInputElement>) {
             {Array.from({ length: OTP_LENGTH }).map((_, i) => (
               <input
                 key={i}
-                ref={(el) => (inputsRef.current[i] = el)}
+                ref={(el) => { inputsRef.current[i] = el; }}
                   onPaste={(e) => handlePaste(i, e)}
 
                 inputMode="numeric"

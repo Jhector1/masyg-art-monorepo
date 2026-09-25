@@ -15,7 +15,6 @@ export default async function StorePage() {
     (p.variants ?? []).some((v) => v.type === "ORIGINAL" && (v.status ?? "ACTIVE") === "ACTIVE" && (v.inventory ?? 1) > 0)
   );
 
-  const favorites = await serverFetchJSON<{ productIds: string[] }>("/api/favorites").catch(() => ({ productIds: [] }));
 
   return (
     <main className="min-h-screen bg-white">
@@ -27,7 +26,6 @@ export default async function StorePage() {
 
         <ProductGridOriginal
           products={available.length ? available : products}
-          initialFavoriteIds={favorites.productIds ?? []}
         />
       </section>
     </main>

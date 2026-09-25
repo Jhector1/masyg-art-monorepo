@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@acme/core/lib/prisma";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
 import type { Storefront } from "@prisma/client";
+import { getPrincipalFromRequest } from "@acme/auth";
+import { authOptions } from "@/lib/auth";
 
 function resolveSite(req: NextRequest): Storefront {
   const fromHeader = req.headers.get("x-storefront")?.toUpperCase();
@@ -24,7 +26,7 @@ function noCache() {
 }
 
 export async function GET(req: NextRequest) {
-  const site = "JEANYVES";
+  const site: Storefront = "JEANYVES";
  const { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
 
   if (!userId && !guestId) {

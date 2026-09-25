@@ -9,7 +9,7 @@ import {
   CartSelectedItem,
 } from "../types";
 import { getEffectiveSale } from "../lib/pricing";
-import { SizeOption } from "@acme/ui/components/product/shared/core/SizeSelectorCore";
+import type { SizeOption } from "../types";
 
 
 type CheckoutApiPayload = {

@@ -19,10 +19,10 @@ async function requireUserId() {
 // Public: fetch reviews for a given product
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const productId = params.id;
+    const productId = (await params).id;
     const reviews = await reviewsService.listByProduct(productId);
     return NextResponse.json(reviews);
   } catch (e: any) {
@@ -34,10 +34,10 @@ export async function GET(
 // Authenticated: add a review for the signed-in user
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const productId = params.id;
+    const productId = (await params).id;
     const userId = await requireUserId();
 
     const { rating, text } = await req.json();

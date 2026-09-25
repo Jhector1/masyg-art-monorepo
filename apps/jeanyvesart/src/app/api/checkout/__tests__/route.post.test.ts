@@ -1,217 +1,110 @@
-/**
- * POST /api/private/checkout — tests (ESM-safe mocks, no spyOn on named exports)
- *
- * Adjust the sample payloads in makeDigitalItem/makePrintItem
- * if your route expects different field names.
- */
+import { makeNextRequest } from "@acme/core/test/helpers/next";
+import { POST } from "../route";
+import { getPrincipalFromRequest, getOrCreateGuestId } from "@acme/auth";
+import { prisma } from "@acme/core/lib/prisma";
+import { stripe } from "@acme/core/lib/stripe";
 
-import { POST } from '../route';
-
-// ---- Mocks (must be top-level) ---------------------------------------------
-jest.mock('@/utils/guest', () => ({
-  getCustomerIdFromRequest: jest.fn(),
+jest.mock("@/lib/auth", () => ({ authOptions: {} }));
+jest.mock("@acme/auth", () => ({
+  getPrincipalFromRequest: jest.fn(),
+  getOrCreateGuestId: jest.fn(),
 }));
-
-jest.mock('@/lib/stripe', () => ({
-  stripe: {
-    checkout: {
-      sessions: {
-        create: jest.fn(),
-      },
-    },
+jest.mock("@acme/core/lib/prisma", () => ({
+  prisma: {
+    cartItem: { findMany: jest.fn() },
+    product: { findUnique: jest.fn() },
+    productVariant: { findUnique: jest.fn() },
+    order: { update: jest.fn() },
+    $transaction: jest.fn(),
   },
 }));
+jest.mock("@acme/core/lib/stripe", () => ({
+  stripe: { checkout: { sessions: { create: jest.fn() } } },
+}));
+jest.mock("@acme/core/lib/pricing", () => ({
+  getEffectiveSale: jest.fn(({ price }: any) => ({ price })),
+  roundMoney: jest.fn((price: number) => price),
+}));
 
-// ---- Typed access to mocks --------------------------------------------------
-import { getCustomerIdFromRequest } from '@acme/core/utils/guest';
-import { stripe } from '@acme/core/lib/stripe';
-
-const mockGetCustomer = getCustomerIdFromRequest as jest.MockedFunction<
-  typeof getCustomerIdFromRequest
->;
+const mockPrincipal = getPrincipalFromRequest as jest.Mock;
+const mockGuest = getOrCreateGuestId as jest.Mock;
+const mockPrisma = prisma as any;
 const mockStripeCreate = stripe.checkout.sessions.create as jest.Mock;
 
-// ---- Helpers ----------------------------------------------------------------
-const asJson = async (res: any) => ({
-  status: res.status,
-  json: await res.json(),
+const tx = {
+  order: { create: jest.fn() },
+  productVariant: { updateMany: jest.fn() },
+  orderItem: { createMany: jest.fn() },
+};
+
+const request = (body: unknown) => makeNextRequest("https://jean.test/api/checkout", {
+  method: "POST",
+  body,
+  headersObj: { "content-type": "application/json", origin: "https://jean.test" },
 });
 
-const makeReq = (body: any) =>
-  new Request('http://localhost/api/private/checkoutcheckout', {
-    method: 'POST',
-    body: JSON.stringify(body),
-    headers: { 'content-type': 'application/json' },
+describe("JeanYves original-art checkout route", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPrincipal.mockResolvedValue({ userId: "u1" });
+    mockGuest.mockReturnValue("g-created");
+    mockPrisma.product.findUnique.mockResolvedValue({
+      id: "p1", title: "Original", thumbnails: ["https://cdn.test/p1.jpg"], site: "JEANYVES",
+      price: 100, salePrice: null, salePercent: null, saleStartsAt: null, saleEndsAt: null,
+    });
+    mockPrisma.productVariant.findUnique.mockResolvedValue({
+      id: "ov1", productId: "p1", type: "ORIGINAL", status: "ACTIVE", listPrice: 125,
+      medium: null, year: null, widthIn: null, heightIn: null, originalSerial: "001",
+    });
+    tx.order.create.mockResolvedValue({ id: "ord1", site: "JEANYVES" });
+    tx.productVariant.updateMany.mockResolvedValue({ count: 1 });
+    tx.orderItem.createMany.mockResolvedValue({ count: 1 });
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(tx));
+    mockPrisma.order.update.mockResolvedValue({});
+    mockStripeCreate.mockResolvedValue({ id: "cs1", url: "https://stripe.test/cs1" });
   });
 
-// Minimal digital/print shapes — adjust to match your route’s types
-const makeDigitalItem = (overrides: Record<string, any> = {}) => ({
-  id: 'cart_dig_1',
-  type: 'Digital',
-  productId: 'prod_abc',
-  name: 'Sunrise Over Jacmel',
-  currency: 'usd',
-  unitAmount: 1200, // in cents
-  quantity: 1,
-  // typical digital metadata your route may add to line item product_data
-  format: 'PNG',
-  size: '4096x4096',
-  license: 'Personal',
-  ...overrides,
-});
+  test("400 when cartProductList is missing", async () => {
+    const res = await POST(request({}) as any);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/cartProductList/i);
+  });
 
-const makePrintItem = (overrides: Record<string, any> = {}) => ({
-  id: 'cart_prt_1',
-  type: 'Print',
-  productId: 'prod_def',
-  name: 'Drums of Rara',
-  currency: 'usd',
-  unitAmount: 4500, // in cents
-  quantity: 1,
-  // typical print options
-  material: 'Canvas',
-  frame: 'Black',
-  size: '12x16',
-  ...overrides,
-});
+  test("creates and reserves an order for a direct ORIGINAL purchase", async () => {
+    const res = await POST(request({ cartProductList: [{ productId: "p1", originalVariantId: "ov1" }] }) as any);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      flow: "redirect",
+      url: "https://stripe.test/cs1",
+      sessionId: "cs1",
+      orderId: "ord1",
+    });
+    expect(tx.productVariant.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: { in: ["ov1"] }, status: "ACTIVE" }) })
+    );
+    expect(mockStripeCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ orderId: "ord1", site: "JEANYVES", userId: "u1" }),
+        line_items: [expect.objectContaining({ quantity: 1 })],
+      })
+    );
+  });
 
-// Common success from Stripe
-const stripeOk = { id: 'cs_test_123', url: 'https://stripe.test/session' };
-
-// ---- Reset between tests ----------------------------------------------------
-afterEach(() => {
-  jest.resetAllMocks();
-});
-
-// ---- Tests ------------------------------------------------------------------
-describe('POST /api/private/checkoutcheckout', () => {
-  test('400 when body missing cartProductList', async () => {
-    mockGetCustomer.mockResolvedValue({ userId: null, guestId: 'guest_123' });
-    const res = await POST(makeReq({}) as any);
-    const { status, json } = await asJson(res);
-
-    expect(status).toBe(400);
-    expect(json.error ?? JSON.stringify(json)).toMatch(/cartProductList/i);
+  test("409 when the original loses the reservation race", async () => {
+    tx.productVariant.updateMany.mockResolvedValue({ count: 0 });
+    const res = await POST(request({ cartProductList: [{ productId: "p1", originalVariantId: "ov1" }] }) as any);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("original_unavailable");
     expect(mockStripeCreate).not.toHaveBeenCalled();
   });
 
-  test('creates Stripe session with digital item metadata and session-level CSV', async () => {
-    mockGetCustomer.mockResolvedValue({ userId: 'user_123', guestId: null });
-    mockStripeCreate.mockResolvedValue(stripeOk);
-
-    const body = {
-      cartProductList: [
-        makeDigitalItem({ id: 'cart_dig_1' }),
-        // add more items if you want
-      ],
-    };
-
-    const res = await POST(makeReq(body) as any);
-    const { status } = await asJson(res);
-
-    expect(status).toBe(200);
-    expect(mockStripeCreate).toHaveBeenCalledTimes(1);
-
-    const arg = mockStripeCreate.mock.calls[0][0];
-
-    // Expect a Stripe Session payload with at least one line item
-    expect(arg).toEqual(
-      expect.objectContaining({
-        mode: expect.any(String),
-        line_items: expect.arrayContaining([expect.any(Object)]),
-      })
-    );
-
-    // Session-level metadata is present (CSV of cart item ids, etc.)
-    // If you use a different key name, tweak the expectation here:
-    expect(arg.metadata).toEqual(
-      expect.objectContaining({
-        // change key if your route uses a different one
-        // e.g., 'purchased_cart_item_ids_csv' or 'cart_item_ids_csv'
-        // We'll just assert ANY key exists and includes the id.
-      })
-    );
-
-    // Be liberal: ensure the cart id shows up somewhere in metadata object
-    const metaString = JSON.stringify(arg.metadata ?? {});
-    expect(metaString).toMatch(/cart_dig_1/);
-
-    // Line-item digital metadata — adjust keys if your route differs
-    const first = arg.line_items[0];
-    expect(first).toEqual(
-      expect.objectContaining({
-        quantity: expect.any(Number),
-        price_data: expect.objectContaining({
-          currency: expect.any(String),
-          unit_amount: expect.any(Number),
-          product_data: expect.objectContaining({
-            name: expect.any(String),
-            metadata: expect.objectContaining({
-              type: 'Digital',
-              format: expect.any(String),
-              size: expect.any(String),
-              license: expect.any(String),
-            }),
-          }),
-        }),
-      })
-    );
-  });
-
-  test('creates Stripe session with print item metadata', async () => {
-    mockGetCustomer.mockResolvedValue({ userId: null, guestId: 'guest_789' });
-    mockStripeCreate.mockResolvedValue(stripeOk);
-
-    const body = {
-      cartProductList: [
-        makePrintItem({
-          id: 'cart_prt_1',
-          size: '16x20',
-          material: 'Paper',
-          frame: 'Natural Wood',
-        }),
-      ],
-    };
-
-    const res = await POST(makeReq(body) as any);
-    const { status } = await asJson(res);
-
-    expect(status).toBe(200);
-    expect(mockStripeCreate).toHaveBeenCalledTimes(1);
-
-    const arg = mockStripeCreate.mock.calls[0][0];
-    const item = arg.line_items[0];
-
-    // Ensure print-specific metadata made it into product_data.metadata
-    expect(item).toEqual(
-      expect.objectContaining({
-        price_data: expect.objectContaining({
-          product_data: expect.objectContaining({
-            metadata: expect.objectContaining({
-              type: 'Print',
-              size: '16x20',
-              material: 'Paper',
-              frame: 'Natural Wood',
-            }),
-          }),
-        }),
-      })
-    );
-  });
-
-  test('500 path bubbles Stripe errors', async () => {
-    mockGetCustomer.mockResolvedValue({ userId: 'user_fail', guestId: null });
-    mockStripeCreate.mockRejectedValue(new Error('Stripe is down'));
-
-    const body = {
-      cartProductList: [makeDigitalItem()],
-    };
-
-    const res = await POST(makeReq(body) as any);
-    const { status, json } = await asJson(res);
-
-    expect(status).toBeGreaterThanOrEqual(500);
-    expect((json.error ?? '') + '').toMatch(/stripe|error/i);
-    expect(mockStripeCreate).toHaveBeenCalledTimes(1);
+  test("generates a guest identity when no principal exists", async () => {
+    mockPrincipal.mockResolvedValue({});
+    mockGuest.mockReturnValue("g99");
+    const res = await POST(request({ cartProductList: [{ productId: "p1", originalVariantId: "ov1" }] }) as any);
+    expect(res.status).toBe(200);
+    expect(tx.order.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ guestId: "g99" }),
+    }));
   });
 });

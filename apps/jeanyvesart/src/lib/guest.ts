@@ -3,8 +3,8 @@ import crypto from "crypto";
 
 const GUEST_COOKIE = "guest_id";
 
-export function getOrCreateGuestId(): string {
-  const store = cookies();
+export async function getOrCreateGuestId(): Promise<string> {
+  const store = await cookies();
   let guestId = store.get(GUEST_COOKIE)?.value;
 
   if (!guestId) {
@@ -22,12 +22,14 @@ export function getOrCreateGuestId(): string {
   return guestId;
 }
 
-export function getGuestId(): string | null {
-  return cookies().get(GUEST_COOKIE)?.value ?? null;
+export async function getGuestId(): Promise<string | null> {
+  const store = await cookies();
+  return store.get(GUEST_COOKIE)?.value ?? null;
 }
 
-export function clearGuestId() {
-  cookies().set(GUEST_COOKIE, "", {
+export async function clearGuestId() {
+  const store = await cookies();
+  store.set(GUEST_COOKIE, "", {
     path: "/",
     maxAge: 0,
   });

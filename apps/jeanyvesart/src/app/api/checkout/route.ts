@@ -22,11 +22,19 @@ type CheckoutEntry =
   | { cartItemId: string; quantity?: number }
   | { productId: string; originalVariantId: string; quantity?: number };
 
+type CheckoutItem = {
+  productId: string;
+  title: string;
+  imageUrl: string | null;
+  unitPrice: number;
+  originalVariantId: string;
+};
+
 export async function POST(req: NextRequest) {
   try {
 let { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
     if (!userId && !guestId) {
-      guestId = getOrCreateGuestId();
+      guestId = await getOrCreateGuestId();
     }
 
     const body = (await req.json().catch(() => null)) as any;
@@ -139,7 +147,7 @@ let { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
     );
 
     // Build unified checkout items (cart-based or direct)
-    const items = [];
+    const items: CheckoutItem[] = [];
 
     // from cart
     for (const id of cartItemIds) {

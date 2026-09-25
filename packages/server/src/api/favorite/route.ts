@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 // import { getToken } from "next-auth/jwt";
 import { PrismaClient } from "@prisma/client";
+import type { Storefront } from "@prisma/client";
 import { productListSelect } from "@acme/core/types";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
 
@@ -10,6 +11,14 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const prisma = new PrismaClient();
+
+function resolveSite(req: NextRequest): Storefront {
+  const fromHeader = req.headers.get("x-storefront")?.toUpperCase();
+  const fromQuery = req.nextUrl.searchParams.get("site")?.toUpperCase();
+  const raw = (fromHeader || fromQuery) as Storefront | undefined;
+  return raw === "JEANYVES" ? "JEANYVES" : "ZILEDIGITAL";
+}
+
 
 // async function requireUserId(req: NextRequest): Promise<string | NextResponse> {
 //   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -25,6 +34,7 @@ const prisma = new PrismaClient();
 // import { requireUserId } from "@/utils/auth"; // ✅ adjust if in different utils
 
 export async function GET(req: NextRequest) {
+  const site = resolveSite(req);
   const { userId } = await getCustomerIdFromRequest(req);
   if(!userId)
       return NextResponse.json({ error: "Missing UserId" }, { status: 400 });
@@ -34,7 +44,7 @@ export async function GET(req: NextRequest) {
 
   // fetch favorites + product + user-specific design
   const favorites = await prisma.favorite.findMany({
-    where: { userId },
+    where: { userId, site },
     select: {
       product: {
         select: {
@@ -81,6 +91,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/favorite  Body: { productId: string }
 export async function POST(req: NextRequest) {
+  const site = resolveSite(req);
   // const uidOrResp = await requireUserId(req);
   // if (uidOrResp instanceof NextResponse) return uidOrResp;
   // const userId = uidOrResp;
@@ -92,8 +103,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing productId" }, { status: 400 });
 
   await prisma.favorite.upsert({
-    where: { userId_productId: { userId, productId: String(productId) } },
-    create: { userId, productId: String(productId) },
+    where: { userId_productId_site: { userId, productId: String(productId), site } },
+    create: { userId, productId: String(productId), site },
     update: {},
   });
 
@@ -102,6 +113,7 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/favorite  Body: { productId: string }
 export async function DELETE(req: NextRequest) {
+  const site = resolveSite(req);
   // const uidOrResp = await requireUserId(req);
   // if (uidOrResp instanceof NextResponse) return uidOrResp;
   // const userId = uidOrResp;
@@ -116,7 +128,7 @@ export async function DELETE(req: NextRequest) {
 
   await prisma.favorite
     .delete({
-      where: { userId_productId: { userId, productId: String(productId) } },
+      where: { userId_productId_site: { userId, productId: String(productId), site } },
     })
     .catch(() => {
       /* idempotent */

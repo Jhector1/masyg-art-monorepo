@@ -15,7 +15,7 @@ interface CalcArgs {
   material?: { multiplier: number };
   /** allow null as well as undefined */
   frame: { multiplier: number } | null | undefined;
-  options: { digital: boolean };
+  options: { digital: boolean; print: boolean };
   customSize: { width: string; height: string };
   isCustom: boolean;
   license: { price: number };
@@ -26,7 +26,7 @@ const baseArgs: CalcArgs = {
   size: { label: "8×10", multiplier: 1 },
   material: { multiplier: 1.2 },
   frame: { multiplier: 1.5 },   // still a real frame by default
-  options: { digital: false },
+  options: { digital: false, print: false },
   customSize: { width: "", height: "" },
   isCustom: false,
   license: { price: 10 },

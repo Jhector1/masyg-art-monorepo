@@ -8,8 +8,17 @@ export const VariantType = {
 
 export type VariantType = typeof VariantType[keyof typeof VariantType];
 
-// Minimal PrismaClient surface you use in tests
-const base = {
+// Minimal PrismaClient surface you use in tests. Keep transaction
+// callback wiring separate so the initializer is not self-referential.
+type MockDb = {
+  order: { findFirst: jest.Mock; create: jest.Mock };
+  orderItem: { create: jest.Mock };
+  cartItem: { findMany: jest.Mock; deleteMany: jest.Mock };
+  $transaction: jest.Mock;
+  $disconnect: jest.Mock;
+};
+
+const base: MockDb = {
   order: {
     findFirst: jest.fn(),
     create: jest.fn(),
@@ -21,9 +30,13 @@ const base = {
     findMany: jest.fn(),
     deleteMany: jest.fn(),
   },
-  $transaction: jest.fn(async (cb: any) => cb(base)),
+  $transaction: jest.fn(),
   $disconnect: jest.fn(),
 };
+
+base.$transaction.mockImplementation(
+  async (cb: (tx: MockDb) => unknown) => cb(base)
+);
 
 export class PrismaClient {
   order = base.order;

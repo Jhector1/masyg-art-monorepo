@@ -217,7 +217,7 @@ export async function GET(req: NextRequest) {
               purchasedDesigns: true,
             },
           },
-          cart: {
+          carts: {
             select: {
               id: true,
               _count: { select: { items: true } },
@@ -278,7 +278,7 @@ export async function GET(req: NextRequest) {
         reviews: user._count.reviews,
         designs: user._count.designs,
         purchasedDesigns: user._count.purchasedDesigns,
-        cartItems: user.cart?._count.items ?? 0,
+        cartItems: user.carts.reduce((sum, cart) => sum + cart._count.items, 0),
       },
       lastOrder,
       addresses: user.addresses,

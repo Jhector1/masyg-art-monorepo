@@ -2,8 +2,14 @@
   "name": "@acme/config",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./jest/next-app": "./jest/next-app.cjs"
+  },
   "dependencies": {
     "zod": "^4.0.17"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit -p tsconfig.json"
   }
 }

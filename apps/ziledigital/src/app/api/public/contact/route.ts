@@ -6,7 +6,6 @@ export const revalidate = 0;
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { sendMail } from "@acme/core/lib/email";
-import { prisma } from "@acme/core/lib/prisma";
 
 /**
  * ENV
@@ -24,6 +23,19 @@ const ALLOWED_ORIGINS = new Set(
     .map((s) => s.trim())
     .filter(Boolean)
 );
+
+const CONTACT_RATE_WINDOW_MS = 10 * 60 * 1000;
+const CONTACT_RATE_LIMIT = 5;
+const CONTACT_RATE_MAX_IPS = 5000;
+
+const contactRateGlobal = globalThis as typeof globalThis & {
+  __zileContactRateLimit?: Map<string, number[]>;
+};
+
+const contactRateLimit =
+  contactRateGlobal.__zileContactRateLimit ?? new Map<string, number[]>();
+
+contactRateGlobal.__zileContactRateLimit = contactRateLimit;
 
 /**
  * Contact payload
@@ -62,36 +74,37 @@ function getClientIp(req: NextRequest) {
 }
 
 /**
- * Basic per-IP rate limiting.
- * This uses your DB (Prisma) so it works across server instances.
+ * Best-effort per-process contact rate limiting.
  *
- * You’ll need a Prisma model (example below).
+ * The previous implementation referenced Prisma models that were never present
+ * in the schema, so the route could not compile or run as written. This bounded
+ * map keeps the existing 5 requests / 10 minutes behavior within a running
+ * server process without inventing database tables.
+ *
+ * For globally consistent multi-instance limits, move this owner to a shared
+ * rate-limit backend in a later infrastructure wave.
  */
 async function enforceRateLimit(ip: string) {
-  // allow 5 requests per 10 minutes per IP
-  const windowMs = 10 * 60 * 1000;
-  const limit = 5;
+  const now = Date.now();
+  const windowStart = now - CONTACT_RATE_WINDOW_MS;
 
-  const now = new Date();
-  const windowStart = new Date(now.getTime() - windowMs);
+  const recent = (contactRateLimit.get(ip) ?? []).filter(
+    (timestamp) => timestamp >= windowStart
+  );
 
-  // Cleanup old rows (cheap)
-  await prisma.contactRateLimit.deleteMany({
-    where: { createdAt: { lt: windowStart } },
-  });
-
-  const count = await prisma.contactRateLimit.count({
-    where: { ip, createdAt: { gte: windowStart } },
-  });
-
-  if (count >= limit) {
+  if (recent.length >= CONTACT_RATE_LIMIT) {
+    contactRateLimit.set(ip, recent);
     return false;
   }
 
-  await prisma.contactRateLimit.create({
-    data: { ip },
-  });
+  recent.push(now);
 
+  if (!contactRateLimit.has(ip) && contactRateLimit.size >= CONTACT_RATE_MAX_IPS) {
+    const oldestKey = contactRateLimit.keys().next().value as string | undefined;
+    if (oldestKey) contactRateLimit.delete(oldestKey);
+  }
+
+  contactRateLimit.set(ip, recent);
   return true;
 }
 
@@ -141,18 +154,9 @@ export async function POST(req: NextRequest) {
     const cleanSubject = sanitizeLine(subject || `New message from ${cleanName}`);
     const cleanMsg = message.trim();
 
-    // ✅ Optional: log the attempt (helps detect abuse)
-    await prisma.contactMessage.create({
-      data: {
-        ip,
-        name: cleanName,
-        email: cleanEmail,
-        subject: cleanSubject,
-        message: cleanMsg,
-        userAgent: req.headers.get("user-agent") || "",
-        origin: req.headers.get("origin") || "",
-      },
-    });
+    // Durable contact-message persistence is intentionally not performed here.
+    // The previous route referenced ContactMessage even though no such Prisma
+    // model exists. Delivery continues through the owner email below.
 
     // ---- Owner notification ----
     const ownerSubject = `[${SITE_NAME}] ${cleanSubject}`;

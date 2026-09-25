@@ -89,7 +89,7 @@ export const authOptions: NextAuthOptions = {
       token.isAdmin = user.isAdmin;
 
       // 🔥 CLAIM GUEST DATA ON FIRST LOGIN
-      const guestId = getGuestId();
+      const guestId = await getGuestId();
 
       if (guestId && !token.guestClaimed) {
         await claimGuestData({
@@ -97,7 +97,7 @@ export const authOptions: NextAuthOptions = {
           userId: user.id,
         });
 
-        clearGuestId(); // optional but recommended
+        await await clearGuestId(); // optional but recommended
         token.guestClaimed = true;
       }
 

@@ -9,7 +9,7 @@ import type {
   CartUpdates,
   AddOptions,
 } from "../types";
-import type { SizeOption } from "@acme/ui/components/product/shared/core/SizeSelectorCore";
+import type { SizeOption } from "../types";
 import { computeFinalUnitPrice } from "../lib/finalize"; // unified client/server pricing
 import { toDate } from "../utils/helpers";
 
