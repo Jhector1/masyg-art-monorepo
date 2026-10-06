@@ -3,8 +3,16 @@
 // ───────────────────────────────────────────────────────────
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ExportFormat, ExportMode, ExportUnit, StyleState } from "../types";
+
+export type ExportStatusSnapshot = {
+  canExport: boolean;
+  purchased: boolean;
+  purchasedDigital: boolean;
+  purchasedPrint: boolean;
+  exportsLeft: number;
+};
 
 export function useExportArtwork(productId: string) {
   const [exporting, setExporting] = useState(false);
@@ -12,35 +20,91 @@ export function useExportArtwork(productId: string) {
   const [exportsLeft, setExportsLeft] = useState(0);
   const [purchased, setPurchased] = useState(false);
   const [purchasedDigital, setPurchasedDigital] = useState(false);
+  const [purchasedPrint, setPurchasedPrint] = useState(false);
 
-  const refreshExportStatus = useCallback(async (): Promise<boolean> => {
-  try {
-    const res = await fetch(
-      `/api/user/products/${productId}/saveUserDesign/status`,
-      { cache: "no-store" }
-    );
-    if (!res.ok) return false;
+  const applyStatus = useCallback((raw: any): ExportStatusSnapshot => {
+    const snapshot: ExportStatusSnapshot = {
+      canExport: !!raw?.canExport,
+      purchased: !!raw?.purchased,
+      purchasedDigital: !!raw?.purchasedDigital,
+      purchasedPrint: !!raw?.purchasedPrint,
+      exportsLeft: Math.max(0, Number(raw?.exportsLeft ?? 0) || 0),
+    };
 
-    const j = await res.json();
+    setCanExport(snapshot.canExport);
+    setPurchased(snapshot.purchased);
+    setPurchasedDigital(snapshot.purchasedDigital);
+    setPurchasedPrint(snapshot.purchasedPrint);
+    setExportsLeft(snapshot.exportsLeft);
 
-    // decide when we’re “ready” to stop retrying
-    const ready =
-      !!j.canExport ||
-      !!j.purchased ||
-      !!j.purchasedDigital ||
-      (j.exportsLeft ?? 0) > 0;
+    return snapshot;
+  }, []);
 
-    setCanExport(!!j.canExport);
-    setPurchased(!!j.purchased);
-    setExportsLeft(j.exportsLeft ?? 0);
-    setPurchasedDigital(!!j.purchasedDigital);
+  const refreshExportStatus = useCallback(async (): Promise<ExportStatusSnapshot | null> => {
+    try {
+      const res = await fetch(
+        `/api/user/products/${productId}/saveUserDesign/status`,
+        {
+          cache: "no-store",
+          credentials: "include",
+          headers: { "cache-control": "no-cache" },
+        }
+      );
+      if (!res.ok) return null;
+      return applyStatus(await res.json());
+    } catch {
+      return null;
+    }
+  }, [applyStatus, productId]);
 
-    return ready;
-  } catch {
-    return false;
-  }
-}, [productId]);
+  const waitForExportStatus = useCallback(
+    async (
+      predicate: (status: ExportStatusSnapshot) => boolean,
+      options?: { tries?: number; delayMs?: number }
+    ): Promise<ExportStatusSnapshot | null> => {
+      const tries = Math.max(1, options?.tries ?? 20);
+      const delayMs = Math.max(50, options?.delayMs ?? 300);
 
+      for (let attempt = 0; attempt < tries; attempt += 1) {
+        const status = await refreshExportStatus();
+        if (status && predicate(status)) return status;
+        if (attempt < tries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+
+      return null;
+    },
+    [refreshExportStatus]
+  );
+
+
+  useEffect(() => {
+    const refresh = () => {
+      void refreshExportStatus();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [refreshExportStatus]);
+
+  const applyPurchasedExports = useCallback(
+    (amount: number) => {
+      const safeAmount = Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
+      if (safeAmount <= 0) return;
+
+      setExportsLeft((current) => current + safeAmount);
+      if (purchased) setCanExport(true);
+    },
+    [purchased]
+  );
 
   const quickDownloadPng = (canvas: HTMLCanvasElement | null, productId: string) => {
     if (!canvas) return;
@@ -55,7 +119,17 @@ export function useExportArtwork(productId: string) {
     format: ExportFormat,
     style: StyleState,
     defsMap: Record<string, string>,
-    options: { mode: ExportMode; scale?: number; outW?: string; outH?: string; unit?: ExportUnit; dpi?: number; printW?: number; printH?: number; saveToLibrary?: boolean; }
+    options: {
+      mode: ExportMode;
+      scale?: number;
+      outW?: string;
+      outH?: string;
+      unit?: ExportUnit;
+      dpi?: number;
+      printW?: number;
+      printH?: number;
+      saveToLibrary?: boolean;
+    }
   ) => {
     setExporting(true);
     try {
@@ -70,7 +144,12 @@ export function useExportArtwork(productId: string) {
         if (Number.isFinite(w)) sizePayload.width = w;
         if (Number.isFinite(h)) sizePayload.height = h;
       } else if (options.mode === "print") {
-        sizePayload.print = { unit: options.unit, width: options.printW, height: options.printH, dpi: options.dpi };
+        sizePayload.print = {
+          unit: options.unit,
+          width: options.printW,
+          height: options.printH,
+          dpi: options.dpi,
+        };
       }
 
       const res = await fetch(`/api/user/products/${productId}/export`, {
@@ -91,7 +170,6 @@ export function useExportArtwork(productId: string) {
         throw new Error(j.error || "Export failed");
       }
 
-      // Download
       const contentType = res.headers.get("Content-Type") || "";
       if (contentType.includes("application/json")) {
         const data = (await res.json()) as { url: string; id?: string };
@@ -111,45 +189,34 @@ export function useExportArtwork(productId: string) {
         URL.revokeObjectURL(url);
       }
 
-      // ✅ Optimistic decrement (instant UI update)
-      setExportsLeft(prev => {
-        const next = Math.max(0, prev - 1);
-        if (!purchased) setCanExport(next > 0);
+      setExportsLeft((current) => {
+        const next = Math.max(0, current - 1);
+        if (next === 0) setCanExport(false);
         return next;
       });
 
-      // 🔄 Reconcile with server (in case of race conditions)
-      // Don't block the UI; fire and forget
-      refreshExportStatus();
+      void refreshExportStatus();
     } finally {
       setExporting(false);
     }
   };
 
   const fetchInitialExportStatus = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/user/products/${productId}/saveUserDesign/status`, { cache: "no-store" });
-      if (!res.ok) return;
-      const j = await res.json();
-     
-      setCanExport(!!j.canExport);
-      setPurchased(!!j.purchased);
-      setExportsLeft(j.exportsLeft ?? 0);
-          setPurchasedDigital(!!j.purchasedDigital);
+    await refreshExportStatus();
+  }, [refreshExportStatus]);
 
-    } catch {}
-  }, [productId]);
-
-  // (optional) export the refresher if you want to trigger it externally
   return {
     exporting,
     canExport,
     purchased,
     purchasedDigital,
+    purchasedPrint,
     exportsLeft,
     quickDownloadPng,
     exportArtwork,
     fetchInitialExportStatus,
-    refreshExportStatus, // ← expose if helpful
+    refreshExportStatus,
+    waitForExportStatus,
+    applyPurchasedExports,
   };
 }

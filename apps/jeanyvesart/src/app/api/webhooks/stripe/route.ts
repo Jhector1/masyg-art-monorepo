@@ -1,10 +1,9 @@
 export const runtime = "nodejs";
 
-import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 
-import { stripe } from "@acme/core/lib/stripe";
 import { prisma } from "@acme/core/lib/prisma";
+import { createStripeWebhookPostHandler } from "@acme/server/billing/stripe-webhook";
 
 const SITE = "JEANYVES" as const;
 
@@ -16,11 +15,10 @@ async function loadOrderFromSession(session: Stripe.Checkout.Session) {
   const orderId = session.metadata?.orderId || undefined;
 
   if (orderId) {
-  return prisma.order.findFirst({
-  where: { stripeSessionId: session.id },
-  include: { items: true },
-});
-
+    return prisma.order.findFirst({
+      where: { id: orderId, stripeSessionId: session.id, site: SITE },
+      include: { items: true },
+    });
   }
 
   // fallback if metadata was missing
@@ -177,56 +175,14 @@ async function releaseReservedOrder(session: Stripe.Checkout.Session) {
   });
 }
 
-export async function POST(req: NextRequest) {
-  const sig = req.headers.get("stripe-signature");
-  if (!sig) {
-    return NextResponse.json({ error: "Missing stripe-signature" }, { status: 400 });
-  }
+export const dynamic = "force-dynamic";
 
-  const rawBody = Buffer.from(await req.arrayBuffer());
-
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(
-      rawBody,
-      sig,
-      // Make sure this matches the CLI "whsec_..." you are currently running with
-      process.env.NEXT_STRIPE_WEBHOOK_SECRET!
-    );
-  } catch (err: any) {
-    console.error("[STRIPE_WEBHOOK_SIGNATURE_ERROR]", err?.message || err);
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
-  }
-
-  // ✅ idempotency: if already successfully processed, ACK
-  const already = await prisma.webhookEvent.findUnique({ where: { id: event.id } });
-  if (already) return NextResponse.json({ received: true });
-
-  try {
-    const session = event.data.object as Stripe.Checkout.Session;
-
-    switch (event.type) {
-      case "checkout.session.completed":
-        await finalizePaidOrder(session);
-        break;
-
-      case "checkout.session.expired":
-        await releaseReservedOrder(session);
-        break;
-
-      default:
-        // ✅ ACK unknown events so Stripe doesn't retry forever
-        break;
-    }
-
-    // ✅ record ONLY after success
-    await prisma.webhookEvent.create({ data: { id: event.id } });
-
-    return NextResponse.json({ received: true });
-  } catch (err: any) {
-    console.error("[STRIPE_WEBHOOK_HANDLER_ERROR]", event.type, err?.message || err);
-
-    // ✅ let Stripe retry
-    return NextResponse.json({ error: "handler_failed" }, { status: 500 });
-  }
-}
+export const POST = createStripeWebhookPostHandler({
+  logPrefix: "JEANYVES_STRIPE_WEBHOOK",
+  onCheckoutCompleted: async (session) => {
+    await finalizePaidOrder(session);
+  },
+  onCheckoutExpired: async (session) => {
+    await releaseReservedOrder(session);
+  },
+});

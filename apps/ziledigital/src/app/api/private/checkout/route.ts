@@ -4,10 +4,14 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 
-import { stripe } from "@acme/core/lib/stripe";
 import { prisma } from "@acme/core/lib/prisma";
 import type { OrderList } from "@acme/core/types";
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
+import {
+  checkoutIdempotencyKey,
+  createCheckoutSession,
+  resolveCheckoutBaseUrl,
+} from "@acme/server/billing/checkout-session";
 
 import {
   applyBundleIfBoth,
@@ -66,7 +70,9 @@ export async function POST(req: NextRequest) {
     const cartItems = await prisma.cartItem.findMany({
       where: {
         id: { in: requestedIds },
-        cart: userId ? { userId } : { guestId: guestId! },
+        cart: userId
+          ? { userId, site: "ZILEDIGITAL" }
+          : { guestId: guestId!, site: "ZILEDIGITAL" },
       },
       include: {
         product: {
@@ -221,67 +227,55 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ Session-level metadata (OK to include actor here)
-    const sessionMetadata: Stripe.MetadataParam = {
-      kind: "order",
-      ...(userId && { userId }),
-      ...(guestId && { guestId }),
-      ...(purchasedCartItemIds.length
-        ? { cartItemIds: purchasedCartItemIds.join(",") }
-        : {}),
-    };
+    const actor = { userId, guestId };
+    const site = "ZILEDIGITAL" as const;
+    const metadata: Stripe.MetadataParam = purchasedCartItemIds.length
+      ? { cartItemIds: purchasedCartItemIds.join(",") }
+      : {};
 
-    // ✅ Idempotency key prevents double sessions on retries/double-click
-    const idemKey = `checkout:${userId ?? guestId}:${purchasedCartItemIds
-      .slice()
-      .sort()
-      .join(",")}`;
+    // Hash the actor + canonical cart ids so retries/double-clicks converge on
+    // one Stripe session without leaking long identifiers into the key.
+    const idemKey = checkoutIdempotencyKey("checkout", [
+      site,
+      userId ?? guestId,
+      purchasedCartItemIds.slice().sort(),
+    ]);
 
-    const commonParams: Stripe.Checkout.SessionCreateParams = {
-      mode: "payment",
-      line_items,
-      ...(requiresShipping
-        ? { shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "FR"] } }
-        : {}),
-      consent_collection: { terms_of_service: "required" },
-      automatic_tax: { enabled: true },
-      metadata: sessionMetadata,
-      client_reference_id: `order:${userId ?? guestId ?? "guest"}`,
-    };
-
-    // If any line was a design order -> use embedded flow (your logic)
     if (hasAnyDesign) {
-      const session = await stripe.checkout.sessions.create(
-        {
-          ...commonParams,
-          ui_mode: "embedded",
-          redirect_on_completion: "never",
-        },
-        { idempotencyKey: idemKey }
-      );
+      const created = await createCheckoutSession({
+        flow: "embedded",
+        lineItems: line_items,
+        actor,
+        site,
+        metadata,
+        requiresShipping,
+        idempotencyKey: idemKey,
+      });
 
       return NextResponse.json({
-        flow: "embedded",
-        clientSecret: session.client_secret,
-        sessionId: session.id,
+        flow: created.flow,
+        clientSecret: created.clientSecret,
+        sessionId: created.sessionId,
       });
     }
 
-    const CLIENT_URL = process.env.NEXT_PUBLIC_CLIENT_URL!;
-    const session = await stripe.checkout.sessions.create(
-      {
-        ...commonParams,
-        payment_method_types: ["card"],
-        success_url: `${CLIENT_URL}/cart/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${CLIENT_URL}/cart`,
-      },
-      { idempotencyKey: idemKey }
-    );
+    const baseUrl = resolveCheckoutBaseUrl(req.headers.get("origin"));
+    const created = await createCheckoutSession({
+      flow: "redirect",
+      lineItems: line_items,
+      actor,
+      site,
+      metadata,
+      requiresShipping,
+      idempotencyKey: idemKey,
+      successUrl: `${baseUrl}/cart/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${baseUrl}/cart`,
+    });
 
     return NextResponse.json({
-      flow: "redirect",
-      url: session.url,
-      sessionId: session.id,
+      flow: created.flow,
+      url: created.url,
+      sessionId: created.sessionId,
     });
   } catch (err: any) {
     console.error("[CHECKOUT_ROUTE_ERROR]", err?.message || err);

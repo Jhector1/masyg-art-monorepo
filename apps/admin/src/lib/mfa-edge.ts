@@ -1,7 +1,9 @@
 // src/lib/mfa-edge.ts
 import { jwtVerify } from "jose";
 
-export const MFA_COOKIE = "mfa_admin";
+import { getAdminMfaCookieName } from "@/lib/auth-cookies";
+
+export const MFA_COOKIE = getAdminMfaCookieName();
 export const MFA_COOKIE_TTL_SEC = 10 * 60;
 
 const SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET!);

@@ -7,6 +7,7 @@ import {
   addToCart,
   patchCart,
   deleteFromCart,
+  isCartOwnerMissingError,
 } from "@acme/server/cart/cart.service";
 
 jest.mock("@/lib/auth", () => ({ authOptions: {} }));
@@ -20,6 +21,7 @@ jest.mock("@acme/server/cart/cart.service", () => ({
   addToCart: jest.fn(),
   patchCart: jest.fn(),
   deleteFromCart: jest.fn(),
+  isCartOwnerMissingError: jest.fn(),
 }));
 jest.mock("@acme/core/lib/prisma", () => ({
   prisma: { cartItem: { deleteMany: jest.fn() } },
@@ -32,6 +34,7 @@ const mockIsInCart = isInCart as jest.Mock;
 const mockAdd = addToCart as jest.Mock;
 const mockPatch = patchCart as jest.Mock;
 const mockDelete = deleteFromCart as jest.Mock;
+const mockIsOwnerMissing = isCartOwnerMissingError as unknown as jest.Mock;
 
 const request = (url: string, body?: unknown) =>
   makeNextRequest(url, {
@@ -47,6 +50,7 @@ describe("JeanYves cart route boundary", () => {
     jest.clearAllMocks();
     mockPrincipal.mockResolvedValue({ userId: "u1" });
     mockGuest.mockReturnValue("guest-created");
+    mockIsOwnerMissing.mockReturnValue(false);
   });
 
   test("GET probe delegates to shared cart service with JEANYVES site", async () => {
@@ -93,6 +97,18 @@ describe("JeanYves cart route boundary", () => {
     const out = await json(await DELETE(request("https://x/api/cart", body) as any));
     expect(out.body).toEqual({ message: "removed" });
     expect(mockDelete).toHaveBeenCalledWith("JEANYVES", { userId: "u1", guestId: undefined }, "p1");
+  });
+
+
+  test("POST maps a stale authenticated user to 401 instead of leaking a Prisma FK error", async () => {
+    const body = { productId: "p1", originalType: true };
+    const stale = new Error("stale user");
+    mockAdd.mockRejectedValue(stale);
+    mockIsOwnerMissing.mockImplementation((error: unknown) => error === stale);
+
+    const out = await json(await POST(request("https://x/api/cart", body) as any));
+    expect(out.status).toBe(401);
+    expect(out.body).toEqual(expect.objectContaining({ error: "session_user_missing" }));
   });
 
   test("missing principal receives a generated guest id", async () => {

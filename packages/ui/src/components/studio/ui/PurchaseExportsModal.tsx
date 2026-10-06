@@ -18,7 +18,7 @@ export default function PurchaseExportsModal({
   onClose: () => void;
   productId: string;
   busy?: boolean;
-  onApplied?: (exportsAdded: number) => void;
+  onApplied?: (exportsAdded: number) => void | Promise<void>;
 }) {
   const [step, setStep] = useState<"pick" | "pay">("pick");
   const [picked, setPicked] = useState<Pack | null>(null);
@@ -121,7 +121,10 @@ export default function PurchaseExportsModal({
                   productId={productId}
                   packKey={picked ?? undefined}
                   open={open && step === "pay"}
-                  onApplied={(n) => onApplied?.(n)}
+                  onApplied={async (n) => {
+                    await onApplied?.(n);
+                    onClose();
+                  }}
                 />
               </div>
             )}

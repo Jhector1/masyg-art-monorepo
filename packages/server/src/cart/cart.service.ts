@@ -34,6 +34,24 @@ import { allSizes } from "@acme/core/data/helpers";
 
 type Owner = { userId?: string | null; guestId?: string | null };
 
+export class CartOwnerMissingError extends Error {
+  readonly code = "CART_OWNER_MISSING";
+
+  constructor() {
+    super("Authenticated user no longer exists. Please sign in again.");
+    this.name = "CartOwnerMissingError";
+  }
+}
+
+export function isCartOwnerMissingError(error: unknown): error is CartOwnerMissingError {
+  return (
+    error instanceof CartOwnerMissingError ||
+    (typeof error === "object" &&
+      error !== null &&
+      (error as { code?: unknown }).code === "CART_OWNER_MISSING")
+  );
+}
+
 function assertOwner(owner: Owner) {
   if (!owner.userId && !owner.guestId) throw new Error("Missing userId/guestId");
 }
@@ -48,6 +66,18 @@ async function getOrCreateCartId(site: Storefront, owner: Owner) {
     select: { id: true },
   });
   if (found) return found.id;
+
+  // A signed JWT can outlive its database user (for example after an account
+  // deletion or a local database rebuild). Never weaken the FK or create an
+  // ownerless cart in that case: fail with a typed identity error instead of
+  // leaking a Prisma P2003 as a generic 500.
+  if (owner.userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: owner.userId },
+      select: { id: true },
+    });
+    if (!user) throw new CartOwnerMissingError();
+  }
 
   const created = await prisma.cart.create({
     data: { site, userId: owner.userId ?? null, guestId: owner.guestId ?? null },
@@ -387,9 +417,11 @@ export async function addToCart(
       saleEndsAt: true,
       sizes: true,
       formats: true,
+      site: true,
     },
   });
   if (!product) throw new Error("Product not found.");
+  if (product.site !== site) throw new Error("Product does not belong to this storefront.");
 
   // newest design snapshot
   let designId: string | null = null;

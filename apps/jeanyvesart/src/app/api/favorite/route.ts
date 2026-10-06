@@ -14,12 +14,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function resolveSite(req: NextRequest): Storefront {
-  const fromHeader = req.headers.get("x-storefront")?.toUpperCase();
-  const fromQuery = req.nextUrl.searchParams.get("site")?.toUpperCase();
-  const raw = (fromHeader || fromQuery) as Storefront | undefined;
-  return raw === "JEANYVES" ? "JEANYVES" : "ZILEDIGITAL";
-}
 // Optional: block liking originals that are RESERVED/SOLD
 async function assertOriginalLikeAllowed(site: Storefront, productId: string) {
   const ov = await prisma.productVariant.findFirst({

@@ -1,6 +1,15 @@
 // middleware.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { getCustomerSessionCookieName } from "@acme/auth/cookies";
+
+async function getCustomerToken(req: NextRequest) {
+  return getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+    cookieName: getCustomerSessionCookieName(),
+  });
+}
 
 function isPath(req: NextRequest, prefix: string) {
   return req.nextUrl.pathname === prefix || req.nextUrl.pathname.startsWith(prefix + "/");
@@ -26,7 +35,7 @@ export async function middleware(req: NextRequest) {
 
   // ---- API: user-only ----
   if (isPath(req, "/api/user")) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getCustomerToken(req);
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     return NextResponse.next();
   }
@@ -41,13 +50,13 @@ export async function middleware(req: NextRequest) {
       isPath(req, "/api/private/downloads"); // only if downloads are allowed for guest
 
     if (guestAllowed) {
-      const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+      const token = await getCustomerToken(req);
       if (token || hasGuest(req)) return NextResponse.next();
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Everything else under /api/private requires login
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getCustomerToken(req);
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     return NextResponse.next();
   }
@@ -60,7 +69,7 @@ export async function middleware(req: NextRequest) {
     isPath(req, "/favorites") ||
     path.includes("/studio")
   ) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getCustomerToken(req);
     if (!token) {
       const loginUrl = new URL("/authenticate", req.url);
       loginUrl.searchParams.set("callbackUrl", req.nextUrl.pathname + req.nextUrl.search);

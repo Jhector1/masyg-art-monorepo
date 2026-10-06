@@ -62,6 +62,7 @@ type Props = {
   snapshotCartItem?: boolean;
   showFormat?: boolean;
   setHeaderBooting: (booting: boolean) => void;
+  onPurchaseComplete?: (selection: { digital: boolean; print: boolean }) => void | Promise<void>;
 };
 
 export default function PurchaseArtModal({
@@ -69,6 +70,7 @@ export default function PurchaseArtModal({
   onClose,
   busy = false,
   setHeaderBooting,
+  onPurchaseComplete,
 
   productId,
   imageSrc,
@@ -362,14 +364,26 @@ export default function PurchaseArtModal({
                         return;
                       }
 
-                      // Close modal so Stripe isn't layered underneath
+                      const expectedPurchase = {
+                        digital: Boolean(wantDigital),
+                        print: Boolean(wantPrint),
+                      };
+
+                      // Close the configurator before mounting Stripe so the two
+                      // dialogs never compete for focus or scroll ownership.
                       onClose();
                       await new Promise((r) => requestAnimationFrame(r));
 
                       if (result?.flow === "embedded") {
                         window.dispatchEvent(
                           new CustomEvent("open-checkout", {
-                            detail: { clientSecret: result.clientSecret, exportHref: "/account/orders" },
+                            detail: {
+                              clientSecret: result.clientSecret,
+                              exportHref: "/account/orders",
+                              onPurchaseComplete: async () => {
+                                await onPurchaseComplete?.(expectedPurchase);
+                              },
+                            },
                           })
                         );
                       } else if (result?.flow === "redirect") {

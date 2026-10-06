@@ -103,7 +103,9 @@ describe("ZileDigital checkout route", () => {
           }),
         ],
       }),
-      { idempotencyKey: "checkout:u1:ci1" }
+      expect.objectContaining({
+        idempotencyKey: expect.stringMatching(/^checkout:[a-f0-9]{64}$/),
+      })
     );
   });
 

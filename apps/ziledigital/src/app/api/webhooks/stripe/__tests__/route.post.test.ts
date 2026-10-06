@@ -27,7 +27,7 @@ const mockOrderHandle = handleOrderFulfillment as jest.Mock;
 const request = (signature = "sig") => makeNextRequest("https://x/api/webhooks/stripe", {
   method: "POST", body: "raw", headersObj: signature ? { "stripe-signature": signature } : {},
 });
-const event = { id: "evt1", type: "checkout.session.completed", data: { object: { id: "cs1", metadata: {} } } };
+const event = { id: "evt1", type: "checkout.session.completed", data: { object: { id: "cs1", payment_status: "paid", metadata: {} } } };
 
 describe("ZileDigital Stripe webhook orchestration", () => {
   beforeEach(() => {
@@ -68,6 +68,19 @@ describe("ZileDigital Stripe webhook orchestration", () => {
     const res = await POST(request() as any);
     expect(await res.json()).toEqual({ received: true, deduped: true });
     expect(mockOrderHandle).not.toHaveBeenCalled();
+  });
+
+
+  test("defers fulfillment when Checkout is completed but not paid", async () => {
+    constructEvent.mockReturnValue({
+      ...event,
+      data: { object: { ...event.data.object, payment_status: "unpaid" } },
+    });
+    const res = await POST(request() as any);
+    expect(await res.json()).toEqual({ received: true, deferred: true });
+    expect(mockOrderHandle).not.toHaveBeenCalled();
+    expect(mockQuotaHandle).not.toHaveBeenCalled();
+    expect(mockMark).toHaveBeenCalledWith("evt1");
   });
 
   test("routes an order session then marks the event processed", async () => {

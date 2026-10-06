@@ -86,6 +86,9 @@ describe("JeanYves original-art checkout route", () => {
       expect.objectContaining({
         metadata: expect.objectContaining({ orderId: "ord1", site: "JEANYVES", userId: "u1" }),
         line_items: [expect.objectContaining({ quantity: 1 })],
+      }),
+      expect.objectContaining({
+        idempotencyKey: expect.stringMatching(/^checkout:[a-f0-9]{64}$/),
       })
     );
   });

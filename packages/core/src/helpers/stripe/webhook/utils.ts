@@ -19,8 +19,12 @@ export async function alreadyProcessed(id: string) {
 export async function markProcessed(id: string) {
   try {
     await prisma.webhookEvent.create({ data: { id } });
-  } catch {
-    // ignore unique collisions
+  } catch (error: any) {
+    // A concurrent retry may win the unique insert. That is the only
+    // persistence error we can safely ignore; everything else must make
+    // the webhook fail so Stripe can retry.
+    if (error?.code === "P2002") return;
+    throw error;
   }
 }
 

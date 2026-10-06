@@ -13,13 +13,14 @@ export async function syncUserToDb({
   image,
   isAdminFromIdp,
 }: SyncUserArgs) {
+  const normalizedEmail = email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
     select: { id: true, image: true },
   });
 
   return prisma.user.upsert({
-    where: { email },
+    where: { email: normalizedEmail },
     update: {
       name: name ?? undefined,
 
@@ -29,7 +30,7 @@ export async function syncUserToDb({
       ...(isAdminFromIdp ? { isAdmin: true } : {}),
     },
     create: {
-      email,
+      email: normalizedEmail,
       name: name ?? null,
       image: image ?? null,
       isAdmin: !!isAdminFromIdp,

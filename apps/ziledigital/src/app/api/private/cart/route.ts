@@ -1,6 +1,5 @@
 // File: src/app/api/private/cart/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import type { Storefront } from "@prisma/client";
 import { z } from "zod";
 
 import { getCustomerIdFromRequest } from "@acme/core/utils/guest";
@@ -11,6 +10,7 @@ import {
   addToCart,
   patchCart,
   deleteFromCart,
+  isCartOwnerMissingError,
 } from "@acme/server/cart/cart.service";
 
 export const runtime = "nodejs";
@@ -21,12 +21,6 @@ export const revalidate = 0;
 /* Helpers */
 /* ----------------------------- */
 
-function resolveSite(req: NextRequest): Storefront {
-  const fromHeader = req.headers.get("x-storefront")?.toUpperCase();
-  const fromQuery = req.nextUrl.searchParams.get("site")?.toUpperCase();
-  const raw = (fromHeader || fromQuery) as Storefront | undefined;
-  return raw === "JEANYVES" ? "JEANYVES" : "ZILEDIGITAL";
-}
 
 /** Never throw: returns null for empty body / invalid JSON */
 async function readJsonSafe(req: NextRequest): Promise<unknown | null> {
@@ -93,7 +87,7 @@ const CartDeleteBodySchema = z.object({
 /* ----------------------------- */
 
 export async function GET(req: NextRequest) {
-  const site = resolveSite(req);
+  const site = "ZILEDIGITAL" as const;
   const { userId, guestId } = await getCustomerIdFromRequest(req);
 
   const sp = req.nextUrl.searchParams;
@@ -120,7 +114,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const site = resolveSite(req);
+  const site = "ZILEDIGITAL" as const;
   const { userId, guestId } = await getCustomerIdFromRequest(req);
 
   // mutations require an actor
@@ -137,12 +131,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const out = await addToCart(site, { userId, guestId }, parsed.data);
-  return noStoreJson(out);
+  try {
+    const out = await addToCart(site, { userId, guestId }, parsed.data);
+    return noStoreJson(out);
+  } catch (error) {
+    if (isCartOwnerMissingError(error)) {
+      return noStoreJson(
+        {
+          error: "session_user_missing",
+          message: "Your session no longer matches an account. Please sign in again.",
+        },
+        { status: 401 }
+      );
+    }
+    throw error;
+  }
 }
 
 export async function PATCH(req: NextRequest) {
-  const site = resolveSite(req);
+  const site = "ZILEDIGITAL" as const;
   const { userId, guestId } = await getCustomerIdFromRequest(req);
 
   const unauth = requireActorOr401(userId, guestId);
@@ -164,7 +171,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const site = resolveSite(req);
+  const site = "ZILEDIGITAL" as const;
   const { userId, guestId } = await getCustomerIdFromRequest(req);
 
   const unauth = requireActorOr401(userId, guestId);

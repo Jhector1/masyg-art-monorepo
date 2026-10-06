@@ -8,7 +8,7 @@ import { loadStripe, Stripe } from "@stripe/stripe-js";
 type OpenCheckoutDetail = {
   clientSecret: string;
   exportHref?: string;
-  onPurchaseComplete?: () => void;
+  onPurchaseComplete?: () => void | Promise<void>;
 };
 declare global {
   interface WindowEventMap {
@@ -164,16 +164,31 @@ export default function CheckoutHost() {
         async fetchClientSecret() {
           return detail.clientSecret;
         },
-        onComplete: () => {
+        onComplete: async () => {
+          // Stripe is finished with the embedded frame. Close it immediately,
+          // then reconcile the page state before announcing completion.
+          const completedDetail = detail;
           safeDestroy();
-          window.dispatchEvent(new CustomEvent("checkout-complete"));
-          showThankYouToast(
-            "Thank you for your purchase! You can now export this design.",
-            detail.exportHref
-              ? { label: "Open Library", onClick: () => (window.location.href = detail.exportHref!) }
-              : undefined
-          );
-          try { detail.onPurchaseComplete?.(); } catch {}
+
+          try {
+            await completedDetail.onPurchaseComplete?.();
+            window.dispatchEvent(new CustomEvent("checkout-complete"));
+            showThankYouToast(
+              "Thank you for your purchase! Your purchase is available now.",
+              completedDetail.exportHref
+                ? {
+                    label: "Open Library",
+                    onClick: () => (window.location.href = completedDetail.exportHref!),
+                  }
+                : undefined
+            );
+          } catch (error) {
+            console.error("[EMBEDDED_CHECKOUT_RECONCILE_ERROR]", error);
+            window.dispatchEvent(new CustomEvent("checkout-error"));
+            showThankYouToast(
+              "Payment was received. Your purchase is still syncing; it will appear automatically."
+            );
+          }
         },
       });
 

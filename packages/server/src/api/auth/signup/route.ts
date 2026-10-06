@@ -15,7 +15,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    if (password.length < 8 || password.length > 128) {
+      return NextResponse.json(
+        { error: "Password must be between 8 and 128 characters." },
+        { status: 400 },
+      );
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return NextResponse.json({ error: "User already exists" }, { status: 409 });
     }
@@ -23,7 +31,7 @@ export async function POST(request: NextRequest) {
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         password: hashed,
         name: name || `User_${Date.now()}`,
       },

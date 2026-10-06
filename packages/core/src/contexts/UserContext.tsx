@@ -77,7 +77,7 @@ export const useUser = () => useContext(UserContext);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider refetchOnWindowFocus={false}>
+    <SessionProvider refetchOnWindowFocus>
       <UserContextInner>{children}</UserContextInner>
     </SessionProvider>
   );
@@ -281,13 +281,17 @@ const mergedUser = useMemo<User | null>(() => {
       setDbUser(null); // ✅ clear db snapshot
       setSessionPulse((n) => n + 1);
 
-      document.cookie = "guest_id=; max-age=0; path=/; SameSite=Lax";
-      document.cookie = "next-auth.callback-url=; max-age=0; path=/";
-      document.cookie = "__Secure-next-auth.callback-url=; max-age=0; path=/";
-
       try {
         await fetch("/api/auth/clear", { method: "POST" });
       } catch {}
+
+      // Both public storefronts expose this route. It clears the local cookie
+      // and performs the first-party broker/peer logout chain. Admin does not
+      // use this customer UserProvider and stays outside the SSO boundary.
+      if (typeof window !== "undefined") {
+        window.location.assign("/api/auth/sso/logout?returnTo=/");
+        return;
+      }
 
       await signOut({ redirect: true, callbackUrl: "/" });
     });

@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
+  // Keep Turbopack dev artifacts isolated from production builds.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   output: "standalone",
   eslint: { ignoreDuringBuilds: true },        // ← skip ESLint in prod build
   typescript: { ignoreBuildErrors: true },      // ← skip TS errors in prod build
@@ -10,6 +12,7 @@ const config: NextConfig = {
     "@acme/server",
     "@acme/config",
     "@acme/db",
+    "@acme/auth",
   ],
   images: {
     remotePatterns: [

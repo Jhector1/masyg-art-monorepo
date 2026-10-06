@@ -12,7 +12,7 @@ type StartCheckoutOptions = {
  * Else, it redirects to the hosted checkout URL.
  */
 export async function startCheckout(orderList: any, opts?: StartCheckoutOptions) {
-  const res = await fetch("/api/private/checkoutcheckout", {
+  const res = await fetch("/api/private/checkout", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },

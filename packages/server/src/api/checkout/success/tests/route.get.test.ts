@@ -13,7 +13,7 @@ const asJson = async (res: any) => ({ status: res.status, json: await res.json()
 
 const prisma = new PrismaClient() as any;
 
-describe('GET /api/private/checkoutcheckout/success', () => {
+describe('GET /api/private/checkout/success', () => {
   beforeEach(() => {
     jest.resetAllMocks();
   });
@@ -21,7 +21,7 @@ describe('GET /api/private/checkoutcheckout/success', () => {
   test('401 when not authenticated', async () => {
     (getCustomerIdFromRequest as jest.Mock).mockResolvedValue({ userId: null, guestId: null });
 
-    const req = makeNextRequest('https://api/private/checkoutcheckout/success?session_id=cs_X', { method: 'GET' });
+    const req = makeNextRequest('https://api/private/checkout/success?session_id=cs_X', { method: 'GET' });
     const res = await GET(req as any);
     const data = await asJson(res);
 
@@ -32,7 +32,7 @@ describe('GET /api/private/checkoutcheckout/success', () => {
   test('empty list when no session_id', async () => {
     (getCustomerIdFromRequest as jest.Mock).mockResolvedValue({ userId: 'u', guestId: null });
 
-    const req = makeNextRequest('https://api/private/checkoutcheckout/success', { method: 'GET' });
+    const req = makeNextRequest('https://api/private/checkout/success', { method: 'GET' });
     const res = await GET(req as any);
     const data = await asJson(res);
 
@@ -44,7 +44,7 @@ describe('GET /api/private/checkoutcheckout/success', () => {
     (getCustomerIdFromRequest as jest.Mock).mockResolvedValue({ userId: 'u_5', guestId: null });
     prisma.order.findFirst.mockResolvedValue(null);
 
-    const req = makeNextRequest('https://api/private/checkoutcheckout/success?session_id=cs_1', { method: 'GET' });
+    const req = makeNextRequest('https://api/private/checkout/success?session_id=cs_1', { method: 'GET' });
     const res = await GET(req as any);
     const data = await asJson(res);
 
@@ -79,7 +79,7 @@ describe('GET /api/private/checkoutcheckout/success', () => {
       ],
     });
 
-    const req = makeNextRequest('https://api/private/checkoutcheckout/success?session_id=cs_ok', { method: 'GET' });
+    const req = makeNextRequest('https://api/private/checkout/success?session_id=cs_ok', { method: 'GET' });
     const res = await GET(req as any);
     const data = await asJson(res);
 

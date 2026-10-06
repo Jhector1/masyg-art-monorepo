@@ -10,6 +10,7 @@ import {
   addToCart,
   patchCart,
   deleteFromCart,
+  isCartOwnerMissingError,
 } from "@acme/server/cart/cart.service";
 import { authOptions } from "@/lib/auth";
 
@@ -17,12 +18,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function resolveSite(req: NextRequest): Storefront {
-  const fromHeader = req.headers.get("x-storefront")?.toUpperCase();
-  const fromQuery = req.nextUrl.searchParams.get("site")?.toUpperCase();
-  const raw = (fromHeader || fromQuery) as Storefront | undefined;
-  return raw === "JEANYVES" ? "JEANYVES" : "ZILEDIGITAL";
-}
 
 async function requireCustomer(req: NextRequest) {
 let { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
@@ -39,6 +34,17 @@ function cartOwnerWhere(site: Storefront, userId?: string | null, guestId?: stri
   return userId
     ? { cart: { userId, site } }
     : { cart: { guestId: guestId!, site } };
+}
+
+function staleSessionResponse(error: unknown) {
+  if (!isCartOwnerMissingError(error)) return null;
+  return NextResponse.json(
+    {
+      error: "session_user_missing",
+      message: "Your session no longer matches an account. Please sign in again.",
+    },
+    { status: 401, headers: { "Cache-Control": "no-store" } }
+  );
 }
 
 export async function GET(req: NextRequest) {
@@ -71,8 +77,14 @@ export async function POST(req: NextRequest) {
   const { userId, guestId } = await requireCustomer(req);
 
   const body = await req.json();
-  const out = await addToCart(site, { userId, guestId }, body);
-  return NextResponse.json(out);
+  try {
+    const out = await addToCart(site, { userId, guestId }, body);
+    return NextResponse.json(out);
+  } catch (error) {
+    const stale = staleSessionResponse(error);
+    if (stale) return stale;
+    throw error;
+  }
 }
 
 export async function PATCH(req: NextRequest) {

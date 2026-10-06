@@ -12,7 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 import { useUser } from "@acme/core/contexts/UserContext";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import UserMenu from "./UserMenu";
 
 type NavItem = { href: string; label: string };
@@ -30,6 +30,10 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
 
   const { user } = useUser();
   const { data: session, status } = useSession();
+
+  const signOutEverywhere = () => {
+    window.location.assign("/api/auth/sso/logout?returnTo=/");
+  };
 
   useEffect(() => {
     const onScroll = () => setElevated(window.scrollY > 2);
@@ -97,7 +101,7 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
           userEmail={user?.email || null}
           userRole={user?.isAdmin ? "Admin" : "Member"}
           menuItems={menuItems}
-          onSignOut={() => signOut({ callbackUrl: "/" })}
+          onSignOut={signOutEverywhere}
         />
       </div>
     );
@@ -259,7 +263,7 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
                     {/* <button
                       type="button"
                       className="col-span-2 rounded-xl bg-neutral-900 px-3 py-2 text-sm text-white hover:opacity-90"
-                      onClick={() => signOut({ callbackUrl: "/" })}
+                      onClick={signOutEverywhere}
                     >
                       Sign out
                     </button> */}
@@ -328,7 +332,7 @@ export default function Header({ cartCount = 0 }: { cartCount?: number }) {
                 <button
                   type="button"
                   className="text-xs text-red-600 hover:text-red-700"
-                  onClick={() => signOut({ callbackUrl: "/" })}
+                  onClick={signOutEverywhere}
                 >
                   Sign out
                 </button>

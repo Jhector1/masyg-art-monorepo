@@ -38,7 +38,7 @@ const asJson = async (res: any) => ({
 });
 
 const makeReq = (body: any) =>
-  new Request('http://localhost/api/private/checkoutcheckout', {
+  new Request('http://localhost/api/private/checkout', {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'content-type': 'application/json' },
@@ -84,7 +84,7 @@ afterEach(() => {
 });
 
 // ---- Tests ------------------------------------------------------------------
-describe('POST /api/private/checkoutcheckout', () => {
+describe('POST /api/private/checkout', () => {
   test('400 when body missing cartProductList', async () => {
     mockGetCustomer.mockResolvedValue({ userId: undefined, guestId: 'guest_123' });
     const res = await POST(makeReq({}) as any);

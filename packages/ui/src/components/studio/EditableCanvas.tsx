@@ -172,6 +172,8 @@ function EditableCanvasInner({ productId }: { productId: string }) {
     exportsLeft,
     quickDownloadPng,
     refreshExportStatus,
+    waitForExportStatus,
+    applyPurchasedExports,
     purchasedDigital,
     exportArtwork,
     fetchInitialExportStatus,
@@ -223,26 +225,18 @@ function EditableCanvasInner({ productId }: { productId: string }) {
   useEffect(() => {
     let dead = false;
 
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-    const refreshWithRetry = async (tries = 8, ms = 600) => {
-      for (let i = 0; i < tries; i++) {
-        const ok = await refreshExportStatus(); // should return boolean; if not, treat truthy
-        if (ok) break;
-        await sleep(ms);
-      }
-    };
-
     const stop = () => {
       if (!dead) setHeaderBooting(false);
     };
 
+    // The checkout-specific completion callback performs the targeted retry.
+    // This listener is only a final canonical refresh + header cleanup.
     const onComplete = async () => {
       try {
-        await refreshWithRetry();
+        await refreshExportStatus();
       } finally {
         stop();
-      } // ✅ even if webhook isn’t done after retries, don’t leave header spinning
+      }
     };
 
     const onAbortOrError = () => stop();
@@ -257,7 +251,7 @@ function EditableCanvasInner({ productId }: { productId: string }) {
       window.removeEventListener("checkout-abort", onAbortOrError);
       window.removeEventListener("checkout-error", onAbortOrError);
     };
-  }, [refreshExportStatus, setHeaderBooting]);
+  }, [refreshExportStatus]);
 
   // Keep state + ref in sync
   useEffect(() => {
@@ -531,8 +525,11 @@ function EditableCanvasInner({ productId }: { productId: string }) {
         onClose={() => setShowPurchase(false)}
         busy={purchasing}
         productId={productId}
-        onApplied={async () => {
-          await refreshExportStatus(); // ⬅️ refresh the canonical instance
+        onApplied={async (amount) => {
+          // Make the newly purchased credits visible immediately, then replace
+          // the optimistic value with the canonical server total before close.
+          applyPurchasedExports(amount);
+          await refreshExportStatus();
         }}
         //       onPick={async (qty) => {
         //         await startCheckout(qty);
@@ -558,6 +555,27 @@ function EditableCanvasInner({ productId }: { productId: string }) {
 
         digital={{ format: "png", license: selectedLicense }}
         print={{ format: "jpg" }}
+        onPurchaseComplete={async ({ digital, print }) => {
+          const settled = await waitForExportStatus(
+            (status) =>
+              (!digital || status.purchasedDigital) &&
+              (!print || status.purchasedPrint),
+            { tries: 24, delayMs: 250 }
+          );
+
+          if (!settled) {
+            // Keep reconciling in the background even after the checkout host
+            // releases its busy state. A delayed webhook should still update
+            // the Studio without requiring a page refresh.
+            void waitForExportStatus(
+              (status) =>
+                (!digital || status.purchasedDigital) &&
+                (!print || status.purchasedPrint),
+              { tries: 60, delayMs: 1000 }
+            );
+            throw new Error("Payment completed, but the purchase is still being finalized.");
+          }
+        }}
         // ✅ valid design payload; use your live editor state
         design={{ style, defs: defsString }}
         getPreviewDataUrl={async () =>

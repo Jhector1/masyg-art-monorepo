@@ -45,3 +45,6 @@ packages/db/prisma/src/generated/
 
 # Local migration backup snapshots
 packages/db/prisma/migrations_backup_*/
+
+# Next.js development build output
+**/.next-dev/

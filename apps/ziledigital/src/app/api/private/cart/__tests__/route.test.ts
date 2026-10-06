@@ -7,6 +7,7 @@ import {
   addToCart,
   patchCart,
   deleteFromCart,
+  isCartOwnerMissingError,
 } from "@acme/server/cart/cart.service";
 
 jest.mock("@acme/core/utils/guest", () => ({ getCustomerIdFromRequest: jest.fn() }));
@@ -16,6 +17,7 @@ jest.mock("@acme/server/cart/cart.service", () => ({
   addToCart: jest.fn(),
   patchCart: jest.fn(),
   deleteFromCart: jest.fn(),
+  isCartOwnerMissingError: jest.fn(),
 }));
 
 const mockIdentity = getCustomerIdFromRequest as jest.Mock;
@@ -24,6 +26,7 @@ const mockIsInCart = isInCart as jest.Mock;
 const mockAdd = addToCart as jest.Mock;
 const mockPatch = patchCart as jest.Mock;
 const mockDelete = deleteFromCart as jest.Mock;
+const mockIsOwnerMissing = isCartOwnerMissingError as unknown as jest.Mock;
 
 const request = (url: string, body?: unknown, method = "POST") =>
   makeNextRequest(url, {
@@ -36,6 +39,7 @@ describe("ZileDigital cart route boundary", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIdentity.mockResolvedValue({ userId: "u1" });
+    mockIsOwnerMissing.mockReturnValue(false);
   });
 
   test("GET probe resolves ZILEDIGITAL and delegates to shared service", async () => {
@@ -89,6 +93,24 @@ describe("ZileDigital cart route boundary", () => {
     const res = await DELETE(request("https://x/api/private/cart", { productId: "p1" }, "DELETE") as any);
     expect(res.status).toBe(200);
     expect(mockDelete).toHaveBeenCalledWith("ZILEDIGITAL", { userId: "u1", guestId: undefined }, "p1");
+  });
+
+
+  test("POST maps a stale authenticated user to 401 instead of leaking a Prisma FK error", async () => {
+    const body = {
+      productId: "p1",
+      digitalType: "PNG",
+      format: "png",
+      license: "personal",
+      quantity: 1,
+    };
+    const stale = new Error("stale user");
+    mockAdd.mockRejectedValue(stale);
+    mockIsOwnerMissing.mockImplementation((error: unknown) => error === stale);
+
+    const res = await POST(request("https://x/api/private/cart", body) as any);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual(expect.objectContaining({ error: "session_user_missing" }));
   });
 
   test("mutations reject when neither user nor guest exists", async () => {

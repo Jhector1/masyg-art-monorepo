@@ -5,12 +5,16 @@ import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import crypto from "crypto";
 
-import { stripe } from "@acme/core/lib/stripe";
 import { prisma } from "@acme/core/lib/prisma";
 import { getPrincipalFromRequest } from "@acme/auth";
 import { authOptions } from "@/lib/auth";
 import { getEffectiveSale, roundMoney } from "@acme/core/lib/pricing";
 import { getOrCreateGuestId } from "@acme/auth";
+import {
+  checkoutIdempotencyKey,
+  createCheckoutSession,
+  resolveCheckoutBaseUrl,
+} from "@acme/server/billing/checkout-session";
 
 const SITE = "JEANYVES" as const;
 
@@ -311,11 +315,7 @@ let { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
       return createdOrder;
     });
 
-    const CLIENT_URL =
-      process.env.NEXT_PUBLIC_CLIENT_URL ??
-      process.env.NEXT_PUBLIC_APP_URL ??
-      req.headers.get("origin") ??
-      "http://localhost:3000";
+    const baseUrl = resolveCheckoutBaseUrl(req.headers.get("origin"));
 
     const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] =
       items.map((i) => ({
@@ -335,46 +335,38 @@ let { userId, guestId } = await getPrincipalFromRequest(req, authOptions);
           },
         },
       }));
-    // const RESERVE_MINUTES = 20;
-    const expires_at = Math.floor(reservedUntil.getTime() / 1000);
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      line_items,
+    const expiresAt = Math.floor(reservedUntil.getTime() / 1000);
+    const idemKey = checkoutIdempotencyKey("checkout", [SITE, order.id]);
 
-      shipping_address_collection: { allowed_countries: ["US", "CA"] },
-
-      consent_collection: { terms_of_service: "required" },
-      automatic_tax: { enabled: true },
-      expires_at: expires_at, // ✅ required for `checkout.session.expired`
-
-      metadata: {
-        kind: "order",
-        orderId: order.id,
-        site: SITE,
-        ...(userId ? { userId } : {}),
-        ...(guestId ? { guestId } : {}),
-      },
-
-      success_url:
-        `${CLIENT_URL}/cart/checkout/success?session_id={CHECKOUT_SESSION_ID}` +
+    const created = await createCheckoutSession({
+      flow: "redirect",
+      lineItems: line_items,
+      actor: { userId, guestId },
+      site: SITE,
+      metadata: { orderId: order.id },
+      requiresShipping: true,
+      allowedCountries: ["US", "CA"],
+      expiresAt,
+      idempotencyKey: idemKey,
+      successUrl:
+        `${baseUrl}/cart/checkout/success?session_id={CHECKOUT_SESSION_ID}` +
         (claimToken ? `&claim=${claimToken}` : ""),
-      cancel_url: `${CLIENT_URL}/cart`,
-      client_reference_id: `order:${userId ?? guestId ?? "guest"}`,
+      cancelUrl: `${baseUrl}/cart`,
     });
+
     await prisma.order.update({
       where: { id: order.id },
       data: {
-        stripeSessionId: session.id,
-        stripeSessionUrl: session.url, // ✅ store this (add field)
+        stripeSessionId: created.sessionId,
+        stripeSessionUrl: created.url, // ✅ store this (add field)
         checkoutExpiresAt: reservedUntil, // ✅ store this too (optional)
       },
     });
     return NextResponse.json({
       flow: "redirect",
-      url: session.url,
-      sessionId: session.id,
+      url: created.url,
+      sessionId: created.sessionId,
       orderId: order.id,
     });
   } catch (err: any) {

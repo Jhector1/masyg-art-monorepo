@@ -6,6 +6,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@acme/core/lib/prisma";
 import { sendMail } from "@acme/core/lib/email";
 import { issueCode, MFA_CODE_TTL_SEC } from "@/lib/mfa-server";
+import {
+  getEmergencyAdminEmail,
+  isEmergencyAdminUserId,
+} from "@/lib/emergency-admin";
 
 const RESEND_COOLDOWN_SEC = 60;
 
@@ -19,11 +23,19 @@ export async function POST(req: Request) {
   const url = new URL(req.url);
   const force = url.searchParams.get("force") === "1";
 
-  const user = await prisma.user.findUnique({
-    where: { id: u.id },
-    select: { email: true },
-  });
-  if (!user?.email) {
+  let email: string | null = null;
+
+  if (u.isEmergencyAdmin === true || isEmergencyAdminUserId(u.id)) {
+    email = getEmergencyAdminEmail();
+  } else {
+    const user = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { email: true },
+    });
+    email = user?.email ?? null;
+  }
+
+  if (!email) {
     return NextResponse.json({ error: "No email on file" }, { status: 400 });
   }
 
@@ -63,7 +75,7 @@ export async function POST(req: Request) {
 
   try {
     await sendMail({
-      to: user.email,
+      to: email,
       subject: "Your admin verification code",
       html: `<p>Your code is: <b>${code}</b></p><p>Valid ${Math.floor(MFA_CODE_TTL_SEC/60)} minutes.</p>`,
       text: `Your code is: ${code} (valid ${Math.floor(MFA_CODE_TTL_SEC/60)} minutes)`,

@@ -259,21 +259,8 @@ export default function OriginalPaintingDetails({
     if (!data?.id || likeBusy) return;
     if (isSold) return; // optional: only block if sold
     setLikeBusy(true);
-    const willLike = !liked;
-
-    toggleFavorite(data.id);
     try {
-      const res = await fetch(
-        `/api/favorite${willLike ? "" : `?productId=${data.id}`}`,
-        {
-          method: willLike ? "POST" : "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: willLike ? JSON.stringify({ productId: data.id }) : undefined,
-        }
-      );
-      if (!res.ok) throw new Error(await res.text());
-    } catch {
-      toggleFavorite(data.id);
+      await toggleFavorite(data.id);
     } finally {
       setLikeBusy(false);
     }

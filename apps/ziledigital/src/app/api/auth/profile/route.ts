@@ -174,7 +174,7 @@ export async function PATCH(req: NextRequest) {
       where: { id: me.id },
       data: {
         name: wantName ? body.name!.trim() : undefined,
-        email: wantEmail ? body.email!.trim() : undefined,
+        email: wantEmail ? body.email!.trim().toLowerCase() : undefined,
       },
       select: { id: true, name: true, email: true, avatarUrl: true, updatedAt: true },
     });

@@ -204,7 +204,7 @@ const { userId } = await getPrincipalFromRequest(req, authOptions);
       where: { id: me.id },
       data: {
         name: wantName ? body.name!.trim() : undefined,
-        email: wantEmail ? body.email!.trim() : undefined,
+        email: wantEmail ? body.email!.trim().toLowerCase() : undefined,
       },
       select: {
         id: true,

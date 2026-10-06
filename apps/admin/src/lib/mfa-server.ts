@@ -3,7 +3,9 @@ import { SignJWT } from "jose";
 import { prisma } from "@acme/core/lib/prisma";
 import crypto from "crypto";
 
-export const MFA_COOKIE = "mfa_admin";
+import { getAdminMfaCookieName } from "@/lib/auth-cookies";
+
+export const MFA_COOKIE = getAdminMfaCookieName();
 
 export const MFA_CODE_TTL_SEC = 5 * 60;                 // OTP valid 5 min
 export const MFA_COOKIE_TTL_SEC = 24 * 60 * 60;         // 1 day (no remember)

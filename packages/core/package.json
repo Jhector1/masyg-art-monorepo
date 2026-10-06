@@ -16,7 +16,8 @@
     "axios": "^1.10.0",
     "slugify": "^1.6.6",
     "uuid": "^11.1.0",
-    "zod": "^4.0.17"
+    "zod": "^4.0.17",
+    "@acme/auth": "*"
   },
   "peerDependencies": {
     "next-auth": "^4.24.11",

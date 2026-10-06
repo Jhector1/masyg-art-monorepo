@@ -17,7 +17,7 @@ export async function listFavoritesForUser(opts: {
 
   return prisma.product.findMany({
     where: {
-      // ...productWhere,
+      site: opts.site,
       favorites: { some: { userId: opts.userId, site: opts.site } },
     },
     select: {
@@ -34,6 +34,12 @@ export async function addFavorite(opts: {
   site: Storefront;
 }) {
   const { userId, productId, site } = opts;
+
+  const product = await prisma.product.findFirst({
+    where: { id: productId, site },
+    select: { id: true },
+  });
+  if (!product) throw new Error("Product does not belong to this storefront.");
 
   await prisma.favorite.upsert({
     where: { userId_productId_site: { userId, productId, site } }, // ✅ matches schema
