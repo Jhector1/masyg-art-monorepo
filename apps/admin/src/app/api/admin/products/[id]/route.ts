@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@acme/core/lib/auth";
 import { deleteProductDeep } from "@acme/core/lib/deleteProduct";
 import { prisma } from "@acme/core/lib/prisma";
 import type { Prisma } from "@prisma/client";
@@ -28,7 +27,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  await requireAdmin(req);
+  const session = await auth();
+  if (!session?.user?.isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const parsed = ProductPatchSchema.safeParse(body);
@@ -92,7 +94,10 @@ if (d.categoryId !== undefined) {
 }
 
 export async function DELETE(req: NextRequest) {
-  await requireAdmin(req);
+  const session = await auth();
+  if (!session?.user?.isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const hard = req.nextUrl.searchParams.get("hard") === "1";
 
   const id = idFromReq(req);
