@@ -74,26 +74,32 @@ export async function settleVerifiedPaidCheckout(evidence:VerifiedPaidEvidence) 
     },select:attemptSelect});
     if(!a)throw new CommerceInvariantError("CHECKOUT_NOT_FOUND","Paid checkout is not registered to the connected merchant");
     assertIdentity(a,evidence);
-    if(prior) {
-      if(prior.organizationId!==a.organizationId || prior.status!=="PROCESSED") {
-        throw new CommerceInvariantError("PROVIDER_EVENT_CONFLICT","Provider event already assigned or unfinished");
-      }
-      // Existing event is accepted only if the matching payment and paid order remain persisted.
-      if(a.order.status!=="PAID" || a.status!=="PAID")throw new CommerceInvariantError("PAYMENT_STATE_CONFLICT","Processed event has inconsistent order state");
+    // A previously-settled payment stays settled after legitimate fulfillment or a
+    // verified full refund. Subsequent signed success events are idempotent, not
+    // grounds to re-consume stock or re-issue download entitlements.
+    if(prior && (prior.organizationId!==a.organizationId || prior.status!=="PROCESSED"))
+      throw new CommerceInvariantError("PROVIDER_EVENT_CONFLICT","Provider event already assigned or unfinished");
+    const settledPaymentStatus =
+      a.status === "PAID" && ["PAID", "FULFILLING", "FULFILLED"].includes(a.order.status)
+        ? "SUCCEEDED" as const
+        : a.status === "PAID" && a.order.status === "REFUNDED"
+          ? "REFUNDED" as const
+          : null;
+    if(prior || a.status === "PAID" || a.order.status !== "PENDING") {
+      if(!settledPaymentStatus)
+        throw new CommerceInvariantError("PAYMENT_STATE_CONFLICT","Paid event has inconsistent order or attempt state");
       const paid=await tx.payment.findFirst({where:{organizationId:a.organizationId,orderId:a.orderId,
         provider:"stripe",providerAccount:evidence.providerAccount,
-        providerPaymentId:evidence.providerPaymentId,status:"SUCCEEDED",amountMinor:evidence.amountMinor,currency:evidence.currency},select:{id:true}});
-      if(!paid)throw new CommerceInvariantError("PAYMENT_STATE_CONFLICT","Processed event missing matching payment");
-      return {status:"PAID" as const,orderId:a.orderId,paymentId:paid.id,replay:true as const};
-    }
-    if(a.order.status==="PAID" || a.status==="PAID") {
-      // Distinct success events can refer to the same paid session/PaymentIntent.
-      if(a.order.status!=="PAID" || a.status!=="PAID")throw new CommerceInvariantError("PAYMENT_STATE_CONFLICT","Inconsistent payment state");
-      const paid=await tx.payment.findFirst({where:{organizationId:a.organizationId,orderId:a.orderId,
-        provider:"stripe",providerAccount:evidence.providerAccount,
-        providerPaymentId:evidence.providerPaymentId,status:"SUCCEEDED",amountMinor:evidence.amountMinor,currency:evidence.currency},select:{id:true}});
-      if(!paid)throw new CommerceInvariantError("PAYMENT_STATE_CONFLICT","Paid attempt is missing the verified payment");
-      await tx.providerEvent.create({data:{organizationId:a.organizationId,provider:"stripe",providerEventId:evidence.providerEventId,
+        providerPaymentId:evidence.providerPaymentId,status:settledPaymentStatus,
+        amountMinor:evidence.amountMinor,currency:evidence.currency},select:{id:true}});
+      if(!paid)
+        throw new CommerceInvariantError("PAYMENT_STATE_CONFLICT","Settled attempt is missing the matching payment");
+      // The same event ID has already been processed; never insert it again.
+      // A distinct signed success event referring to this exact paid intent may
+      // arrive after fulfillment or refund; record it without changing money,
+      // inventory, fulfillment status, or grant revocations.
+      if(!prior) await tx.providerEvent.create({data:{organizationId:a.organizationId,
+        provider:"stripe",providerEventId:evidence.providerEventId,
         status:"PROCESSED",attempts:1,processedAt:new Date()}});
       return {status:"PAID" as const,orderId:a.orderId,paymentId:paid.id,replay:true as const};
     }

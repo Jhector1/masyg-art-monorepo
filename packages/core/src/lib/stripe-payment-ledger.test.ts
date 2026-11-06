@@ -104,3 +104,49 @@ test("payment settlement refuses invalid purchased-file metadata before payment 
     expect(tx.providerEvent.create).not.toHaveBeenCalled();
   }
 });
+
+
+test.each(["FULFILLING","FULFILLED"])("signed success replay after %s is idempotent",async orderStatus=>{
+  const progressed={...attempt,status:"PAID",order:{...attempt.order,status:orderStatus}};
+  const tx=makeTx({attempt:progressed,payment:{id:"pay_001"}});wire(tx);
+  const result=await settleVerifiedPaidCheckout({...evidence,providerEventId:"evt_test_later_success"});
+  expect(result).toMatchObject({replay:true,status:"PAID"});
+  expect(tx.payment.findFirst).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({status:"SUCCEEDED",providerPaymentId:evidence.providerPaymentId})}));
+  expect(tx.stockHold.findMany).not.toHaveBeenCalled();
+  expect(tx.inventoryLevel.updateMany).not.toHaveBeenCalled();
+  expect(tx.order.updateMany).not.toHaveBeenCalled();
+  expect(tx.digitalGrant.create).not.toHaveBeenCalled();
+  expect(tx.providerEvent.create).toHaveBeenCalledTimes(1);
+});
+
+test("signed success replay after a verified full refund never reinstates entitlements",async()=>{
+  const refunded={...attempt,status:"PAID",order:{...attempt.order,status:"REFUNDED"}};
+  const prior=makeTx({attempt:refunded,event:{organizationId:"org_001",status:"PROCESSED"},payment:{id:"pay_001"}});wire(prior);
+  expect(await settleVerifiedPaidCheckout(evidence)).toMatchObject({replay:true});
+  expect(prior.payment.findFirst).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({status:"REFUNDED"})}));
+  expect(prior.providerEvent.create).not.toHaveBeenCalled();
+  const distinct=makeTx({attempt:refunded,payment:{id:"pay_001"}});wire(distinct);
+  expect(await settleVerifiedPaidCheckout({...evidence,providerEventId:"evt_test_after_refund"})).toMatchObject({replay:true});
+  expect(distinct.payment.findFirst).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({status:"REFUNDED"})}));
+  expect(distinct.stockHold.findMany).not.toHaveBeenCalled();
+  expect(distinct.digitalGrant.create).not.toHaveBeenCalled();
+  expect(distinct.order.updateMany).not.toHaveBeenCalled();
+  expect(distinct.payment.create).not.toHaveBeenCalled();
+  expect(distinct.providerEvent.create).toHaveBeenCalledTimes(1);
+});
+
+test("replay refuses inconsistent settlement status and mismatched recorded payment",async()=>{
+  for(const state of [
+    {...attempt,status:"SESSION_CREATED",order:{...attempt.order,status:"FULFILLED"}},
+    {...attempt,status:"PAID",order:{...attempt.order,status:"PENDING"}},
+    {...attempt,status:"PAID",order:{...attempt.order,status:"CANCELLED"}},
+  ]) {
+    const tx=makeTx({attempt:state,payment:{id:"pay_001"}});wire(tx);
+    await expect(settleVerifiedPaidCheckout(evidence)).rejects.toThrow("inconsistent");
+    expect(tx.providerEvent.create).not.toHaveBeenCalled();
+  }
+  const refunded={...attempt,status:"PAID",order:{...attempt.order,status:"REFUNDED"}};
+  const tx=makeTx({attempt:refunded});wire(tx);
+  await expect(settleVerifiedPaidCheckout(evidence)).rejects.toThrow("matching payment");
+  expect(tx.providerEvent.create).not.toHaveBeenCalled();
+});
