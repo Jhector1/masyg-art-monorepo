@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import Stripe from "stripe";
 import { CommerceInvariantError } from "@acme/core/lib/commerce-invariants";
 import { dispatchSignedStripeTestWebhook } from "../../../../payments/stripe-test-webhook-controller";
+import { readBoundedWebhookBody, WebhookBodyTooLargeError } from "../../../../lib/bounded-webhook-body";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -18,15 +19,17 @@ export async function POST(req:NextRequest) {
     return Response.json({error:"Invalid webhook signature"},{status:400,headers});
   if(Number(req.headers.get("content-length")||0)>LIMIT)
     return Response.json({error:"Too large"},{status:413,headers});
-  const raw=await req.text();
-  if(Buffer.byteLength(raw)>LIMIT)
-    return Response.json({error:"Too large"},{status:413,headers});
   try {
+    // Bound memory while receiving the body, even when Content-Length is absent or false.
+    // Preserve exact bytes for Stripe HMAC verification.
+    const raw=await readBoundedWebhookBody(req,LIMIT);
     const result=await dispatchSignedStripeTestWebhook({rawBody:raw,signature,
       webhookSecret:process.env.ZILEDIGITAL_STRIPE_TEST_WEBHOOK_SECRET,
       platformTestKey:process.env.ZILEDIGITAL_STRIPE_TEST_PLATFORM_KEY});
     return Response.json({received:true,status:result.status},{status:200,headers});
   } catch(error) {
+    if(error instanceof WebhookBodyTooLargeError)
+      return Response.json({error:"Too large"},{status:413,headers});
     // Cryptographic signature failure and invalid Connect envelope are permanent
     // request errors. Never acknowledge them, but do not ask Stripe to retry.
     if(error instanceof Stripe.errors.StripeSignatureVerificationError ||
