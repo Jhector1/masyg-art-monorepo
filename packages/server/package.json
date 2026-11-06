@@ -9,7 +9,8 @@
     "./billing/*": "./src/billing/*.ts",
     "./api/*": "./src/api/*.ts",
     "./utils": "./src/utils/index.ts",
-    "./utils/*": "./src/utils/*.ts"
+    "./utils/*": "./src/utils/*.ts",
+    "./lib/*": "./src/lib/*.ts"
   },
   "dependencies": {
     "@acme/core": "*",
@@ -24,7 +25,8 @@
     "probe-image-size": "^7.2.3",
     "sanitize-html": "^2.17.0",
     "stripe": "^18.3.0",
-    "@acme/auth": "*"
+    "@acme/auth": "*",
+    "zod": "^4.0.17"
   },
   "scripts": {
     "check-types": "tsc --noEmit -p tsconfig.json"

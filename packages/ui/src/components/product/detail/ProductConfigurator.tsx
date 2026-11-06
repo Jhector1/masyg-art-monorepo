@@ -20,6 +20,7 @@ import { usePurchaseConfigurator } from "@acme/core/hooks/usePurchaseConfigurato
 import { cleanSizes } from "@acme/core/utils/helpers";
 import { computeFinalUnitPrice } from "@acme/core/lib/finalize";
 import { roundMoney } from "@acme/core/lib/pricing";
+import { getDisplayKind, getFulfillmentCapabilities } from "@acme/core/lib/product-capabilities";
 
 import type {
   ProductDetailResult,
@@ -43,7 +44,7 @@ type KindPolicy = {
 };
 
 function getKindPolicy(product: ProductDetailResult): KindPolicy {
-  switch (product.kind) {
+  switch (getDisplayKind(product)) {
     case "BOOK_DIGITAL": {
       const hasEditions =
         Array.isArray(product.sizes) && product.sizes.length > 0;
@@ -187,8 +188,8 @@ export default function ProductConfigurator(props: ProductConfiguratorProps) {
   const policy: KindPolicy = {
     ...basePolicy,
     allow: {
-      digital: basePolicy.allow.digital && !disabledOptions?.digital,
-      print: basePolicy.allow.print && !disabledOptions?.print,
+      digital: basePolicy.allow.digital && getFulfillmentCapabilities(product).supportsDigital && !disabledOptions?.digital,
+      print: basePolicy.allow.print && getFulfillmentCapabilities(product).supportsPrint && !disabledOptions?.print,
     },
     hide: {
       ...basePolicy.hide,

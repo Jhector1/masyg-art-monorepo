@@ -1,19 +1,7 @@
-export { generateMetadata } from "./metadata";
-
-// import ScreenshotGuard from "@/components/ScreenshotGuard";
+export {generateMetadata} from "./metadata";
 import ProductDetail from "./ProductClient";
 
-// option A: async / await
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  
-  return (
-    // <ScreenshotGuard blurAmount="10px" blurDurationMs={1500}>
-      <ProductDetail productId={id} />
-    // </ScreenshotGuard>
-  );
+export default async function ProductPage({params}:{params:Promise<{id:string}>}){
+  const {id:slug}=await params;
+  return <ProductDetail slug={slug}/>;
 }

@@ -1,118 +1,98 @@
 import { prisma } from "@acme/db";
+import { hashGuestCartToken } from "./guestIdentity";
 
-export async function claimGuestData({
-  guestId,
-  userId,
-}: {
-  guestId: string;
-  userId: string;
-}) {
+/**
+ * Claim a single bearer-token cart after successful authentication.
+ * No guest purchase rights, orders or reviews are transferred implicitly.
+ * The token identifies exactly one cart, whose organization and store are read
+ * from the trusted database record, never from request input.
+ */
+export async function claimGuestData({ guestId, userId }: { guestId: string; userId: string }) {
   if (!guestId || !userId) return;
+  const guestTokenHash = hashGuestCartToken(guestId);
 
   await prisma.$transaction(async (tx) => {
-    const guestCarts = await tx.cart.findMany({
-      where: { guestId },
-      select: { id: true, site: true },
+    const guestCart = await tx.cart.findUnique({
+      where: { guestTokenHash },
+      include: { items: true },
     });
+    if (!guestCart) return;
 
-    for (const guestCartRef of guestCarts) {
-      const guestCart = await tx.cart.findUnique({
-        where: { id: guestCartRef.id },
-        include: { items: true },
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true },
+    });
+    if (!user) throw new Error("Authenticated identity not found");
+
+    const organizationId = guestCart.organizationId;
+    const storeId = guestCart.storeId;
+    let customer = await tx.customer.findFirst({
+      where: { organizationId, userId: user.id },
+      select: { id: true },
+    });
+    if (!customer) {
+      // An existing guest customer may be attached only if unclaimed.
+      const byEmail = await tx.customer.findFirst({
+        where: { organizationId, email: user.email.trim().toLowerCase() },
+        select: { id: true, userId: true },
       });
-      if (!guestCart) continue;
-
-      const userCart = await tx.cart.findFirst({
-        where: { userId, site: guestCart.site },
-        include: { items: true },
-      });
-
-      if (!userCart) {
-        await tx.cart.update({
-          where: { id: guestCart.id },
-          data: { userId, guestId: null },
-        });
-        continue;
+      if (byEmail?.userId && byEmail.userId !== user.id) {
+        throw new Error("Customer identity is already associated with a different account");
       }
-
-      for (const item of guestCart.items) {
-        const identity =
-          item.originalVariantId
-            ? { originalVariantId: item.originalVariantId }
-            : item.digitalVariantId
-              ? { digitalVariantId: item.digitalVariantId }
-              : item.printVariantId
-                ? { printVariantId: item.printVariantId }
-                : {
-                    digitalVariantId: null,
-                    printVariantId: null,
-                    originalVariantId: null,
-                  };
-
-        const existing = await tx.cartItem.findFirst({
-          where: {
-            cartId: userCart.id,
-            productId: item.productId,
-            ...identity,
-          },
-        });
-
-        if (existing) {
-          await tx.cartItem.update({
-            where: { id: existing.id },
-            data: { quantity: { increment: item.quantity } },
+      customer = byEmail
+        ? await tx.customer.update({
+            where: { id: byEmail.id },
+            data: { userId: user.id },
+            select: { id: true },
+          })
+        : await tx.customer.create({
+            data: {
+              organizationId,
+              userId: user.id,
+              email: user.email.trim().toLowerCase(),
+              name: user.name,
+            },
+            select: { id: true },
           });
-          continue;
-        }
-
-        await tx.cartItem.create({
-          data: {
-            cartId: userCart.id,
-            productId: item.productId,
-            digitalVariantId: item.digitalVariantId,
-            printVariantId: item.printVariantId,
-            originalVariantId: item.originalVariantId,
-            price: item.price,
-            originalPrice: item.originalPrice,
-            quantity: item.quantity,
-            designId: item.designId,
-            previewUrlSnapshot: item.previewUrlSnapshot,
-            styleSnapshot: item.styleSnapshot ?? undefined,
-          },
-        });
-      }
-
-      await tx.cart.delete({ where: { id: guestCart.id } });
     }
 
-    await tx.favorite.updateMany({
-      where: { guestId },
-      data: { userId, guestId: null },
+    const existingCart = await tx.cart.findFirst({
+      where: {
+        organizationId,
+        storeId,
+        customerId: customer.id,
+        id: { not: guestCart.id },
+      },
+      select: { id: true },
     });
 
-    await tx.review.updateMany({
-      where: { guestId },
-      data: { userId, guestId: null },
-    });
+    if (!existingCart) {
+      await tx.cart.update({
+        where: { id: guestCart.id },
+        data: { customerId: customer.id, guestTokenHash: null },
+      });
+      return;
+    }
 
-    await tx.order.updateMany({
-      where: { guestId },
-      data: { userId, guestId: null },
-    });
-
-    await tx.userDesign.updateMany({
-      where: { guestId },
-      data: { userId, guestId: null },
-    });
-
-    await tx.designEntitlement.updateMany({
-      where: { guestId },
-      data: { userId, guestId: null },
-    });
-
-    await tx.designUsage.updateMany({
-      where: { guestId },
-      data: { userId, guestId: null },
-    });
+    // Unique (organization, cart, variant) prevents duplicate lines.
+    for (const item of guestCart.items) {
+      await tx.cartItem.upsert({
+        where: {
+          organizationId_cartId_variantId: {
+            organizationId,
+            cartId: existingCart.id,
+            variantId: item.variantId,
+          },
+        },
+        update: { quantity: { increment: item.quantity } },
+        create: {
+          organizationId,
+          cartId: existingCart.id,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        },
+      });
+    }
+    await tx.cart.delete({ where: { id: guestCart.id } });
   });
 }

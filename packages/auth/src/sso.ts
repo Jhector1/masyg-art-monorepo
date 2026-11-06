@@ -150,7 +150,6 @@ export async function consumeCustomerSsoCode(args: { code: string; audience: str
           email: true,
           name: true,
           image: true,
-          avatarUrl: true,
           updatedAt: true,
         },
       });

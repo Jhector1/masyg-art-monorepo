@@ -8,6 +8,7 @@ import { handleCheckout } from "@acme/core/utils/handleCheckout";
 import { cleanSizes, toDate } from "@acme/core/utils/helpers";
 import { allFrames, allLicenses, allMaterials } from "@acme/core/data/helpers";
 import { computeFinalUnitPrice } from "@acme/core/lib/finalize";
+import { getDisplayKind, getFulfillmentCapabilities } from "@acme/core/lib/product-capabilities";
 
 import type {
   AddOptions,
@@ -28,25 +29,14 @@ const uniqFormats = (urls: string[] = []) => {
     .filter((ext) => ext && !seen.has(ext) && seen.add(ext));
 };
 
-function capabilitiesByKind(
-  kind?: ProductDetailResult["kind"],
-  originalVariant?: any
-) {
-  if (originalVariant) {
-    return { supportsDigital: false, supportsPrint: false, isOriginalOnly: true };
-  }
-  switch (kind) {
-    case "BOOK_DIGITAL":
-      return { supportsDigital: true, supportsPrint: false, isOriginalOnly: false };
-    case "STICKER":
-    case "MUG":
-    case "CARD":
-      return { supportsDigital: false, supportsPrint: true, isOriginalOnly: false };
-    case "ART":
-    case "OTHER":
-    default:
-      return { supportsDigital: true, supportsPrint: true, isOriginalOnly: false };
-  }
+function capabilitiesByProduct(p?: ProductDetailResult | null) {
+  const capabilities = getFulfillmentCapabilities(p);
+  const isOriginalOnly = Boolean(p?.originalVariant) && !capabilities.supportsDigital;
+  return {
+    supportsDigital: capabilities.supportsDigital,
+    supportsPrint: capabilities.supportsPrint && !isOriginalOnly,
+    isOriginalOnly,
+  };
 }
 
 const sizesFromKindInfo = (p: ProductDetailResult): string[] => {
@@ -56,9 +46,9 @@ const sizesFromKindInfo = (p: ProductDetailResult): string[] => {
 
 const preferredMaterialForKind = (p?: ProductDetailResult): string | null => {
   if (!p?.kindInfo) return null;
-  if (p.kind === "MUG" && p.kindInfo.material) return p.kindInfo.material;
-  if (p.kind === "STICKER" && p.kindInfo.material) return p.kindInfo.material;
-  if (p.kind === "CARD" && p.kindInfo.stock) return p.kindInfo.stock;
+  if (getDisplayKind(p) === "MUG" && p.kindInfo.material) return p.kindInfo.material;
+  if (getDisplayKind(p) === "STICKER" && p.kindInfo.material) return p.kindInfo.material;
+  if (getDisplayKind(p) === "CARD" && p.kindInfo.stock) return p.kindInfo.stock;
   return null;
 };
 
@@ -94,8 +84,8 @@ export function useProductPurchase({ productId }: { productId: string }) {
 
   // derived caps
   const caps = useMemo(
-    () => capabilitiesByKind(product?.kind, product?.originalVariant),
-    [product?.kind, product?.originalVariant]
+    () => capabilitiesByProduct(product),
+    [product]
   );
 
   const safeSetWantDigital = useCallback(
@@ -141,7 +131,7 @@ export function useProductPurchase({ productId }: { productId: string }) {
         }
 
         // seed basic defaults ONCE (cart hydration will override later)
-        const nextCaps = capabilitiesByKind(p.kind, (p as any).originalVariant);
+        const nextCaps = capabilitiesByProduct(p);
 
         // if no cart yet, choose a kind-appropriate default selection (optional)
         if (!inCart) {
@@ -151,10 +141,10 @@ export function useProductPurchase({ productId }: { productId: string }) {
           if ((p as any).originalVariant) {
             seedDigital = false;
             seedPrint = false;
-          } else if (p.kind === "BOOK_DIGITAL") {
+          } else if (getDisplayKind(p) === "BOOK_DIGITAL") {
             seedDigital = true;
             seedPrint = false;
-          } else if (p.kind === "STICKER" || p.kind === "MUG" || p.kind === "CARD") {
+          } else if (getDisplayKind(p) === "STICKER" || getDisplayKind(p) === "MUG" || getDisplayKind(p) === "CARD") {
             seedDigital = false;
             seedPrint = true;
           }

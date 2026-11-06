@@ -1,123 +1,58 @@
-// apps/admin/src/components/ClientFrame.tsx
 "use client";
-
-import React from "react";
-import { usePathname } from "next/navigation";
+import React, { Suspense } from "react";
 import Link from "next/link";
-import AdminHeader, { AuthButtons } from "../components/Header";
+import { usePathname, useSearchParams } from "next/navigation";
+import AdminHeader, { AuthButtons } from "./Header";
 
-export default function ClientFrame({
-  user,
-  children,
-}: {
-  user: { name?: string; email?: string };
-  children: React.ReactNode;
-}) {
-  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+const links = [
+  { href: "/merchant", title: "Overview", detail: "Store performance" },
+  { href: "/merchant/storefronts", title: "Storefronts", detail: "Visibility & publishing" },
+  { href: "/merchant/products", title: "Products", detail: "Catalog and editing" },
+  { href: "/merchant/products/new", title: "Create product", detail: "Artwork & variants" },
+  { href: "/merchant/media", title: "Media library", detail: "Thumbnails & gallery" },
+  { href: "/merchant/categories", title: "Categories", detail: "Organize artwork" },
+  { href: "/merchant/inventory", title: "Inventory", detail: "Stock & locations" },
+  { href: "/merchant/orders", title: "Orders", detail: "Payments & fulfillment records" },
+  { href: "/merchant/customers", title: "Customers", detail: "Store purchase history" },
+  { href: "/merchant/staff", title: "Staff", detail: "Organization access" },
+];
+function MerchantNav({ pathname, close }: { pathname: string; close: () => void }) {
+  const params = useSearchParams();
+  const currentStore = params.get("store");
+  const query = currentStore ? `?store=${encodeURIComponent(currentStore)}` : "";
+  return <div className="space-y-1">{links.map(link => {
+    const selected = link.href === pathname || (link.href === "/merchant/storefronts" && pathname.startsWith("/merchant/storefronts/")) || (link.href === "/merchant/products" && pathname.startsWith("/merchant/products/") && !pathname.endsWith("/new"));
+    return <Link key={link.href} href={`${link.href}${query}`} onClick={close} aria-current={selected ? "page" : undefined}
+      className={`block rounded-xl px-3 py-2.5 text-sm font-semibold transition ${selected ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-amber-50 hover:text-zinc-900"}`}>
+      {link.title}<span className={`mt-0.5 block text-[11px] font-normal ${selected ? "text-zinc-300" : "text-zinc-400"}`}>{link.detail}</span>
+    </Link>;
+  })}</div>;
+}
+export default function ClientFrame({ user, children }: { user: { name?: string; email?: string }; children: React.ReactNode }) {
   const pathname = usePathname();
-
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const merchantMode = pathname === "/merchant" || pathname.startsWith("/merchant/");
   React.useEffect(() => setSidebarOpen(false), [pathname]);
-
-  return (
-    <div className="bg-[#0f0f1a] bg-dot-grid bg-[length:var(--tw-background-size-dot-grid)] min-h-screen bg-gradient-to-r from-amber-100 via-white to-slate-100 text-gray-900">
-      <AdminHeader
-        user={user}
-        brandHref="/admin"
-        breadcrumbs={[
-          { label: "Admin", href: "/admin" },
-          { label: "Dashboard" },
-        ]}
-        onToggleSidebar={() => setSidebarOpen((v) => !v)}
-        sidebarExpanded={sidebarOpen}
-        newLinkHref="/admin/private/uploader"
-        newLinkLabel="New"
-      />
-
-      <div className="mx-auto grid max-w-screen-2xl grid-cols-1 md:grid-cols-[240px_1fr]">
-     <aside
-  id="admin-sidebar"
-  className="border-r bg-white/60 dark:bg-zinc-950/60 dark:border-zinc-800 md:static"
-  data-open={sidebarOpen ? "true" : "false"}
->
-  {sidebarOpen && (
-    <button
-      className="fixed inset-0 z-40 block md:hidden bg-black/20 backdrop-blur-[1px]"
-      onClick={() => setSidebarOpen(false)}
-      aria-label="Close sidebar"
-    />
-  )}
-
-  <div
-    className={`z-50 md:z-auto ${
-      sidebarOpen
-        ? "fixed left-0 top-16 block h-[calc(100dvh-4rem)] w-64"
-        : "hidden"
-    } md:block`}
-  >
-    {/* Make the column fill height so we can pin the footer */}
-    <div className="flex h-full flex-col bg-white dark:bg-zinc-950">
-      {/* NAV (scrolls if needed) */}
-      <nav
-        className="flex-1 overflow-y-auto border-r dark:border-zinc-800 p-3 text-sm"
-        onClick={(e) => {
-          const el = e.target as HTMLElement;
-          if (window.innerWidth < 768 && el.closest("a")) setSidebarOpen(false);
-        }}
-      >
-        <ul className="space-y-1">
-          <li>
-            <Link className="block rounded-lg px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900" href="/admin">
-              Overview
-            </Link>
-          </li>
-          <li>
-            <Link className="block rounded-lg px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900" href="/admin/private/users">
-              Users
-            </Link>
-          </li>
-          <li>
-            <Link className="block rounded-lg px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900" href="/admin/private/categories">
-              Categories
-            </Link>
-          </li>
-          <li>
-            <Link className="block rounded-lg px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900" href="/admin/private/orders">
-              Orders
-            </Link>
-          </li>
-          <li>
-            <Link className="block rounded-lg px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900" href="/admin/private/products">
-              Products
-            </Link>
-          </li>
-          <li>
-            <Link className="block rounded-lg px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900" href="/admin/private/uploader">
-              New product
-            </Link>
-          </li>
-        </ul>
-      </nav>
-
-      {/* FOOTER ACTION (pinned to bottom) */}
-      <div className="border-t bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:bg-zinc-950/70 dark:border-zinc-800 md:hidden">
-        <div className="p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-          <AuthButtons
-            signedIn={!!user?.email}
-            callbackUrl="/admin"
-            className="inline-flex w-full justify-center"
-          />
-        </div>
-      </div>
+  const page = pathname === "/merchant/invitations/accept" ? "Accept invitation" : pathname.includes("/products/new") ? "Create product" : pathname.startsWith("/merchant/products/") ? "Edit product" : pathname === "/merchant/products" ? "Products" : pathname === "/merchant/categories" ? "Categories" : pathname === "/merchant/inventory" ? "Inventory" : pathname.startsWith("/merchant/orders") ? "Orders" : pathname.startsWith("/merchant/customers") ? "Customers" : pathname === "/merchant/staff" ? "Staff" : pathname === "/merchant/media" ? "Media library" : pathname === "/merchant/storefronts/settings" ? "Store settings" : pathname === "/merchant/storefronts" ? "Storefronts" : "Overview";
+  const home = merchantMode ? "/merchant" : "/admin";
+  return <div className="min-h-screen bg-gradient-to-br from-amber-50/60 via-zinc-50 to-slate-100 text-zinc-900">
+    <AdminHeader user={user} title={merchantMode ? page : "Platform administration"}
+      subtitle={merchantMode ? "Canonical commerce management" : undefined} brandHref={home}
+      breadcrumbs={merchantMode ? [{ label: "Merchant", href: "/merchant" }, { label: page }] : [{ label: "Admin", href: "/admin" }, { label: "Platform" }]}
+      onToggleSidebar={() => setSidebarOpen(open => !open)} sidebarExpanded={sidebarOpen}
+      newLinkHref={merchantMode ? "/merchant/products/new" : "/admin"} newLinkLabel={merchantMode ? "Add product" : "Overview"}
+      showSearch={false} showNotifications={!merchantMode} />
+    <div className="mx-auto flex w-full max-w-[1600px] gap-0 lg:gap-6 lg:px-5">
+      {sidebarOpen && <button aria-label="Close navigation" type="button" className="fixed inset-0 z-40 bg-zinc-950/40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+      <aside id="admin-sidebar" className={`${sidebarOpen ? "fixed inset-y-0 left-0 z-50 w-64 bg-white pt-20 shadow-2xl" : "hidden"} shrink-0 border-r border-zinc-200/80 lg:sticky lg:top-28 lg:mt-5 lg:block lg:h-[calc(100dvh-9rem)] lg:w-56 lg:rounded-2xl lg:border lg:bg-white/90 lg:pt-0 lg:shadow-sm`}>
+        <nav aria-label="Administration navigation" className="flex h-full flex-col p-4">
+          <div className="px-2 pb-3 text-[11px] font-bold uppercase tracking-[.2em] text-zinc-400">{merchantMode ? "Merchant workspace" : "Platform"}</div>
+          {merchantMode ? <Suspense fallback={<p className="text-xs text-zinc-500">Loading navigation…</p>}><MerchantNav pathname={pathname} close={() => setSidebarOpen(false)}/></Suspense> : <Link href="/admin" className="rounded-xl bg-zinc-100 p-3 text-sm font-semibold">Platform overview</Link>}
+          <div className="mt-auto border-t border-zinc-100 pt-4"><p className="mb-3 px-2 text-xs leading-5 text-zinc-500">{merchantMode ? "All merchant operations are scoped to authorized organizations and storefronts." : "Platform privileges are separate from merchant access."}</p><div className="lg:hidden"><AuthButtons signedIn={!!user.email} callbackUrl={home} className="flex w-full"/></div></div>
+        </nav>
+      </aside>
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:py-8">{children}</main>
     </div>
-  </div>
-</aside>
-
-        <main className="p-4 md:p-6">{children}</main>
-      </div>
-
-      <footer className="text-center text-sm py-6">
-        &copy; 2024 ZileDigital Market
-      </footer>
-    </div>
-  );
+    <footer className="mx-auto max-w-[1600px] px-5 pb-8 pt-4 text-center text-xs text-zinc-500">© {new Date().getFullYear()} ZileDigital · Commerce administration</footer>
+  </div>;
 }

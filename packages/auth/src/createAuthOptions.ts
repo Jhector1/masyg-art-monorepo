@@ -72,7 +72,7 @@ export function createAuthOptions(cfg: AuthFactoryConfig = {}): NextAuthOptions 
             id: String(user.id),
             email: user.email,
             name: user.name ?? user.email.split("@")[0],
-            image: user.avatarUrl ?? user.image ?? null,
+            image: user.image ?? null,
             avatarTs: user.updatedAt ? Date.parse(String(user.updatedAt)) : undefined,
           } as any;
         },
@@ -96,22 +96,22 @@ export function createAuthOptions(cfg: AuthFactoryConfig = {}): NextAuthOptions 
             select: {
               id: true,
               email: true,
-              password: true,
+              passwordHash: true,
               name: true,
-              avatarUrl: true,
+              image: true,
               updatedAt: true,
             },
           });
 
-          if (!user) return null;
-          const ok = await compare(creds.password, user.password);
+          if (!user?.passwordHash) return null;
+          const ok = await compare(creds.password, user.passwordHash);
           if (!ok) return null;
 
           return {
             id: String(user.id),
             email: user.email,
             name: user.name ?? user.email.split("@")[0],
-            image: user.avatarUrl ?? null,
+            image: user.image ?? null,
             avatarTs: user.updatedAt ? Date.parse(String(user.updatedAt)) : undefined,
           } as any;
         },
@@ -187,35 +187,25 @@ export function createAuthOptions(cfg: AuthFactoryConfig = {}): NextAuthOptions 
             email: email.trim().toLowerCase(),
             name,
             image: oauthPic,
-            isAdminFromIdp: false,
           });
 
           token.userId = String(dbUser.id);
           token.isAdmin = false;
 
-          // ✅ avatar precedence: DB avatarUrl > oauthPic > existing token.picture
-          const dbAvatar = nonEmpty((dbUser as any).avatarUrl ?? null);
-          token.picture = dbAvatar ?? oauthPic ?? (token as any).picture ?? null;
+          // Identity owns one canonical image field. Never override a user-selected image.
+          token.picture = nonEmpty(dbUser.image) ?? oauthPic ?? (token as any).picture ?? null;
 
           // ✅ optional: cache bust
           (token as any).avatarTs = (dbUser as any).updatedAt
             ? Date.parse(String((dbUser as any).updatedAt))
             : (token as any).avatarTs;
 
-          // ✅ optional: seed DB avatarUrl once (only if empty and oauthPic exists)
-          if (!dbAvatar && oauthPic) {
-            await prisma.user.update({
-              where: { id: dbUser.id },
-              data: { avatarUrl: oauthPic },
-            });
-          }
-
           // ✅ claim guest data once (server-only helper should read cookies())
           if (enableGuestClaim) {
             const guestId = await getGuestId();
             if (guestId && !(token as any).guestClaimed) {
               await claimGuestData({ guestId, userId: String(dbUser.id) });
-              await await clearGuestId();
+              await clearGuestId();
               (token as any).guestClaimed = true;
             }
           }

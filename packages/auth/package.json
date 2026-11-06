@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./cookies": "./src/cookies.ts"
+    "./cookies": "./src/cookies.ts",
+    "./guestIdentity": "./src/lib/guestIdentity.ts"
   },
   "dependencies": {
     "@acme/db": "*",

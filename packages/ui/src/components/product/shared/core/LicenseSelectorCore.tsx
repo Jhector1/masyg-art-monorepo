@@ -16,11 +16,15 @@ export default function LicenseSelectorCore({
   licenses,
   onSelect,
   disabled,
+  showFullPrice = false,
+  currency = "USD",
 }: {
   selected: LicenseOption;
   licenses: LicenseOption[];
   onSelect: (license: LicenseOption) => void;
   disabled?: boolean;
+  showFullPrice?: boolean;
+  currency?: string;
 }) {
   return (
     <section className="space-y-3">
@@ -67,7 +71,7 @@ export default function LicenseSelectorCore({
                       {license.name}
                     </h4>
                     <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-                      {license.type === "personal" ? "FREE" : `$${license.price}`}
+                      {showFullPrice ? new Intl.NumberFormat("en-US",{style:"currency",currency}).format(license.price) : license.type === "personal" ? "FREE" : `$${license.price}`}
                     </span>
                   </div>
                   <p className="text-sm text-gray-500 mt-1">{license.description}</p>

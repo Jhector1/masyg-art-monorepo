@@ -13,6 +13,8 @@ export default function PrintCustomizerCore({
   onFrame,
   total,
   disabled,
+  glazingOptions = [], glazing = "None", onGlazing,
+  showGlazingSelector = false, showFrameSelector = true, allowUnframed = true,
 }: {
   imageSrc: string;
   materials: MaterialOption[];
@@ -23,6 +25,12 @@ export default function PrintCustomizerCore({
   onFrame: (f: FrameOption | null) => void;
   total: number;
   disabled?: boolean;
+  glazingOptions?: string[];
+  glazing?: string;
+  onGlazing?: (name:string)=>void;
+  showGlazingSelector?: boolean;
+  showFrameSelector?: boolean;
+  allowUnframed?: boolean;
 }) {
   // const [parsedFrameWidth, parsedFrameColor] = useMemo(() => {
   //   if (!frame?.border) return [0, "#000"];
@@ -35,7 +43,7 @@ export default function PrintCustomizerCore({
   return (
     <div className="p-4 sm:p-6 bg-white rounded-xl ring-1 ring-black/10 space-y-6">
       {/* Material Selector */}
-      <div>
+      {materials.length>0&&<div>
         <h3 className="font-semibold mb-2">Material:</h3>
         <div className="flex flex-wrap gap-4">
           {materials.map((m) => (
@@ -55,15 +63,15 @@ export default function PrintCustomizerCore({
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Frame Selector */}
-      <div>
+      {showFrameSelector&&<div>
         <h3 className="font-semibold mb-2">Frame:</h3>
         <div className="flex flex-wrap gap-3 items-center">
           <button
             onClick={() => onFrame(null)}
-            disabled={disabled}
+            disabled={disabled || !allowUnframed}
             className={`px-3 py-1 rounded ${frame === null ? "bg-purple-600 text-white" : "bg-gray-100"} ${
               disabled ? "opacity-50 cursor-not-allowed" : ""
             }`}
@@ -88,15 +96,29 @@ export default function PrintCustomizerCore({
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
-      {/* Preview (super simple) */}
+      {showGlazingSelector&&<div>
+        <h3 className="mb-2 font-semibold">Protective glazing:</h3>
+        <div className="flex flex-wrap gap-2">
+          {glazingOptions.map(choice=><button key={choice} type="button" disabled={disabled}
+            onClick={()=>onGlazing?.(choice)} aria-pressed={choice.toLowerCase()===glazing.toLowerCase()}
+            className={`rounded-lg border px-3 py-2 text-sm ${choice.toLowerCase()===glazing.toLowerCase()?"border-purple-600 bg-purple-600 text-white":"border-gray-300 bg-white hover:border-purple-400"}`}>{choice}</button>)}
+          {!glazingOptions.length&&<p className="text-xs text-gray-600">No glazing combinations are offered for this edition.</p>}
+        </div>
+      </div>}
+
+      {/* Preview (layered approximation, never payment authority) */}
       <div>
         <h3 className="font-semibold mb-2">Preview:</h3>
         <div className="relative w-full max-w-3xl aspect-[4/3] mx-auto grid place-items-center bg-gray-50 rounded-lg">
-          <img src={imageSrc} alt="Artwork" className="max-h-[70%] rounded shadow" />
+          <div className="relative max-w-[85%] max-h-[85%]" style={{padding:frame?"12px":"0",backgroundColor:frame?.label.toLowerCase().includes("white")?"#f6f5f1":frame?.label.toLowerCase().includes("oak")?"#b48d5e":frame?.label.toLowerCase().includes("walnut")?"#5b3828":frame?"#202124":"transparent",boxShadow:frame?"0 10px 22px rgba(0,0,0,.24)":"none"}}>
+            {imageSrc?<img src={imageSrc} alt="Artwork with approximate framing and glazing" className="block max-h-[260px] max-w-full object-contain bg-white"/>:<div className="grid h-48 w-56 place-items-center bg-gray-100 text-xs text-gray-600">Upload a public artwork preview</div>}
+            {glazing.toLowerCase()!=="none"&&<div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{background:glazing.toLowerCase().includes("non-glare")?"linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.03))":"linear-gradient(120deg,rgba(255,255,255,.3),rgba(255,255,255,0) 37%,rgba(255,255,255,.12) 70%,rgba(255,255,255,0))"}}/>}
+          </div>
         </div>
       </div>
+      <p className="text-xs text-gray-500">Visual simulation only—actual frame and glazing appearance may vary.</p>
 
       {/* Price */}
       {/* <div className="flex justify-between items-center">

@@ -10,11 +10,13 @@ type Dir = 1 | -1;
 interface ImageSliderProps {
   images?: string[];
   autoPlayMs?: number;
+  unoptimized?: boolean;
 }
 
 export default function ImageSlider({
   images = [],
   autoPlayMs = 4500,
+  unoptimized = false,
 }: ImageSliderProps) {
   const [index, setIndex] = useState(0);
   const [autoDir, setAutoDir] = useState<Dir>(1);
@@ -245,6 +247,7 @@ export default function ImageSlider({
             <div className="relative h-full w-1/3">
               <NextImage
                 src={images[prevIndex]}
+                unoptimized={unoptimized}
                 alt={`Slide ${prevIndex + 1}`}
                 fill
                 sizes={sizes}
@@ -259,6 +262,7 @@ export default function ImageSlider({
                 <NextImage
                   key={images[index]}
                   src={images[index]}
+                unoptimized={unoptimized}
                   alt={`Slide ${index + 1}`}
                   fill
                   sizes={sizes}
@@ -273,6 +277,7 @@ export default function ImageSlider({
             <div className="relative h-full w-1/3">
               <NextImage
                 src={images[nextIndex]}
+                unoptimized={unoptimized}
                 alt={`Slide ${nextIndex + 1}`}
                 fill
                 sizes={sizes}
@@ -309,6 +314,7 @@ export default function ImageSlider({
       {zoomOpen && (
         <ZoomCarouselModal
           images={images}
+          unoptimized={unoptimized}
           startIndex={zoomStartIndex}
           isOpen={zoomOpen}
           onClose={() => setZoomOpen(false)}

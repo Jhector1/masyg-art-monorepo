@@ -15,10 +15,6 @@ function isPath(req: NextRequest, prefix: string) {
   return req.nextUrl.pathname === prefix || req.nextUrl.pathname.startsWith(prefix + "/");
 }
 
-function hasGuest(req: NextRequest) {
-  return Boolean(req.cookies.get("guest_id")?.value);
-}
-
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
@@ -40,22 +36,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ---- API: private (some allow guest) ----
+  // Reserved private routes must always require a signed-in buyer.
+  // Guest cookies never authorize checkout settlement or digital downloads.
   if (isPath(req, "/api/private")) {
-    // Guest-allowed endpoints
-    const guestAllowed =
-      isPath(req, "/api/private/cart") ||
-      isPath(req, "/api/private/checkout") ||
-      isPath(req, "/api/private/designs") ||
-      isPath(req, "/api/private/downloads"); // only if downloads are allowed for guest
-
-    if (guestAllowed) {
-      const token = await getCustomerToken(req);
-      if (token || hasGuest(req)) return NextResponse.next();
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Everything else under /api/private requires login
     const token = await getCustomerToken(req);
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     return NextResponse.next();

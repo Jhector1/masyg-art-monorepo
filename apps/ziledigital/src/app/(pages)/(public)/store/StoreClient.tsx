@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 import SEO from "@acme/ui/components/SEO";
-import Gallery from "@acme/ui/components/store/Gallery";
-import { ProductListItem } from "@acme/core/types";
-import { fetchProducts } from "@acme/core/utils/fetchProducts";
+import OriginalPublishedGallery from "@acme/ui/components/storefront/OriginalPublishedGallery";
 import { KINDS } from "@acme/core/data/categories";
 
 type KindFilter = "ALL" | (typeof KINDS)[number];
@@ -22,16 +20,11 @@ function normalizeKindParam(value: string | null): KindFilter {
 }
 
 export default function StoreClient() {
-  const [products, setProducts] = useState<ProductListItem[]>([]);
   const [kindFilter, setKindFilter] = useState<KindFilter>("ALL");
 
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-
-  useEffect(() => {
-    fetchProducts().then(setProducts).catch(console.error);
-  }, []);
 
   const kindParam = searchParams.get("kind");
   useEffect(() => {
@@ -49,10 +42,6 @@ export default function StoreClient() {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
-  const filtered = useMemo(() => {
-    if (kindFilter === "ALL") return products;
-    return products.filter((p) => p.kind === kindFilter);
-  }, [products, kindFilter]);
   return (
     <>
       <SEO title="Haitian Digital Art Gallery" description="Buy and explore uniquely crafted Haitian vector artworks." />
@@ -71,7 +60,7 @@ export default function StoreClient() {
         ))}
       </div>
 
-      <Gallery products={filtered} />
+      <OriginalPublishedGallery kind={kindFilter} />
     </>
   );
 }

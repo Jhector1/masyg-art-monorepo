@@ -96,7 +96,6 @@ export default function AuthenticationForm({
             name: fullName,
             email,
             password,
-            acceptPolicy,
           }),
         });
         if (!res.ok) {

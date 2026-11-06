@@ -36,6 +36,20 @@ export async function middleware(req: NextRequest) {
   }
   if (path.startsWith("/api/auth")) return NextResponse.next();
 
+  // Public merchant registration and email-verification endpoints are the
+  // ONLY unauthenticated merchant endpoints. They enforce same-origin JSON,
+  // payload limits and provider/email challenge checks inside their handlers.
+  if (path === "/merchant/register" && ["GET", "HEAD"].includes(req.method)) return NextResponse.next();
+  if (["/", "/merchant/signin"].includes(path) && ["GET", "HEAD"].includes(req.method)) return NextResponse.next();
+  if (path === "/api/merchant/auth/register" || path === "/api/merchant/auth/verify" ||
+      path === "/api/merchant/auth/resend") return NextResponse.next();
+
+  // Invite links carry a one-use token in the URL fragment (never sent to the server).
+  // Keep this GET page public so NextAuth redirects cannot discard that fragment;
+  // accepting the invitation still requires a signed-in user and same-origin POST.
+  if (path === "/merchant/invitations/accept" && (req.method === "GET" || req.method === "HEAD"))
+    return NextResponse.next();
+
   // MFA routes do not require an MFA cookie. A live emergency session does
   // not use the database-backed MFA path at all, so redirect it out of the
   // verification page and reject it immediately when emergency mode is off.
@@ -75,9 +89,42 @@ export async function middleware(req: NextRequest) {
   // Gate EVERYTHING else in this app.
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, cookieName: getAdminSessionCookieName() });
   if (!token) {
-    const signInUrl = new URL("/api/auth/signin", url.origin);
-    signInUrl.searchParams.set("callbackUrl", url.href);
+    const isMerchant = path === "/merchant" || path.startsWith("/merchant/") ||
+      path === "/api/merchant" || path.startsWith("/api/merchant/");
+    const signInUrl = new URL(isMerchant ? "/merchant/signin" : "/api/auth/signin", url.origin);
+    signInUrl.searchParams.set("callbackUrl", isMerchant && path.startsWith("/api/") ? "/merchant" : url.href);
     return NextResponse.redirect(signInUrl);
+  }
+
+  // Merchant area uses signed identity plus DB membership, never global admin grants.
+  // Platform /admin and other /api/admin paths retain their existing MFA gate.
+  if (path === "/merchant" || path.startsWith("/merchant/") ||
+      path === "/api/merchant" || path.startsWith("/api/merchant/")) {
+    if (token.isEmergencyAdmin === true) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+    if (path.startsWith("/api/merchant/") && !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+      // Authenticated JWT cookies alone do not establish same-origin write intent.
+      const origin = req.headers.get("origin");
+      const expectedOrigin = process.env.NEXTAUTH_URL
+        ? new URL(process.env.NEXTAUTH_URL).origin
+        : req.nextUrl.origin;
+      if (!origin || origin !== expectedOrigin) {
+        return NextResponse.json({ error: "Forbidden origin" }, { status: 403 });
+      }
+      const contentType = req.headers.get("content-type")?.toLowerCase() ?? "";
+      // Images and private downloads are submitted as FormData by the existing
+      // authenticated merchant-media handler. Keep the JSON-only policy for
+      // every other merchant mutation; this is NOT an authentication bypass.
+      const multipartMediaUpload = req.method === "POST" &&
+        /^\/api\/merchant\/organizations\/[^/]+\/products\/[^/]+\/media$/.test(path) &&
+        contentType.startsWith("multipart/form-data;") &&
+        /(?:^|;)\s*boundary=(?:"[^"]+"|[^\s;"]+)\s*(?:;|$)/.test(contentType);
+      if (!contentType.startsWith("application/json") && !multipartMediaUpload) {
+        return NextResponse.json({ error: "JSON required" }, { status: 415 });
+      }
+    }
+    return NextResponse.next();
   }
 
   if (token.isAdmin !== true) {

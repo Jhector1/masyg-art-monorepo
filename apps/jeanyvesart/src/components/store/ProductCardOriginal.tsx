@@ -121,7 +121,7 @@ export default function ProductCardOriginal({
         {dims(v) && (
           <div className="mt-1 text-[12px] text-neutral-500">{dims(v)}</div>
         )}
-        <div className="mt-2 text-[14px] text-neutral-900">{money(price)}</div>
+        <div className="mt-2 text-[14px] text-neutral-900">{money(price, p.currency)}</div>
       </div>
     </article>
   );

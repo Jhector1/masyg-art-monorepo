@@ -1,0 +1,454 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ZileDigital Commerce Public Catalog API",
+    "version": "1.0.0-alpha.1",
+    "description": "Experimental, anonymously readable, tenant-scoped REST/JSON contract. No buyer, merchant, cart, checkout, payments, or download endpoints are enabled on this API origin."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3010",
+      "description": "Local development only. A production API hostname has not been provisioned."
+    }
+  ],
+  "tags": [
+    {
+      "name": "Published catalog",
+      "description": "Public reads. No cookie or bearer credentials; GET only."
+    }
+  ],
+  "paths": {
+    "/v1/stores/{storeId}/products": {
+      "get": {
+        "operationId": "listPublishedProducts",
+        "tags": [
+          "Published catalog"
+        ],
+        "summary": "List published store listings",
+        "security": [],
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published product data only; never includes private file identifiers or secret storage keys",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid pagination or search",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Store not published, listing not published, or not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/stores/{storeId}/products/{slug}": {
+      "get": {
+        "operationId": "getPublishedProduct",
+        "tags": [
+          "Published catalog"
+        ],
+        "summary": "Read a published product listing",
+        "security": [],
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published product data only; never includes private file identifiers or secret storage keys",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid pagination or search",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Store not published, listing not published, or not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/stores/{storeId}/media/{assetId}": {
+      "get": {
+        "operationId": "getPublishedProductImage",
+        "tags": [
+          "Published catalog"
+        ],
+        "summary": "Redirect to a public image only when its store, listing and product are published",
+        "security": [],
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the public Cloudinary preview; the stored original has been downscaled and watermarked before upload",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Store, listing or asset is not publicly visible"
+          },
+          "503": {
+            "description": "Media storage unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Store": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "slug",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PublicMedia": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "assetId",
+          "mimeType"
+        ],
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "description": "Opaque public preview identifier; not a download URL"
+          },
+          "mimeType": {
+            "type": "string"
+          }
+        }
+      },
+      "Variant": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "attributes",
+          "fulfillment",
+          "priceMinor",
+          "currency",
+          "available"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "attributes": {},
+          "fulfillment": {
+            "type": "string",
+            "enum": [
+              "PHYSICAL",
+              "DIGITAL"
+            ]
+          },
+          "priceMinor": {
+            "type": "integer",
+            "description": "Merchant-configured price in currency minor units; never accept client-side prices for checkout"
+          },
+          "compareAtMinor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Display-only regular price in minor units when this variant is on sale; priceMinor is charged."
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "description",
+          "publicMedia",
+          "variants"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publicMedia": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicMedia"
+            }
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Variant"
+            }
+          }
+        }
+      },
+      "Listing": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slug",
+          "product"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          }
+        }
+      },
+      "CatalogList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "store",
+          "page",
+          "products"
+        ],
+        "properties": {
+          "store": {
+            "$ref": "#/components/schemas/Store"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Listing"
+            }
+          }
+        }
+      },
+      "CatalogDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "store",
+          "slug",
+          "product"
+        ],
+        "properties": {
+          "store": {
+            "$ref": "#/components/schemas/Store"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "x-platform-restrictions": {
+    "cors": "Wildcard only for anonymous public catalog GET; never credentialed or private endpoints",
+    "source-of-truth": "@acme/core/lib/public-catalog via @acme/server",
+    "future": "Do not enable checkout/order or digital-download routes without independent identity, origin and tenant-bound authorization design"
+  }
+}

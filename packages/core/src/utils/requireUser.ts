@@ -1,8 +1,8 @@
-import { PrismaClient, User } from "@prisma/client";
+import {User} from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../lib/auth"; // your NextAuth config
 
-const db = new PrismaClient();
+import { prisma as db } from "@acme/db";
 
 export async function requireUser(): Promise<User> {
   const session = await getServerSession(authOptions);

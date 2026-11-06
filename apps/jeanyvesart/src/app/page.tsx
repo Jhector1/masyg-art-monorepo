@@ -1,19 +1,11 @@
 // File: src/app/page.tsx
 import Link from "next/link";
-// import { serverFetchJSON } from "./lib/server/api";
-import ProductCardOriginal from "@/components/store/ProductCardOriginal";
-import type { Product } from "@/lib/products";
-import { serverFetchJSON } from "../lib/server/api";
+import OriginalCatalogGrid from "@/components/store/OriginalCatalogGrid";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function HomePage() {
-  const products = await serverFetchJSON<Product[]>(
-    "/api/products?type=ORIGINAL"
-  ).catch(() => []);
-  const featured = products.slice(0, 8);
-
+export default function HomePage() {
   return (
     <main className="min-h-screen bg-white text-neutral-900">
       {/* HERO */}
@@ -56,21 +48,7 @@ export default async function HomePage() {
           </Link>
         </div>
 
-        {featured.length === 0 ? (
-          <div className="py-16 text-center text-neutral-400">
-            No works available right now.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12">
-            {featured.map((p) => (
-              <ProductCardOriginal
-                key={p.id}
-                product={p}
-                href={`/store/${p.id}`}
-              />
-            ))}
-          </div>
-        )}
+        <OriginalCatalogGrid limit={8} />
       </section>
     </main>
   );

@@ -18,10 +18,8 @@ type Address = {
   createdAt: string;
 };
 
-const SITE = "JEANYVES";
-
 function noStoreHeaders() {
-  return { "x-storefront": SITE, "Cache-Control": "no-store" };
+  return { "Cache-Control": "no-store" };
 }
 
 export default function ProfilePage() {
@@ -37,6 +35,7 @@ export default function ProfilePage() {
     email: "",
     currentPassword: "",
     newPassword: "",
+    confirmPassword: "",
   });
 
   // Addresses
@@ -95,36 +94,41 @@ export default function ProfilePage() {
     setSaveBusy(true);
     setSaveError(null);
     setSaveOk(null);
-
     try {
-      const payload: any = {
-        name: form.name?.trim(),
-        email: form.email?.trim(),
-      };
-
-      // only send password fields if user typed them
-      if (form.currentPassword || form.newPassword) {
-        payload.password = form.currentPassword; // your backend expects password to authorize changes
-        payload.newPassword = form.newPassword;  // if your route supports it
-      }
-
-      // NOTE: your existing route appears to be /auth/profile (not /api/auth/profile)
-      const res = await fetch("/auth/profile", {
-        method: "PATCH", // if your route uses POST, change to "POST"
-        headers: { "Content-Type": "application/json", ...noStoreHeaders() },
-        body: JSON.stringify(payload),
+      const res = await fetch("/api/auth/profile", {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name: form.name.trim(), password: form.currentPassword}),
       });
-
       const out = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(out?.error || out?.message || "Failed to update profile");
-
-      setSaveOk("Profile updated.");
-      setForm((s) => ({ ...s, currentPassword: "", newPassword: "" }));
-
-      // refresh any server components / navbar user menu etc.
+      if (!res.ok) throw new Error(out?.error || "Unable to save profile");
+      setSaveOk("Name updated.");
+      setForm((s) => ({...s, currentPassword: ""}));
       router.refresh();
-    } catch (e: any) {
-      setSaveError(e?.message ?? "Failed to update profile");
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Unable to save profile");
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
+  async function changePassword() {
+    setSaveBusy(true);
+    setSaveError(null);
+    setSaveOk(null);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({oldPassword: form.currentPassword,
+          newPassword: form.newPassword, confirmPassword: form.confirmPassword}),
+      });
+      const out = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(out?.error || "Unable to change password");
+      setSaveOk("Password changed.");
+      setForm((s) => ({...s, currentPassword: "", newPassword: "", confirmPassword: ""}));
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Unable to change password");
     } finally {
       setSaveBusy(false);
     }
@@ -269,9 +273,10 @@ export default function ProfilePage() {
               <span className="text-xs text-neutral-600">Email</span>
               <input
                 value={form.email}
-                onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
+                readOnly
                 className="rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
               />
+              <span className="text-xs text-neutral-500">Email changes require verified confirmation.</span>
             </label>
 
             <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
@@ -291,8 +296,21 @@ export default function ProfilePage() {
                   placeholder="New password"
                   className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-400"
                 />
+                <input
+                  type="password"
+                  value={form.confirmPassword}
+                  onChange={(e) => setForm((s) => ({ ...s, confirmPassword: e.target.value }))}
+                  placeholder="Confirm new password"
+                  className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-400"
+                />
+                <button
+                  type="button"
+                  onClick={changePassword}
+                  disabled={saveBusy || !form.currentPassword || !form.newPassword || !form.confirmPassword}
+                  className="rounded-xl border border-neutral-900 px-3 py-2 text-sm font-medium text-neutral-800 disabled:opacity-50"
+                >Change password</button>
                 <p className="text-[11px] text-neutral-500">
-                  If your backend only requires password when changing email/name, keep these empty unless needed.
+                  Use your current password to save your name or to change your password (12+ characters).
                 </p>
               </div>
             </div>
@@ -302,7 +320,7 @@ export default function ProfilePage() {
               disabled={saveBusy}
               className="mt-2 rounded-xl border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
             >
-              {saveBusy ? "Saving…" : "Save changes"}
+              {saveBusy ? "Saving…" : "Save name"}
             </button>
           </div>
         </div>

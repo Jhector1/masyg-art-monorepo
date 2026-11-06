@@ -1,77 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@acme/core/lib/prisma";
+import { requireSameOriginJson } from "@acme/server/lib/public-request-guard";
+import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { sendMail } from "@acme/core/lib/email"; // ✅ import your email util
 
-const prisma = new PrismaClient();
-
-export async function POST(request: NextRequest) {
+export const runtime = "nodejs";
+const schema = z.object({
+  email:z.string().trim().email().max(254).transform(v=>v.toLowerCase()),
+  name:z.string().trim().min(1).max(120).optional(),
+  password:z.string().min(12).max(128),
+}).strict();
+/** Default closed. Enable only with provider-backed rate limits + email verification in place. */
+export async function POST(req: NextRequest) {
+  if (process.env.ZILEDIGITAL_PUBLIC_SIGNUP_ENABLED !== "true") {
+    return NextResponse.json({error:"Registration is not enabled"},{status:503});
+  }
   try {
-    const { email, password, name } = await request.json();
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 }
-      );
-    }
-
-    const normalizedEmail = String(email).trim().toLowerCase();
-    if (password.length < 8 || password.length > 128) {
-      return NextResponse.json(
-        { error: "Password must be between 8 and 128 characters." },
-        { status: 400 },
-      );
-    }
-
-    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-    if (existing) {
-      return NextResponse.json({ error: "User already exists" }, { status: 409 });
-    }
-
-    const hashed = await bcrypt.hash(password, 10);
+    requireSameOriginJson(req);
+    const raw = await req.text();
+    if (raw.length > 4096) return NextResponse.json({error:"Invalid signup payload"},{status:400});
+    const input=schema.safeParse(JSON.parse(raw));
+    if (!input.success) return NextResponse.json({error:"Invalid signup payload"},{status:400});
+    const passwordHash = await bcrypt.hash(input.data.password,12);
     const user = await prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        password: hashed,
-        name: name || `User_${Date.now()}`,
-      },
+      data:{email:input.data.email,name:input.data.name ?? null,passwordHash},
+      select:{id:true,email:true,name:true},
     });
-
-    // ✅ Send welcome email (non-blocking if fails)
-    try {
-      await sendMail({
-        to: user.email,
-        subject: "Welcome to ZileDigital ✨",
-        html: `
-          <h2>Welcome${user.name ? `, ${user.name}` : ""}!</h2>
-          <p>Thanks for joining our Haitian-inspired digital art community.</p>
-          <p>You can now log in and explore artworks, customize digital pieces, and more.</p>
-          <p>
-            <a href="${
-              process.env.NEXT_PUBLIC_APP_URL || "https://ziledigital.com"
-            }/profile"
-               style="display:inline-block;padding:10px 16px;background:#4f46e5;
-                      color:#fff;border-radius:8px;text-decoration:none;">
-              Go to your profile
-            </a>
-          </p>
-        `,
-        text: `Welcome to ZileDigital${
-          user.name ? `, ${user.name}` : ""
-        }! Thanks for joining. Log in at ${
-          process.env.NEXTAUTH_URL || "https://ziledigital.com"
-        }/profile`,
-      });
-    } catch (err) {
-      console.error("Welcome email failed:", err);
+    return NextResponse.json({user},{status:201,headers:{"Cache-Control":"no-store"}});
+  } catch(error) {
+    if (error instanceof SyntaxError) return NextResponse.json({error:"Invalid JSON"},{status:400});
+    if (error instanceof Error && error.name === "CartSafetyError") return NextResponse.json({error:"Invalid request origin or type"},{status:400});
+    if (typeof error === "object" && error && "code" in error && error.code === "P2002") {
+      return NextResponse.json({error:"Account already exists"},{status:409});
     }
-
-    return NextResponse.json(
-      { user: { id: user.id, email: user.email, name: user.name } },
-      { status: 201 }
-    );
-  } catch (err) {
-    console.error("Signup Error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("Signup failed",error);
+    return NextResponse.json({error:"Unable to register"},{status:500});
   }
 }

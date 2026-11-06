@@ -3,10 +3,13 @@
 
 import Image from "next/image";
 // import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import type { CollectionItem, VariantType } from "@acme/core/types";
-import { safeFilename, useDownloader } from "@acme/core/lib/client/downloads";
+import {
+  getCurrentStorefront, listStoreDigitalPurchases, downloadStoreGrant,
+  saveStoreGrantDownload,
+  type BuyerDigitalGrantFile,
+} from "@acme/core/lib/client/storefront-commerce";
 
 
 
@@ -18,28 +21,38 @@ interface CollectionGalleryProps {
 
 const TABS: VariantType[] = ["ALL", "DIGITAL", "PRINT"];
 
-function prettyBytes(n?: number | null) {
-  if (!n || n <= 0) return "";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.min(
-    Math.floor(Math.log(n) / Math.log(1024)),
-    units.length - 1
-  );
-  const v = n / Math.pow(1024, i);
-  return `${v.toFixed(v >= 10 ? 0 : 1)} ${units[i]}`;
-}
-
-function resString(w?: number | null, h?: number | null, dpi?: number | null) {
-  if (!w || !h) return "";
-  return `${w}×${h}${dpi ? ` @ ${dpi}dpi` : ""}`;
-}
-
 export default function CollectionGallery({
   items,
   filter,
   setFilter,
 }: CollectionGalleryProps) {
-  const router = useRouter();
+  // Get usable grant IDs from the authenticated, store-scoped entitlement API.
+  // Never trust `item.digital.tokens[].url` from the legacy collection payload.
+  const [storeId, setStoreId] = useState<string | null>(null);
+  const [grantsByItem, setGrantsByItem] = useState<Record<string, BuyerDigitalGrantFile[]>>({});
+  useEffect(() => {
+    let active = true;
+    async function loadGrants() {
+      try {
+        const current = await getCurrentStorefront();
+        const entitlements = await listStoreDigitalPurchases(current.store.id);
+        if (!active) return;
+        const perItem: Record<string, BuyerDigitalGrantFile[]> = {};
+        for (const order of entitlements.orders ?? []) {
+          for (const item of order.items ?? []) {
+            perItem[item.orderItemId] = item.files ?? [];
+          }
+        }
+        setStoreId(current.store.id);
+        setGrantsByItem(perItem);
+      } catch {
+        // Fail closed: no grants shown if the buyer/store cannot be verified.
+        if (active) { setStoreId(null); setGrantsByItem({}); }
+      }
+    }
+    void loadGrants();
+    return () => { active = false; };
+  }, []);
   const filtered = useMemo(
     () => items.filter((it) => (filter === "ALL" ? true : it.type === filter)),
     [items, filter]
@@ -98,18 +111,10 @@ export default function CollectionGallery({
                   item.product.thumbnails?.[0] ||
                   "/images/placeholder.png";
 
+                const verifiedFiles = grantsByItem[item.id] ?? [];
                 const topMeta =
-                  item.type === "DIGITAL" && item.digital?.tokens?.length
-                    ? (() => {
-                        const a = item.digital!.tokens[0];
-                        return [
-                          a.ext?.toUpperCase(),
-                          resString(a.width, a.height, a.dpi),
-                          prettyBytes(a.sizeBytes),
-                        ]
-                          .filter(Boolean)
-                          .join(" • ");
-                      })()
+                  item.type === "DIGITAL" && verifiedFiles.length
+                    ? verifiedFiles[0].label
                     : item.type === "PRINT"
                     ? [
                         item.print?.size,
@@ -159,7 +164,7 @@ export default function CollectionGallery({
                       <div className="flex items-center justify-between pt-2">
                         <div className="text-sm text-gray-700">
                           <span className="font-semibold">
-                            ${item.price.toFixed(2)}
+                            {new Intl.NumberFormat("en-US",{style:"currency",currency:item.currency||"USD"}).format(item.price)}
                           </span>
                           {item.quantity > 1 && (
                             <span className="text-gray-500">
@@ -172,8 +177,8 @@ export default function CollectionGallery({
                         <div className="flex items-center gap-2">
                           {item.type === "DIGITAL" ? (
                             <DownloadMenu
-                              tokens={item.digital?.tokens || []}
-                              title={item.product.title}
+                              files={verifiedFiles}
+                              storeId={storeId}
                               itemId={item.id}
                             />
                           ) : (
@@ -225,37 +230,18 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-// type CollectionDigitalAsset = {
-//   tokenId: string;
-//   url: string;
-//   ext: string | null;
-//   width?: number | null;
-//   height?: number | null;
-//   dpi?: number | null;
-//   sizeBytes?: number | null;
-// };
-
 function DownloadMenu({
-  tokens,
-  title,
-  itemId,
+  files, storeId, itemId,
 }: {
-  tokens: Array<{
-    tokenId: string;
-    url: string;
-    ext: string | null;
-    width?: number | null;
-    height?: number | null;
-    dpi?: number | null;
-    sizeBytes?: number | null;
-  }>;
-  title: string;
+  files: BuyerDigitalGrantFile[];
+  storeId: string | null;
   itemId: string;
 }) {
   const [open, setOpen] = useState(false);
-  const { downloadingId, pct, download, isDownloading } = useDownloader();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!tokens.length)
+  if (!storeId || files.length === 0)
     return (
       <span
         className="text-xs px-3 py-1.5 rounded-full bg-gray-100 text-gray-400"
@@ -265,8 +251,7 @@ function DownloadMenu({
       </span>
     );
 
-  const anyBusy = isDownloading();
-
+  const anyBusy = downloadingId !== null;
   return (
     <div className="relative z-20" onClick={(e) => e.stopPropagation()}>
       <button
@@ -286,62 +271,50 @@ function DownloadMenu({
       {open && (
         <div
           className="absolute right-0 mt-2 w-64 rounded-xl bg-white shadow-lg ring-1 ring-black/5 z-30 overflow-hidden"
-          // keep open while downloading so spinner remains visible
-          onMouseLeave={() => {
-            if (!anyBusy) setOpen(false);
-          }}
+          onMouseLeave={() => { if (!anyBusy) setOpen(false); }}
         >
           <ul className="divide-y divide-gray-100">
-            {tokens.map((a) => {
-              const labelParts = [
-                a.ext?.toUpperCase(),
-                resString(a.width, a.height, a.dpi),
-                prettyBytes(a.sizeBytes),
-              ]
-                .filter(Boolean)
-                .join(" • ");
-
-              const id = `${itemId}:${a.tokenId}`;
+            {files.map((file) => {
+              const id = `${itemId}:${file.grantId}`;
               const busy = downloadingId === id;
-              const percent = pct(id);
-
               return (
-                <li key={a.tokenId} className="p-2">
+                <li key={file.grantId} className="p-2">
                   <button
                     type="button"
                     className={`w-full text-left flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-gray-50 ${
                       busy ? "cursor-wait" : ""
                     }`}
-                    disabled={busy}
+                    disabled={anyBusy}
                     onClick={async () => {
-                      // keep menu open during download
-                      const ext = (a.ext || "file").toLowerCase();
-                      await download(id, a.url, safeFilename(title, ext));
-                      // close after completion
-                      setOpen(false);
+                      setDownloadingId(id);
+                      setError(null);
+                      try {
+                        const {blob, filename} = await downloadStoreGrant(storeId, file.grantId);
+                        saveStoreGrantDownload(blob, filename);
+                        setOpen(false);
+                      } catch (reason) {
+                        setError(reason instanceof Error ? reason.message : "Download unavailable");
+                      } finally {
+                        setDownloadingId(null);
+                      }
                     }}
                   >
-                    {/* Spinner + % */}
                     {busy ? (
                       <span className="inline-flex items-center gap-1 text-xs text-gray-700">
-                        <SpinnerMini />
-                        {percent > 0 && percent < 100 ? `${percent}%` : "…"}
+                        <SpinnerMini />…
                       </span>
                     ) : (
-                      <span className="text-sm text-gray-900">
-                        Download {a.ext?.toUpperCase() || "File"}
-                      </span>
+                      <span className="text-sm text-gray-900">Download file</span>
                     )}
-
-                    {/* right-aligned meta */}
-                    <span className="ml-auto text-[11px] text-gray-600">
-                      {labelParts}
+                    <span className="ml-auto text-[11px] text-gray-600 truncate max-w-28" title={file.label}>
+                      {file.label}
                     </span>
                   </button>
                 </li>
               );
             })}
           </ul>
+          {error && <p role="alert" className="px-3 pb-2 text-xs text-rose-700">{error}</p>}
         </div>
       )}
     </div>

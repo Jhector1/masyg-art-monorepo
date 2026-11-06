@@ -22,13 +22,15 @@ export type Product = {
   description?: string | null;
   price: number;        // fallback price
   thumbnails: string[]; // first image is primary
+  slug?: string; // published listing slug (not the global product ID)
+  currency?: string;
   variants?: OriginalVariant[];
 };
 
-export function money(n: number) {
+export function money(n: number, currency = "USD") {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
-    currency: "USD",
+    currency,
     maximumFractionDigits: 0,
   }).format(n);
 }

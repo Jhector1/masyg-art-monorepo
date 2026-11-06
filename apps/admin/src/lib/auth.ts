@@ -5,6 +5,8 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@acme/core/lib/prisma";
 import { compare } from "bcryptjs";
+import { requiresMerchantEmailVerification } from "@acme/core/lib/merchant-email-policy";
+import { randomUUID } from "node:crypto";
 import {
   EMERGENCY_ADMIN_USER_ID,
   getEmergencyAdminEmail,
@@ -35,7 +37,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
     Credentials({
-      name: "Admin password",
+      name: "Email and password",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
@@ -53,17 +55,21 @@ export const authOptions: NextAuthOptions = {
 
         const email = creds.email.trim().toLowerCase();
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user?.password) return null;
-        const ok = await compare(creds.password, user.password);
-        return ok ? user : null;
+        if (!user?.passwordHash) return null;
+        const ok = await compare(creds.password, user.passwordHash);
+        // Password identity is not email ownership. Re-enabling verification blocks unverified accounts,
+        // including accounts created while SMTP verification was disabled.
+        if (ok && requiresMerchantEmailVerification(process.env.MERCHANT_EMAIL_VERIFICATION_REQUIRED) &&
+            !user.emailVerified) return null;
+        return ok ? { id: user.id, email: user.email, name: user.name, image: user.image } : null;
       },
     }),
   ],
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account, profile }) {
       if (user) {
-        const userId = (user as any).id as string | undefined;
+        const userId = user.id;
 
         if (isEmergencyAdminUserId(userId)) {
           token.sub = EMERGENCY_ADMIN_USER_ID;
@@ -74,13 +80,20 @@ export const authOptions: NextAuthOptions = {
           return token;
         }
 
+        // Only Google-backed verified identities may mark the account verified.
+        if (account?.provider === "google" &&
+            (profile as { email_verified?: unknown } | undefined)?.email_verified === true) {
+          await prisma.user.updateMany({ where: { id: userId!, emailVerified: null },
+            data: { emailVerified: new Date() } });
+        }
+        token.merchantSessionId = randomUUID();
         const dbUser = await prisma.user.findUnique({
           where: { id: userId! },
-          select: { isAdmin: true, email: true },
+          select: { email: true },
         });
         const email = dbUser?.email?.toLowerCase();
         token.isAdmin =
-          dbUser?.isAdmin === true || (!!email && ADMIN_EMAILS.includes(email));
+          !!email && ADMIN_EMAILS.includes(email);
         token.sub = userId;
         token.isEmergencyAdmin = false;
         return token;
@@ -94,25 +107,29 @@ export const authOptions: NextAuthOptions = {
       }
 
       if (token.sub) {
+        if (typeof token.merchantSessionId !== "string") token.merchantSessionId = randomUUID();
         // Re-check normal admin authorization whenever NextAuth refreshes the
         // server session. This prevents a long-lived JWT from preserving an
         // admin grant after the database/admin allowlist has been changed.
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { isAdmin: true, email: true },
+          select: { email: true },
         });
         const email = dbUser?.email?.toLowerCase();
         token.isAdmin =
-          dbUser?.isAdmin === true || (!!email && ADMIN_EMAILS.includes(email));
+          !!email && ADMIN_EMAILS.includes(email);
       }
       return token;
     },
 
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.sub as string;
-        (session.user as any).isAdmin = token.isAdmin === true;
-        (session.user as any).isEmergencyAdmin = token.isEmergencyAdmin === true;
+        Object.assign(session.user, {
+          id: token.sub,
+          isAdmin: token.isAdmin === true,
+          isEmergencyAdmin: token.isEmergencyAdmin === true,
+          merchantSessionId: typeof token.merchantSessionId === "string" ? token.merchantSessionId : undefined,
+        });
       }
       return session;
     },

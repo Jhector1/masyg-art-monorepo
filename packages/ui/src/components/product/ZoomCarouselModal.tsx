@@ -8,12 +8,14 @@ type Dir = 1 | -1;
 
 export default function ZoomCarouselModal({
   images,
+  unoptimized = false,
   startIndex = 0,
   isOpen,
   onClose,
   title,
 }: {
   images: string[];
+  unoptimized?: boolean;
   startIndex?: number;
   isOpen: boolean;
   onClose: () => void;
@@ -373,6 +375,7 @@ export default function ZoomCarouselModal({
           <div className="relative h-full w-1/3">
             <Image
               src={images[prevIndex] ?? '/placeholder.png'}
+              unoptimized={unoptimized}
               alt={`Slide ${prevIndex + 1}`}
               fill
               sizes={sizes}
@@ -392,6 +395,7 @@ export default function ZoomCarouselModal({
             >
               <Image
                 src={images[index] ?? '/placeholder.png'}
+              unoptimized={unoptimized}
                 alt={`Slide ${index + 1}`}
                 fill
                 sizes={sizes}
@@ -406,6 +410,7 @@ export default function ZoomCarouselModal({
           <div className="relative h-full w-1/3">
             <Image
               src={images[nextIndex] ?? '/placeholder.png'}
+              unoptimized={unoptimized}
               alt={`Slide ${nextIndex + 1}`}
               fill
               sizes={sizes}

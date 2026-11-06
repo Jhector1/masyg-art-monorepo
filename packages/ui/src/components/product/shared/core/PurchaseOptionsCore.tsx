@@ -12,6 +12,9 @@ export default function PurchaseOptionsCore({
   disabled,
   allowDigital,
   allowPrint,
+  currency = "USD",
+  showBundleDiscount = true,
+  physicalLabel = "Print",
 }: {
   digitalChecked: boolean;
   printChecked: boolean;
@@ -22,8 +25,12 @@ export default function PurchaseOptionsCore({
   disabled?: boolean;
   allowDigital?: boolean;
   allowPrint?: boolean;
+  currency?: string;
+  showBundleDiscount?: boolean;
+  physicalLabel?: string;
 }) {
   const isDisabled = !!disabled;
+  const money=(amount:string|number)=>new Intl.NumberFormat("en-US",{style:"currency",currency}).format(Number(amount));
 
   if (!allowDigital && !allowPrint) return null;
 
@@ -31,7 +38,7 @@ export default function PurchaseOptionsCore({
     <fieldset className="w-full">
       <legend className="block text-bold text-sm font-medium text-gray-700 mb-2">
         Select Your Purchase Options{" "}
-        {allowDigital && allowPrint && (
+        {allowDigital && allowPrint && showBundleDiscount && (
           <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
             20% off when you pick both
           </span>
@@ -48,7 +55,7 @@ export default function PurchaseOptionsCore({
               isDisabled ? "opacity-50 cursor-not-allowed" : "hover:border-gray-400",
             ].join(" ")}>
               <span>Digital</span>
-              <span className="font-medium">${Number(digitalPrice).toFixed(2)}</span>
+              <span className="font-medium">{money(digitalPrice)}</span>
             </div>
           </label>
         )}
@@ -61,8 +68,8 @@ export default function PurchaseOptionsCore({
               "border-gray-300 peer-checked:bg-purple-600 peer-checked:text-white",
               isDisabled ? "opacity-50 cursor-not-allowed" : "hover:border-gray-400",
             ].join(" ")}>
-              <span>Print</span>
-              <span className="font-medium">${Number(printPrice).toFixed(2)}</span>
+              <span>{physicalLabel}</span>
+              <span className="font-medium">{money(printPrice)}</span>
             </div>
           </label>
         )}

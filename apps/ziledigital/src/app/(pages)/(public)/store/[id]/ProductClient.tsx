@@ -1,203 +1,71 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import ScreenshotGuard from "@acme/ui/components/ScreenshotGuard";
-
+import { useEffect, useState } from "react";
 import ProductImageGallery from "@acme/ui/components/product/detail/ProductImageGallery";
-import ProductConfigurator from "@acme/ui/components/product/detail/ProductConfigurator";
-import UniversalModal from "@acme/ui/components/modal/UniversalModal";
-import AuthenticationForm from "@acme/ui/components/authenticate/AuthenticationFom";
-import CartActions from "@acme/ui/components/product/CartActions";
-import ReviewsSection from "@acme/ui/components/product/review/ReviewSection";
-// import { DescriptionCard } from "@/components/product/shared/core/DescriptionCard";
+import {
+  catalogMediaPath, fetchPublishedListing, fetchPublishedStore,
+  type PublicCatalogDetail,
+} from "@acme/core/lib/public-catalog-view";
+import CanonicalArtInfoModel from "../../../../../components/CanonicalArtInfoModel";
 
-// import type {
-//   MaterialOption,
-//   FrameOption,
-//   LicenseOption,
-// } from "@acme/core/types";
-// import {
-//   allFrames,
-//   allLicenses,
-//   allMaterials,
-//   allSizes,
-// } from "@acme/core/data/helpers";
-import { useUser } from "@acme/core/contexts/UserContext";
-import { useProductData } from "@acme/ui/components/studio/hooks/useProductData";
-import { roundMoney } from "@acme/core/lib/pricing";
-import { KindInfoPanel } from "../../../../../components/KindInfoPanel";
-interface ProductDetailProps {
-  productId: string;
-  showProduct?: boolean;
-  showReviews?: boolean;
-}
+/**
+ * The original ZileDigital product-detail DOM and gallery remain the visual source of truth.
+ * Only the data adapter differs: canonical host-bound catalog, actual variants, secure cart.
+ */
+export default function ProductDetail({slug}:{slug:string}) {
+  const [product,setProduct] = useState<PublicCatalogDetail|null>(null);
+  const [preview,setPreview] = useState<{src:string;alt:string}|null>(null);
+  const [loading,setLoading] = useState(true);
+  const [error,setError] = useState<string|null>(null);
 
-export default function ProductDetail({
-  productId,
-  showReviews = true,
-  showProduct = true,
-}: ProductDetailProps) {
-  const { isLoggedIn, guestId } = useUser();
-  const [isModalOpen, setModalOpen] = useState(false);
-  const router = useRouter();
+  useEffect(()=>{
+    const controller = new AbortController();
+    setLoading(true); setError(null); setProduct(null); setPreview(null);
+    void (async()=>{
+      try {
+        const context=await fetchPublishedStore(controller.signal);
+        const result=await fetchPublishedListing(context.store.id,slug,controller.signal);
+        if(controller.signal.aborted)return;
+        if(result.store.id!==context.store.id || result.slug!==slug) throw new Error("Storefront mismatch");
+        const first=result.product.publicMedia[0];
+        setProduct(result);
+        setPreview(first?{
+          src:catalogMediaPath(result.store.id,first.assetId),
+          alt:first.altText||result.product.title,
+        }:null);
+      }catch(reason){
+        if(!controller.signal.aborted)setError(reason instanceof Error?reason.message:"Artwork unavailable");
+      }finally{if(!controller.signal.aborted)setLoading(false);}
+    })();
+    return()=>controller.abort();
+  },[slug]);
 
-  const {
-    product,
-    inCart,
-    options,
-    setOptions,
-    size,
-    setSize,
-    customSize,
-    setCustomSize,
-    isCustom,
-    setIsCustom,
-    material,
-    setMaterial,
-    frame,
-    setFrame,
-    license,
-    setLicense,
-    wantDigital,
-  
-    wantPrint,
-  
-    addToCart,
-    removeFromCart,
+  const thumbnails=product?.product.publicMedia.map(media=>catalogMediaPath(product.store.id,media.assetId))??[];
+  const loadingUI=<div className="p-10 text-center">Loading product…</div>;
 
-    preview,
-    setPreview,
-    // calculatePrice,
-    // unified pricing from the hook (API-identical, per unit)
-    finalPrice,
-    baseUnit,
-    priceWithSale,
-    priceWithBundle,
-  } = useProductData({ productId });
-
-  const loadingUI = <div className="p-10 text-center">Loading product…</div>;
-
-  // Sale / bundle flags for UI
-  const bundleWins = useMemo(
-    () => wantDigital && wantPrint && priceWithBundle < priceWithSale,
-    [wantDigital, wantPrint, priceWithBundle, priceWithSale]
-  );
-  const saleActive = useMemo(
-    () => !bundleWins && priceWithSale < baseUnit,
-    [bundleWins, priceWithSale, baseUnit]
-  );
-
-  const pricingForBanner = useMemo(
-    () => ({
-      price: finalPrice,
-      compareAt: saleActive ? roundMoney(baseUnit) : null,
-      onSale: bundleWins ? true : saleActive,
-      endsAt:
-        bundleWins || !product?.saleEndsAt
-          ? null
-          : new Date(product.saleEndsAt as any),
-    }),
-    [finalPrice, saleActive, baseUnit, bundleWins, product?.saleEndsAt]
-  );
-
-  const goCustomize = () => {
-    if (!productId) return;
-    router.push(`${encodeURIComponent(String(productId))}/studio`);
-  };
-
-  return (
-    <>
-      <UniversalModal isOpen={isModalOpen} onClose={() => setModalOpen(false)}>
-        <AuthenticationForm
-          onSuccess={() => setModalOpen(false)}
-          isGuest={true}
-          handlerAction={async () => {
-            if (!isLoggedIn && !guestId) setModalOpen(true);
-            if (!product) return;
-
-            // Do not send price; server recomputes
-            if (!inCart) {
-              await addToCart(
-                productId,
-                wantDigital ? "Digital" : null,
-                wantPrint ? "Print" : null,
-                product.formats[0]?.split(".").pop() || "",
-                size?.label ?? null,
-                material.label,
-                frame?.label ?? null,
-                license.type,
-                1
-              );
-            } else {
-              await removeFromCart(
-                product.id,
-                options.digitalVariantId!,
-                options.printVariantId!
-              );
-            }
-          }}
-        />
-      </UniversalModal>
-
-      {!product ? (
-        loadingUI
-      ) : (
-        <main className="max-w-7xl mx-auto pt-10 lg:pt-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
-            {/* <ScreenshotGuard blurAmount="10px" blurDurationMs={1500}> */}
-
-            {showProduct && (
-              <ProductImageGallery
-                product={product}
-                preview={preview}
-                setPreview={setPreview}
-              />
-            )}
-            {/* </ScreenshotGuard> */}
-
-            {/* info section  */}
-            <KindInfoPanel product={product} />
-
-          
+  return <>
+    {!product ? (
+      error?<div className="p-10 text-center text-red-700" role="alert">{error}</div> : loading ? loadingUI : null
+    ) : (
+      <main className="max-w-7xl mx-auto w-full min-w-0 px-4 sm:px-6 pt-8 lg:pt-12">
+        <h1 className="sr-only">{product.product.title}</h1>
+        <div className="grid min-w-0 grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
+          {thumbnails.length>0 ? (
+            <ProductImageGallery product={{thumbnails}} preview={preview} setPreview={setPreview}/>
+          ) : (
+            <div className="min-h-[300px] lg:min-h-[65vh] grid place-items-center rounded-2xl bg-gray-50 text-gray-500">
+              Preview unavailable
+            </div>
+          )}
+          <div className="min-w-0">
+            <h2 className="mb-5 text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900">{product.product.title}</h2>
+            <CanonicalArtInfoModel product={product}/>
           </div>
-
-          <div className="mt-14">
-            {showReviews && <ReviewsSection productId={product.id} />}
-          </div>
-        </main>
-      )}
-
-      {/* JSON-LD: reflect unified price */}
-      {product && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Product",
-              name: product.title,
-              image: product.thumbnails ?? [],
-              description: product.description,
-              sku: product.id,
-              offers: {
-                "@type": "Offer",
-                priceCurrency: "USD",
-                price: Number(finalPrice).toFixed(2),
-                ...(saleActive && product.saleEndsAt
-                  ? {
-                      priceValidUntil: new Date(
-                        product.saleEndsAt as any
-                      ).toISOString(),
-                    }
-                  : {}),
-                availability: "https://schema.org/InStock",
-                url: `/store/${product.id}`,
-              },
-            }),
-          }}
-        />
-      )}
-    </>
-  );
+        </div>
+        {/* The historical review block is intentionally omitted until the tenant-scoped
+            review service has been restored; no retired review endpoint is called. */}
+        <div className="mt-14" />
+      </main>
+    )}
+  </>;
 }

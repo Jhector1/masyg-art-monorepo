@@ -16,6 +16,7 @@ import type {
   ProductListItem,
 } from "@acme/core/types";
 import { useCart } from "@acme/core/contexts/CartContext";
+import {originalGalleryMoney,cartGalleryPresentation,type OriginalGalleryItem} from "@acme/core/lib/client/original-ui-catalog";
 
 // Pricing utils
 import { applyBundleIfBoth, getEffectiveSale, roundMoney } from "@acme/core/lib/pricing";
@@ -24,10 +25,12 @@ interface GalleryProps {
   products:
     | Array<ProductListAndOrderCount>
     | ProductListItem[]
-    | Array<CartSelectedItem>;
+    | Array<CartSelectedItem>
+    | OriginalGalleryItem[];
   showCartItem?: boolean;
   showLikeButton?: boolean;
   onLikeToggle?: (id: string, liked: boolean) => void;
+  onRemoveCartVariant?: (variantId:string)=>Promise<void>;
 }
 
 export default function Gallery({
@@ -35,11 +38,13 @@ export default function Gallery({
   showLikeButton = true,
   onLikeToggle,
   showCartItem = false,
+  onRemoveCartVariant,
 }: GalleryProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const { isLoggedIn } = useUser();
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
+  const [favoriteError,setFavoriteError] = useState<string|null>(null);
   const router = useRouter();
   const { removeFromCart } = useCart();
 
@@ -49,14 +54,23 @@ export default function Gallery({
       return;
     }
     const liked = !isFavorite(id);
-    toggleFavorite(id);
-    onLikeToggle?.(id, liked);
+    setFavoriteError(null);
+    void toggleFavorite(id).then(()=>onLikeToggle?.(id,liked))
+      .catch(()=>setFavoriteError("Could not update favorites. Please try again."));
   };
 
   function derivePricing(
-    p: ProductListItem | ProductListAndOrderCount | CartSelectedItem
+    p: ProductListItem | ProductListAndOrderCount | CartSelectedItem | OriginalGalleryItem
   ) {
     const anyP = p as any;
+    if(anyP.canonical===true){
+      const price=anyP.price as number;
+      const currency=anyP.currency as string;
+      const compare=Number.isSafeInteger(anyP.compareAtMinor) && anyP.compareAtMinor>anyP.priceMinor
+        ?anyP.compareAtMinor/(10**(new Intl.NumberFormat("en-US",{style:"currency",currency}).resolvedOptions().maximumFractionDigits??2)):null;
+      return {price,compareAt:compare,onSale:compare!==null,endsAt:null,
+        pctOff:compare?Math.max(0,Math.round(100*(1-price/compare))):0};
+    }
     const base = typeof anyP.price === "number" ? anyP.price : 0;
     const starts = anyP.saleStartsAt ? new Date(anyP.saleStartsAt) : null;
     const ends = anyP.saleEndsAt ? new Date(anyP.saleEndsAt) : null;
@@ -105,6 +119,7 @@ export default function Gallery({
         <AuthenticationForm />
       </UniversalModal>
 
+      {favoriteError&&<p role="alert" className="text-sm text-red-700">{favoriteError}</p>}
       <motion.div
         className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 mt-8"
   initial={false}          // ✅ important: do NOT render hidden on the server
@@ -118,21 +133,28 @@ export default function Gallery({
 
         {products.map((p) => {
           const liked = isFavorite(p.id);
+          const original = (p as Partial<OriginalGalleryItem>).canonical===true;
+          const slug = original ? (p as OriginalGalleryItem).canonicalSlug : p.id;
+          // Product IDs are used for favorite operations; listing slugs are only navigation.
+          const href = slug ? `/store/${encodeURIComponent(slug)}` : "/store";
           const imgSrc = getPrimaryImage(p);
           const isCartItem = isCartSelectedItem(p);
           // console.log("Rendering product", p.id, { imgSrc });
 
           const pricing = derivePricing(p);
-          const current = isCartItem ? (p as CartSelectedItem).price : pricing.price;
-          const compare = isCartItem
-            ? (p as CartSelectedItem).originalPrice
-            : pricing.compareAt ?? null;
+          // Cart prices and optional print labels come only from the server-quoted
+          // canonical cart projection or a verified variant snapshot.
+          const cartDisplay = isCartItem
+            ? cartGalleryPresentation(p as CartSelectedItem | OriginalGalleryItem)
+            : null;
+          const current = cartDisplay?.price ?? pricing.price;
+          const compare = cartDisplay ? cartDisplay.compareAt : pricing.compareAt ?? null;
           const discounted = compare != null && current < compare;
 
 
           return (
             <motion.div
-              key={p.id + (isCartItem ? (p as CartSelectedItem).previewUrl ?? "" : "")}
+              key={p.id + (isCartItem ? (p as CartSelectedItem).cartItemId : "")}
               variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
               initial={{ opacity: 0, y: 16 }}
   animate={{ opacity: 1, y: 0 }}
@@ -190,7 +212,7 @@ export default function Gallery({
                 {/* Image */}
                 <div
                   className="relative w-full overflow-hidden rounded-xl bg-neutral-100"
-                  onClick={() => router.push(`/store/${p.id}`)}
+                  onClick={() => router.push(href)}
                 >
                   <div className="aspect-[4/5]">
                     <Image
@@ -213,19 +235,16 @@ export default function Gallery({
                 </div>
 
                 {/* Optional frame tile (cart item) */}
-                {isCartItem && (p as CartSelectedItem).print?.frame && (
+                {isCartItem && !original && cartDisplay?.frame && (
                   <div className="mt-2 flex items-center gap-2">
                     <span className="text-[11px] text-neutral-500">+</span>
                     <div
                       className="relative w-20 sm:w-24 overflow-hidden rounded-lg bg-neutral-100"
-                      onClick={() => router.push(`/store/${p.id}`)}
+                      onClick={() => router.push(href)}
                     >
                       <div className="aspect-square">
                         <Image
-                          src={`/images/${(p as CartSelectedItem)
-                            .print!.frame!.toLowerCase()
-                            .split(" ")
-                            .join("-")}.png`}
+                          src={`/images/${cartDisplay.frame.toLowerCase().split(" ").join("-")}.png`}
                           alt={(p as any).title}
                           fill
                           className="object-contain"
@@ -237,7 +256,7 @@ export default function Gallery({
                       </div>
                     </div>
                     <p className="text-[11px] text-neutral-500">
-                      {(p as CartSelectedItem).print?.material || ""}
+                      {cartDisplay.material || ""}
                     </p>
                   </div>
                 )}
@@ -246,7 +265,7 @@ export default function Gallery({
                 <div className="mt-3 flex items-start justify-between gap-3">
                   <div className="space-y-1.5">
                     <h3
-                      onClick={() => router.push(`/store/${p.id}`)}
+                      onClick={() => router.push(href)}
                       className="cursor-pointer text-[13px] font-medium tracking-wide text-neutral-900 hover:underline"
                     >
                       {(p as any).title}
@@ -262,16 +281,19 @@ export default function Gallery({
                     <p className="text-sm font-medium text-neutral-900">
                       {discounted ? (
                         <>
-                          <span>${current.toFixed(2)}</span>
+                          <span>{original?originalGalleryMoney((p as OriginalGalleryItem).priceMinor,(p as OriginalGalleryItem).currency):`$${current.toFixed(2)}`}</span>
                           <span className="ml-2 align-middle text-[12px] text-neutral-400 line-through">
-                            ${compare!.toFixed(2)}
+                            {original?originalGalleryMoney((p as OriginalGalleryItem).compareAtMinor!,(p as OriginalGalleryItem).currency):`$${compare!.toFixed(2)}`}
                           </span>
                         </>
                       ) : (
-                        <span>${current.toFixed(2)}</span>
+                        <span>{original?originalGalleryMoney((p as OriginalGalleryItem).priceMinor,(p as OriginalGalleryItem).currency):`$${current.toFixed(2)}`}</span>
                       )}
                     </p>
 
+                    {isCartItem && original && cartDisplay?.selection && Object.keys(cartDisplay.selection).length>0 && <p className="text-[11px] text-neutral-500">
+                      {Object.entries(cartDisplay.selection).map(([key,value])=>`${key}: ${value}`).join(" · ")}
+                    </p>}
                     {/* Variant summary (cart item) */}
                     {isCartItem && (
                       <p className="text-[11px] text-neutral-600">
@@ -282,6 +304,10 @@ export default function Gallery({
                             : "Digital"
                           : ""}
                       </p>
+                    )}
+
+                    {original && !(p as OriginalGalleryItem).available && !isCartItem && (
+                      <p className="text-[11px] text-neutral-500">Unavailable</p>
                     )}
 
                     {"artistName" in p && (p as any).artistName && (
@@ -300,8 +326,9 @@ export default function Gallery({
                   {showCartItem && isCartItem && (
                     <button
                       onClick={async () => {
-                        const { digital, print, id } = p as CartSelectedItem;
-                        await removeFromCart(id, digital?.id ?? "", print?.id ?? "");
+                        const { digital, print, id,cartItemId } = p as CartSelectedItem;
+                        if(onRemoveCartVariant) await onRemoveCartVariant(cartItemId);
+                        else await removeFromCart(id, digital?.id ?? "", print?.id ?? "");
                       }}
                       className="text-xs text-neutral-500 underline decoration-neutral-300 underline-offset-4 hover:text-neutral-800"
                     >
@@ -320,7 +347,7 @@ export default function Gallery({
 
 /** Prefer snapshot (user design) > explicit imageUrl > svg preview > first thumbnail */
 function getPrimaryImage(
-  p: ProductListItem | ProductListAndOrderCount | CartSelectedItem
+  p: ProductListItem | ProductListAndOrderCount | CartSelectedItem | OriginalGalleryItem
 ): string {
   const anyP = p as any;
   if (anyP.previewUrl) return anyP.previewUrl;
@@ -332,7 +359,7 @@ function getPrimaryImage(
 
 /** Narrowing guard that works for both digital-only and print-only cart lines */
 function isCartSelectedItem(
-  p: ProductListItem | ProductListAndOrderCount | CartSelectedItem
+  p: ProductListItem | ProductListAndOrderCount | CartSelectedItem | OriginalGalleryItem
 ): p is CartSelectedItem {
   return !!p && typeof p === "object" && "cartItemId" in p;
 }

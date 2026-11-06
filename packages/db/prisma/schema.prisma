@@ -7,91 +7,131 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Storefront {
-  ZILEDIGITAL
-  JEANYVES
-}
-model Product {
-  id                String              @id @default(uuid())
-  categoryId        String
-    externalId String?         @unique
+// ZileDigital canonical commerce schema. One physical DB, one set of models,
+// merchant ownership at organization level, storefront publication explicitly scoped.
+// Prices use minor units; NEVER use Float for money.
 
-  title             String
-  description       String
-  price             Float
-  thumbnails        String[]
-  formats           String[]
-  createdAt         DateTime            @default(now())
-  svgFormat         String?
-  svgPreview        String?
-  sizes             String[]
-  saleEndsAt        DateTime?
-  salePercent       Int?
-  salePrice         Float?
-  saleStartsAt      DateTime?
-  publicId          String
-  cartItems         CartItem[]
-  DesignEntitlement DesignEntitlement[]
-  DesignUsage       DesignUsage[]
-  favorites         Favorite[]
-  orderItems        OrderItem[]
-  category          Category            @relation(fields: [categoryId], references: [id])
-  assets            ProductAsset[]
-  variants          ProductVariant[]
-  purchasedDesigns  PurchasedDesign[]   @relation("Product_PurchasedDesigns")
-  reviews           Review[]
-  designs           UserDesign[]
-
-  kind             ProductKind @default(ART)
-  tags             String[]    @default([]) // if migration balks, see note below
-  requiresShipping Boolean     @default(false)
-  isCustomizable   Boolean     @default(false)
-  optionSchema     Json?
-
-  bundleItems BundleItem[] @relation("ProductToBundleItems")  
-  site        Storefront @default(ZILEDIGITAL)
-
-  @@index([site])
-  @@index([site, categoryId])
-  @@index([site, kind])
-  
-  @@index([saleStartsAt, saleEndsAt])
-  @@index([saleEndsAt])
-  @@index([categoryId])
-  @@index([kind])
-  @@index([requiresShipping])
-  @@index([tags], type: Gin) // Postgres-only; great for array contains queries
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MEMBER
 }
 
+enum StoreRole {
+  MANAGER
+  EDITOR
+  VIEWER
+}
+
+enum PublicationStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum FulfillmentKind {
+  PHYSICAL
+  DIGITAL
+}
+
+// Product offerings classify what is sold, separately from category and delivery.
+// v39B creates this structure; existing checkout keeps using ProductVariant.
+enum OfferingKind {
+  ORIGINAL
+  PRINT
+  DOWNLOAD
+  MERCHANDISE
+}
+
+enum InventoryPolicy {
+  TRACKED
+  UNLIMITED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLING
+  FULFILLED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum ShipmentStatus {
+  PENDING
+  SHIPPED
+  DELIVERED
+  RETURNED
+}
+
+enum DomainStatus {
+  PENDING
+  VERIFIED
+  DISABLED
+}
+
+enum CheckoutAttemptStatus {
+  PREPARED
+  SESSION_CREATING
+  SESSION_CREATED
+  PAID
+  EXPIRED
+  CANCELLED
+  FAILED
+}
+
+enum StockHoldStatus {
+  HELD
+  CONSUMED
+  RELEASED
+}
+
+enum ConnectionStatus {
+  PENDING
+  VERIFIED
+  DISABLED
+}
+
+enum ProviderEventStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+// Identity remains global. Merchant data never lives on User.
 model User {
-  id                String              @id @default(cuid())
-  email             String              @unique
-  name              String?
-  password          String
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  avatarUrl         String?             @db.VarChar(255)
-  downloadCount     Int                 @default(0)
-  emailVerified     DateTime?
-  image             String?
-  avatarPublicId    String?             @db.VarChar(191)
-  isAdmin           Boolean             @default(false)
-  accounts          Account[]
-  addresses         Address[]
-    carts Cart[]
-
-  DesignEntitlement DesignEntitlement[]
-  downloadTokens    DownloadToken[]
-  favorites         Favorite[]
-  orders            Order[]
-  purchasedDesigns  PurchasedDesign[]   @relation("User_PurchasedDesigns")
-  reviews           Review[]
-  sessions          Session[]
-  designs           UserDesign[]
+  id              String @id @default(cuid())
+  email           String @unique
+  name            String?
+  passwordHash    String?
+  emailVerified   DateTime?
+  image           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  memberships     OrganizationMember[]
+  storeGrants     StoreMember[]
+  accounts        Account[]
+  sessions        Session[]
+  customerRecords Customer[]
+  guestClaims GuestPurchaseClaim[]
+  savedAddresses  CustomerAddress[]
+  savedFavorites StoreFavorite[]
+  merchantSignupChallenge MerchantSignupChallenge?
+  merchantOnboardingClaim MerchantOnboardingClaim?
+  merchantMfaCredential MerchantMfaCredential?
+  merchantMfaRecoveryCodes MerchantMfaRecoveryCode[]
 }
 
 model Account {
-  id                String  @id @default(cuid())
+  id                String @id @default(cuid())
   userId            String
   type              String
   provider          String
@@ -103,491 +143,790 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([provider, providerAccountId])
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
+  id           String @id @default(cuid())
+  sessionToken String @unique
   userId       String
   expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
   identifier String
-  token      String   @unique
+  token      String @unique
   expires    DateTime
-
   @@unique([identifier, token])
 }
 
-/// Categorization
+model MerchantSignupChallenge {
+  userId         String @id
+  tokenHash      String @unique
+  expiresAt      DateTime
+  lastSentAt     DateTime @default(now())
+  resendCount    Int @default(0)
+  createdAt      DateTime @default(now())
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MerchantOnboardingClaim {
+  userId         String @id
+  organizationId String @unique
+  createdAt      DateTime @default(now())
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MerchantMfaCredential {
+  userId           String @id
+  version          String
+  secretCiphertext String
+  enabledAt        DateTime?
+  pendingExpiresAt DateTime?
+  lastUsedStep     BigInt?
+  failedAttempts   Int @default(0)
+  lockedUntil      DateTime?
+  updatedAt        DateTime @updatedAt
+  user             User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MerchantMfaRecoveryCode {
+  codeHash String @id
+  userId   String
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model Organization {
+  id          String @id @default(cuid())
+  slug        String @unique
+  name        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  members     OrganizationMember[]
+  stores      Storefront[]
+  storeGrants StoreMember[]
+  categories  Category[]
+  products    Product[]
+  offerings   ProductOffering[]
+  optionGroups CatalogOptionGroup[]
+  variants    ProductVariant[]
+  listings    StoreListing[]
+  assets      MediaAsset[]
+  digitalFiles DigitalFile[]
+  locations   InventoryLocation[]
+  levels      InventoryLevel[]
+  customers   Customer[]
+  carts       Cart[]
+  orders      Order[]
+  payments    Payment[]
+  shipments   Shipment[]
+  downloads   DigitalGrant[]
+  reviews     Review[]
+  connections IntegrationConnection[]
+  events      ProviderEvent[]
+  checkoutAttempts CheckoutAttempt[]
+  guestClaims GuestPurchaseClaim[]
+  auditLogs   MerchantAuditLog[]
+  staffInvitations StaffInvitation[]
+  customerNotes CustomerNote[]
+  savedAddresses CustomerAddress[]
+}
+
+model OrganizationMember {
+  organizationId String
+  userId         String
+  role           OrganizationRole
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([organizationId, userId])
+  @@index([userId])
+}
+
+model Storefront {
+  id             String @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  published      Boolean @default(false)
+  theme          Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  members        StoreMember[]
+  domains        StoreDomain[]
+  listings       StoreListing[]
+  carts          Cart[]
+  orders         Order[]
+  shipments      Shipment[]
+  checkoutAttempts CheckoutAttempt[]
+  guestClaims GuestPurchaseClaim[]
+  reviews        Review[]
+  @@unique([organizationId, slug])
+  @@unique([organizationId, id])
+  savedAddresses CustomerAddress[]
+  shippingConfiguration StoreShippingConfiguration?
+  shippingRates StoreShippingRate[]
+}
+
+// Explicit merchant settings for TEST physical checkout; never merchant secrets.
+model StoreShippingConfiguration {
+  organizationId String
+  storeId        String
+  enabled        Boolean @default(false)
+  physicalTaxCode String? @db.VarChar(13)
+  shippingTaxCode String? @db.VarChar(13)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  store          Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Cascade)
+  @@id([organizationId, storeId])
+}
+
+// Flat merchant rates. Empty region = countrywide; exact region overrides it.
+model StoreShippingRate {
+  id             String @id @default(cuid())
+  organizationId String
+  storeId        String
+  country        String @db.VarChar(2)
+  region         String @default("") @db.VarChar(16)
+  currency       String @db.VarChar(3)
+  amountMinor    Int
+  enabled        Boolean @default(false)
+  createdAt      DateTime @default(now())
+  store          Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Cascade)
+  @@unique([organizationId, storeId, country, region, currency])
+  @@index([organizationId, storeId, enabled])
+}
+
+// Org OWNER/ADMIN may manage all stores; MEMBER requires an explicit store grant.
+model StoreMember {
+  organizationId String
+  storeId        String
+  userId         String
+  role           StoreRole
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  store          Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Cascade)
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([organizationId, storeId, userId])
+  @@index([userId])
+}
+
+// Never route by unverified hostname. Normalized host unique across platform.
+model StoreDomain {
+  hostname       String @id
+  organizationId String
+  storeId        String
+  status         DomainStatus @default(PENDING)
+  verifiedAt     DateTime?
+  createdAt      DateTime @default(now())
+  store          Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Cascade)
+  @@index([organizationId, storeId])
+}
+
 model Category {
-  id       String    @id @default(uuid())
-  name     String    @unique
-  products Product[]
+  id             String @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  productLinks   ProductCategory[]
+  @@unique([organizationId, slug])
+  @@unique([organizationId, id])
 }
-enum FulfillmentProvider {
-  INTERNAL
-  PRINTFUL
+
+model Product {
+  id             String @id @default(cuid())
+  organizationId String
+  title          String
+  description    String @default("")
+  status         PublicationStatus @default(DRAFT)
+  offersDigitalLicenses Boolean @default(false)
+  offersFraming Boolean @default(false)
+  offersGlazing Boolean @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  variants       ProductVariant[]
+  offerings      ProductOffering[]
+  media          ProductMedia[]
+  categories     ProductCategory[]
+  listings       StoreListing[]
+  reviews        Review[]
+  @@unique([organizationId, id])
+  @@index([organizationId, status])
 }
-model ProductVariant {
-  id             String           @id @default(cuid())
+
+model ProductCategory {
+  organizationId String
   productId      String
-  type           VariantType?
-  format         String?
-  size           String?
-  material       String?
-  frame          String?
-  license        String?
-  depthIn        Float?
-  framed         Boolean?         @default(false)
-  heightIn       Float?
-  inventory      Int?             @default(1)
-  listPrice      Float?
-    baseCost    Float?            // ✅ what Printful charges you
-
-  medium         String?
-  originalSerial String?          @unique
-  sku            String?          @unique
-  soldAt         DateTime?
-  status         InventoryStatus? @default(ACTIVE)
-  surface        String?
-  weightLb       Float?
-  widthIn        Float?
-  year           Int?
-  uploadType     VariantType?
-
-  reservedAt      DateTime?
-reservedUntil   DateTime?
-reservedOrderId String?
-
-  // NEW flexible knobs
-  attributes       Json?
-  barcode          String?  @unique
-  upc              String?  @unique
-  hsCode           String?
-  packQuantity     Int?
-  requiresShipping Boolean? // null => inherit Product.requiresShipping
-  fulfillmentProvider  FulfillmentProvider @default(INTERNAL)
-  printfulVariantId    Int?      @unique          // from Printful
-  // relations
-  CartItemsAsDigital   CartItem[]   @relation("CartItemDigital")
-  CartItemsAsOriginal  CartItem[]   @relation("CartItemOriginal")
-  CartItemsAsPrint     CartItem[]   @relation("CartItemPrint")
-  OrderItemsAsDigital  OrderItem[]  @relation("OrderItemDigital")
-  OrderItemsAsOriginal OrderItem[]  @relation("OrderItemOriginal")
-  OrderItemsAsPrint    OrderItem[]  @relation("OrderItemPrint")
-  product              Product      @relation(fields: [productId], references: [id])
-  bundleItems          BundleItem[] @relation("VariantToBundleItems")
-  // (optionally add: @@index([status]), @@index([sku]) is not needed since it's unique)
-
-  // indexes
-    @@index([reservedOrderId])
-  @@index([reservedUntil])
-  @@index([productId])
-  @@index([status])
-  @@index([listPrice])
+  categoryId     String
+  product        Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  category       Category @relation(fields: [organizationId, categoryId], references: [organizationId, id], onDelete: Cascade)
+  @@id([organizationId, productId, categoryId])
 }
 
-/// Shopping Cart
+model ProductVariant {
+  id             String @id @default(cuid())
+  organizationId String
+  productId      String
+  offeringId     String? // optional until all variant creation paths adopt offerings
+  name           String
+  sku            String?
+  attributes     Json?
+  fulfillment    FulfillmentKind
+  inventoryPolicy InventoryPolicy @default(UNLIMITED)
+  priceMinor     Int
+  /// Display-only regular price, when higher than the currently charged priceMinor.
+  compareAtMinor Int?
+  currency       String @db.VarChar(3)
+  active         Boolean @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  product        Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  offering       ProductOffering? @relation(fields: [organizationId, productId, offeringId], references: [organizationId, productId, id], onDelete: Restrict)
+  inventory      InventoryLevel[]
+  digitalFiles   DigitalFile[]
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+  @@unique([organizationId, sku])
+  @@unique([organizationId, id])
+  @@index([organizationId, productId])
+  @@index([organizationId, productId, offeringId])
+}
+
+// An offering is a way to sell an existing product; it is NOT a separate listing,
+// stock ledger, cart line, or checkout price. Variants remain authoritative.
+model ProductOffering {
+  id             String @id @default(cuid())
+  organizationId String
+  productId      String
+  kind           OfferingKind
+  name           String
+  slug           String
+  status         PublicationStatus @default(DRAFT)
+  sortOrder      Int @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  product        Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  variants       ProductVariant[]
+  optionGroups   OfferingOptionGroup[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, productId, id])
+  @@unique([organizationId, productId, slug])
+  @@index([organizationId, productId, sortOrder])
+}
+
+// Reusable vocabulary belongs to the merchant organization, not the platform.
+// For example, "grind" or "frame" can be shared among the merchant's offerings.
+model CatalogOptionGroup {
+  id             String @id @default(cuid())
+  organizationId String
+  key            String
+  name           String
+  active         Boolean @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  values         CatalogOptionValue[]
+  offerings      OfferingOptionGroup[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, key])
+}
+
+model CatalogOptionValue {
+  id             String @id @default(cuid())
+  organizationId String
+  groupId        String
+  key            String
+  label          String
+  active         Boolean @default(true)
+  sortOrder      Int @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  group          CatalogOptionGroup @relation(fields: [organizationId, groupId], references: [organizationId, id], onDelete: Restrict)
+  @@unique([organizationId, groupId, id])
+  @@unique([organizationId, groupId, key])
+  @@index([organizationId, groupId, sortOrder])
+}
+
+// Composite FKs make cross-organization or cross-product links impossible.
+// Future seller UI can attach reusable groups to offerings explicitly.
+model OfferingOptionGroup {
+  organizationId String
+  productId      String
+  offeringId     String
+  groupId        String
+  required       Boolean @default(false)
+  sortOrder      Int @default(0)
+  offering       ProductOffering @relation(fields: [organizationId, productId, offeringId], references: [organizationId, productId, id], onDelete: Cascade)
+  group          CatalogOptionGroup @relation(fields: [organizationId, groupId], references: [organizationId, id], onDelete: Restrict)
+  @@id([organizationId, productId, offeringId, groupId], map: "OfferingOptionGroup_pkey")
+  @@index([organizationId, groupId])
+}
+
+// A Product can be shared across the merchant's stores only by creating a listing.
+model StoreListing {
+  organizationId String
+  storeId        String
+  productId      String
+  slug           String
+  status         PublicationStatus @default(DRAFT)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  store          Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Restrict)
+  product        Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  reviews        Review[]
+  savedBy        StoreFavorite[]
+  @@id([organizationId, storeId, productId])
+  @@unique([organizationId, storeId, slug])
+  @@index([organizationId, productId])
+}
+
+// Buyer favorites are per verified store, per authenticated user and per published listing.
+// The composite listing foreign key prevents cross-tenant links even in raw SQL.
+model StoreFavorite {
+  organizationId String
+  storeId        String
+  userId         String
+  productId      String
+  createdAt      DateTime @default(now())
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing        StoreListing @relation(fields: [organizationId, storeId, productId], references: [organizationId, storeId, productId], onDelete: Cascade)
+  @@id([organizationId, storeId, userId, productId])
+  @@index([userId, organizationId, storeId])
+}
+
+model MediaAsset {
+  id             String @id @default(cuid())
+  organizationId String
+  storageKey     String @unique
+  mimeType       String
+  sizeBytes      BigInt
+  checksumSha256 String?
+  private        Boolean @default(true)
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  productMedia   ProductMedia[]
+  digitalFiles   DigitalFile[]
+  @@unique([organizationId, id])
+}
+
+model ProductMedia {
+  organizationId String
+  productId      String
+  assetId        String
+  sortOrder      Int @default(0)
+  altText        String? @db.VarChar(180)
+  product        Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  asset          MediaAsset @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
+  @@id([organizationId, productId, assetId])
+}
+
+model DigitalFile {
+  id             String @id @default(cuid())
+  organizationId String
+  variantId      String
+  assetId        String
+  label          String
+  retiredAt      DateTime?
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  variant        ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Restrict)
+  asset          MediaAsset @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
+  grants         DigitalGrant[]
+  orderSnapshots OrderDigitalFile[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, variantId, assetId])
+  @@index([organizationId, variantId, retiredAt], map: "DigitalFile_org_variant_active_idx")
+}
+
+model InventoryLocation {
+  id             String @id @default(cuid())
+  organizationId String
+  name           String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  levels         InventoryLevel[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, name])
+}
+
+model InventoryLevel {
+  organizationId String
+  variantId      String
+  locationId     String
+  onHand         Int @default(0)
+  reserved       Int @default(0)
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  variant        ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Restrict)
+  location       InventoryLocation @relation(fields: [organizationId, locationId], references: [organizationId, id], onDelete: Restrict)
+  holds          StockHold[]
+  @@id([organizationId, variantId, locationId])
+}
+
+// Customers are organization-specific even if a global user account exists.
+model Customer {
+  id             String @id @default(cuid())
+  organizationId String
+  userId         String?
+  email          String
+  name           String?
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  orders         Order[]
+  guestClaims    GuestPurchaseClaim[]
+  notes          CustomerNote[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, email])
+}
+
+
+// Buyer-owned saved shipping addresses scoped to a single published storefront.
+// Order.shippingAddress remains an immutable per-order snapshot at checkout.
+model CustomerAddress {
+  id             String @id @default(cuid())
+  organizationId String
+  storeId        String
+  userId         String
+  label          String? @db.VarChar(60)
+  street         String @db.VarChar(200)
+  city           String @db.VarChar(120)
+  state          String @db.VarChar(120)
+  postalCode     String @db.VarChar(30)
+  country        String @db.VarChar(2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  store          Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Restrict)
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([organizationId, storeId, userId, createdAt])
+}
+
 model Cart {
-  id        String   @id @default(cuid())
-  userId    String?
-  guestId   String?
-  site      Storefront @default(ZILEDIGITAL)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user  User? @relation(fields: [userId], references: [id])
-  items CartItem[]
-
-  @@unique([userId, site])
-  @@unique([guestId, site])
-  @@index([guestId, site])
+  id             String @id @default(cuid())
+  organizationId String
+  storeId        String
+  customerId     String?
+  guestTokenHash String? @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  store          Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Restrict)
+  items          CartItem[]
+  @@unique([organizationId, id])
+  @@index([organizationId, storeId])
 }
 
 model CartItem {
-  id                 String          @id @default(cuid())
-  cartId             String
-  productId          String
-  digitalVariantId   String?
-  printVariantId     String?
-  price              Float
-  quantity           Int             @default(1)
-  addedAt            DateTime        @default(now())
-  designId           String?
-  previewUrlSnapshot String?         @db.VarChar(2000)
-  styleSnapshot      Json?
-  originalPrice      Float
-  originalVariantId  String?
-  cart               Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  design             UserDesign?     @relation(fields: [designId], references: [id])
-  digitalVariant     ProductVariant? @relation("CartItemDigital", fields: [digitalVariantId], references: [id])
-  originalVariant    ProductVariant? @relation("CartItemOriginal", fields: [originalVariantId], references: [id])
-  printVariant       ProductVariant? @relation("CartItemPrint", fields: [printVariantId], references: [id])
-  product            Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@index([designId])
-  @@index([cartId])
-  @@index([originalVariantId])
+  id             String @id @default(cuid())
+  organizationId String
+  cartId         String
+  variantId      String
+  quantity       Int
+  cart           Cart @relation(fields: [organizationId, cartId], references: [organizationId, id], onDelete: Cascade)
+  variant        ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Restrict)
+  @@unique([organizationId, cartId, variantId])
 }
 
-/// Favorites / Wishlist
-model Favorite {
-  id        String     @id @default(cuid())
-  userId    String?
-  productId String
-  guestId   String?
-  site      Storefront @default(ZILEDIGITAL) // ✅ new
-  createdAt DateTime   @default(now())
-
-  product   Product  @relation(fields: [productId], references: [id])
-  user      User?    @relation(fields: [userId], references: [id])
-
-  @@unique([userId, productId, site])   // ✅ new composite unique
-  @@unique([guestId, productId, site])  // ✅ new composite unique
-  @@index([userId, site])
-  @@index([guestId, site])
-}
-/// Product Reviews
-model Review {
-  id        String   @id @default(cuid())
-  userId    String?
-  productId String
-  rating    Int      @default(5)
-  comment   String?
-  createdAt DateTime @default(now())
-  guestId   String?
-  product   Product  @relation(fields: [productId], references: [id])
-  user      User?    @relation(fields: [userId], references: [id])
-
-  @@index([productId])
-  @@index([userId])
-  @@index([guestId])
-}
-
-/// Orders & Payments
 model Order {
-  id                  String            @id @default(cuid())
-  userId              String?
-  total               Float
-  status              String            @default("PENDING")
-  placedAt            DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  shippingId          String?
-  stripeSessionId     String?           @unique
-  stripeSessionUrl String?
-  checkoutExpiresAt DateTime?
-  guestId             String?
-  claimTokenExpiresAt DateTime?
-  claimTokenHash      String?           @unique
-  downloadTokens      DownloadToken[]
-  shipping            Address?          @relation("Order_shipping", fields: [shippingId], references: [id])
-  user                User?             @relation(fields: [userId], references: [id])
-  items               OrderItem[]
-  payment             Payment?
-  purchasedDesigns    PurchasedDesign[] @relation("Order_PurchasedDesigns")
-  site Storefront @default(ZILEDIGITAL)
-  @@index([site])
-  @@index([guestId])
-  @@index([claimTokenExpiresAt])
+  id             String @id @default(cuid())
+  organizationId String
+  storeId        String
+  customerId     String?
+  status         OrderStatus @default(PENDING)
+  currency       String @db.VarChar(3)
+  subtotalMinor  Int
+  taxMinor       Int @default(0)
+  shippingMinor  Int @default(0)
+  totalMinor     Int
+  shippingAddress Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  store          Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Restrict)
+  customer       Customer? @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  items          OrderItem[]
+  payments       Payment[]
+  shipments      Shipment[]
+  checkoutAttempts CheckoutAttempt[]
+  guestClaims GuestPurchaseClaim[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, storeId, id])
+  @@index([organizationId, storeId, createdAt])
 }
 
+// Immutable purchase snapshot. Product/variant cannot be removed while sold.
 model OrderItem {
-  id                 String           @id @default(cuid())
-  orderId            String
-  productId          String
-  digitalVariantId   String?
-  printVariantId     String?
-  type               VariantType
-  price              Float
-  quantity           Int              @default(1)
-  previewUrlSnapshot String?
-  listPrice          Float?
-  originalVariantId  String?
-  downloadTokens     DownloadToken[]
-  digitalVariant     ProductVariant?  @relation("OrderItemDigital", fields: [digitalVariantId], references: [id])
-  order              Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  originalVariant    ProductVariant?  @relation("OrderItemOriginal", fields: [originalVariantId], references: [id])
-  printVariant       ProductVariant?  @relation("OrderItemPrint", fields: [printVariantId], references: [id])
-  product            Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
-  purchasedDesign    PurchasedDesign? @relation("OrderItem_PurchasedDesign")
-
-  @@index([orderId])
-  @@index([originalVariantId])
+  id             String @id @default(cuid())
+  organizationId String
+  orderId        String
+  variantId      String
+  titleSnapshot  String
+  skuSnapshot    String?
+  fulfillment    FulfillmentKind
+  attributesSnapshot Json?
+  quantity       Int
+  unitPriceMinor Int
+  totalMinor     Int
+  order          Order @relation(fields: [organizationId, orderId], references: [organizationId, id], onDelete: Restrict)
+  variant        ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Restrict)
+  grants         DigitalGrant[]
+  purchasedFiles OrderDigitalFile[]
+  shipments      ShipmentItem[]
+  reviews        Review[]
+  stockHolds     StockHold[]
+  @@unique([organizationId, id])
+  @@index([organizationId, orderId])
 }
 
-/// Addresses (User & Shipping)
-model Address {
-  id         String   @id @default(cuid())
-  userId     String?
-  label      String?
-  street     String
-  city       String
-  state      String
-  postalCode String
-  country    String
-  createdAt  DateTime @default(now())
-  guestId    String?
-  user       User?    @relation(fields: [userId], references: [id])
-  orders     Order[]  @relation("Order_shipping")
-
-  @@index([guestId])
-}
-
-/// Payment Records
 model Payment {
-  id            String   @id @default(cuid())
-  orderId       String   @unique
-  amount        Float
-  provider      String
-  transactionId String
-  status        String   @default("PENDING")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  order         Order    @relation(fields: [orderId], references: [id])
+  id              String @id @default(cuid())
+  organizationId  String
+  orderId         String
+  provider        String
+  providerAccount String
+  providerPaymentId String
+  amountMinor     Int
+  currency        String @db.VarChar(3)
+  status          PaymentStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  order           Order @relation(fields: [organizationId, orderId], references: [organizationId, id], onDelete: Restrict)
+  @@unique([organizationId, provider, providerAccount, providerPaymentId])
+  @@index([organizationId, orderId])
 }
 
-model ProductAsset {
-  id             String           @id @default(cuid())
+model Shipment {
+  id             String @id @default(cuid())
+  organizationId String
+  storeId        String
+  orderId        String
+  status         ShipmentStatus @default(PENDING)
+  trackingNumber String?
+  carrier        String?
+  planKey        String? @unique @db.VarChar(64)
+  planFingerprint String? @db.VarChar(64)
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  store          Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Restrict)
+  order          Order @relation(fields: [organizationId, storeId, orderId], references: [organizationId, storeId, id], onDelete: Restrict)
+  items          ShipmentItem[]
+  @@unique([organizationId, id])
+}
+
+model ShipmentItem {
+  organizationId String
+  shipmentId     String
+  orderItemId    String
+  quantity       Int
+  shipment       Shipment @relation(fields: [organizationId, shipmentId], references: [organizationId, id], onDelete: Cascade)
+  orderItem      OrderItem @relation(fields: [organizationId, orderItemId], references: [organizationId, id], onDelete: Restrict)
+  @@id([organizationId, shipmentId, orderItemId])
+}
+
+// Snapshot entitled file IDs at purchase time, in the SAME transaction as order item.
+// File ownership/variant association is validated on creation and again at settlement.
+model OrderDigitalFile {
+  organizationId String
+  orderItemId    String
+  digitalFileId  String
+  item           OrderItem @relation(fields: [organizationId, orderItemId], references: [organizationId, id], onDelete: Restrict)
+  file           DigitalFile @relation(fields: [organizationId, digitalFileId], references: [organizationId, id], onDelete: Restrict)
+  @@id([organizationId, orderItemId, digitalFileId])
+  @@index([organizationId, digitalFileId])
+}
+
+// Tokens are hashed, never store reusable signed download URLs.
+model DigitalGrant {
+  id             String @id @default(cuid())
+  organizationId String
+  orderItemId    String
+  digitalFileId  String
+  tokenHash      String @unique
+  expiresAt      DateTime?
+  maximumUses    Int?
+  uses           Int @default(0)
+  revokedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  item           OrderItem @relation(fields: [organizationId, orderItemId], references: [organizationId, id], onDelete: Restrict)
+  file           DigitalFile @relation(fields: [organizationId, digitalFileId], references: [organizationId, id], onDelete: Restrict)
+  @@unique([organizationId, orderItemId, digitalFileId])
+  @@index([organizationId, orderItemId])
+}
+
+// One verified review per purchased line and storefront (no unverified score injection).
+model Review {
+  id             String @id @default(cuid())
+  organizationId String
+  storeId        String
   productId      String
-  storageKey     String?          @unique
-  url            String
-  previewUrl     String?
-  mimeType       String
-  ext            String
-  isVector       Boolean          @default(false)
-  width          Int?
-  height         Int?
-  dpi            Int?
-  colorProfile   String?
-  sizeBytes      Int?
-  checksum       String?
-  pdfPageCount   Int?
-  pdfPageWIn     Float?
-  pdfPageHIn     Float?
-  svgViewBox     String?
-  hasAlpha       Boolean?
-  isAnimated     Boolean?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  deliveryType   CldDeliveryType?
-  resourceType   CldResourceType?
-  downloadTokens DownloadToken[]
-  product        Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, url], name: "productId_url")
-  @@index([productId])
-  @@index([url])
+  orderItemId    String
+  rating         Int
+  body           String?
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  store          Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Restrict)
+  product        Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  item           OrderItem @relation(fields: [organizationId, orderItemId], references: [organizationId, id], onDelete: Restrict)
+  listing        StoreListing @relation(fields: [organizationId, storeId, productId], references: [organizationId, storeId, productId], onDelete: Restrict)
+  @@unique([organizationId, orderItemId])
+  @@index([organizationId, storeId, productId])
 }
 
-model DownloadToken {
-  id               String       @id @default(cuid())
+// No provider secrets or OAuth tokens in Prisma; encrypted secret-store refs only.
+model IntegrationConnection {
+  id             String @id @default(cuid())
+  organizationId String
+  provider       String
+  accountRef     String
+  secretRef      String
+  capabilities   String[]
+  status         ConnectionStatus @default(PENDING)
+  verifiedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  checkoutAttempts CheckoutAttempt[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, provider, accountRef])
+}
+
+model ProviderEvent {
+  id             String @id @default(cuid())
+  organizationId String
+  provider       String
+  providerEventId String
+  receivedAt     DateTime @default(now())
+  status         ProviderEventStatus @default(RECEIVED)
+  attempts       Int @default(0)
+  processedAt    DateTime?
+  failureCode    String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@unique([provider, providerEventId])
+  @@index([status, receivedAt])
+}
+
+// One-use email invitation. Only a token hash is persisted, never the link secret.
+// activeKey is unique while open and set NULL after acceptance or revocation.
+model StaffInvitation {
+  id             String @id @default(cuid())
+  organizationId String
+  email          String @db.VarChar(254)
+  role           OrganizationRole
+  storeId        String?
+  tokenHash      String @unique @db.VarChar(64)
+  activeKey      String? @unique @db.VarChar(400)
+  deliveryStatus String @default("PENDING") @db.VarChar(12)
+  providerMessageId String?
+  createdByUserId String
+  expiresAt      DateTime
+  sentAt         DateTime?
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId, createdAt])
+  @@index([organizationId, email])
+}
+
+// Customer notes remain private to a specific storefront; never enter receipts.
+model CustomerNote {
+  id             String @id @default(cuid())
+  organizationId String
+  storeId        String
+  customerId     String
+  actorUserId    String
+  body           String @db.VarChar(2000)
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer       Customer @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  @@index([organizationId, storeId, customerId, createdAt])
+}
+
+model MerchantAuditLog {
+  id             String @id @default(cuid())
+  organizationId String
+  actorUserId    String?
+  action         String
+  targetType     String
+  targetId       String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId, createdAt])
+}
+
+// No provider charge is initiated here. One attempt per merchant/store/idempotency key.
+// A caller must re-use an existing attempt or reject fingerprint disagreement.
+model CheckoutAttempt {
+  id                  String @id @default(cuid())
+  organizationId      String
+  storeId             String
+  orderId             String
+  connectionId        String
+  idempotencyKeyHash  String
+  requestFingerprint  String
+  status              CheckoutAttemptStatus @default(PREPARED)
+  expiresAt           DateTime
+  providerSessionId   String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  store               Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Restrict)
+  order               Order @relation(fields: [organizationId, storeId, orderId], references: [organizationId, storeId, id], onDelete: Restrict)
+  connection          IntegrationConnection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict)
+  @@unique([organizationId, storeId, idempotencyKeyHash])
+  @@unique([organizationId, providerSessionId])
+  @@index([status, expiresAt])
+}
+
+// A real, expiring hold is linked to the purchased line AND physical stock location.
+// All mutations to InventoryLevel.reserved and StockHold must share one transaction.
+model StockHold {
+  id             String @id @default(cuid())
+  organizationId String
+  orderItemId    String
+  variantId      String
+  locationId     String
+  quantity       Int
+  status         StockHoldStatus @default(HELD)
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  item           OrderItem @relation(fields: [organizationId, orderItemId], references: [organizationId, id], onDelete: Restrict)
+  level          InventoryLevel @relation(fields: [organizationId, variantId, locationId], references: [organizationId, variantId, locationId], onDelete: Restrict)
+  @@unique([organizationId, orderItemId, locationId])
+  @@index([status, expiresAt])
+}
+
+// A mailbox possession challenge only. The token is NEVER persisted in plaintext.
+// No public endpoint is installed by v18; verified session + trusted mail delivery
+// must be wired and rate-limited before accepting customer claim requests.
+model GuestPurchaseClaim {
+  id               String @id @default(cuid())
+  organizationId   String
+  storeId          String
   orderId          String
-  assetId          String
-  orderItemId      String?
-  userId           String?
-  guestId          String?
-  signedUrl        String
+  customerId       String
+  requesterUserId  String
+  tokenHash        String @unique
   expiresAt        DateTime
-  remainingUses    Int?
-  downloadCount    Int          @default(0)
-  lastDownloadedAt DateTime?
-  licenseSnapshot  String?
-  createdAt        DateTime     @default(now())
-  asset            ProductAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  order            Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderItem        OrderItem?   @relation(fields: [orderItemId], references: [id])
-  user             User?        @relation(fields: [userId], references: [id])
-
-  @@index([orderId])
-  @@index([assetId])
-  @@index([guestId])
-  @@index([orderId, assetId])
-}
-
-/// Per-user, per-product editable design + quotas
-model UserDesign {
-  id                String              @id @default(cuid())
-  userId            String?
-  guestId           String?
-  productId         String
-  style             Json
-  defs              Json?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  previewUpdatedAt  DateTime?
-  previewUrl        String?             @db.VarChar(2000)
-  previewPublicId   String?             @db.VarChar(255)
-  CartItem          CartItem[]
-  DesignEntitlement DesignEntitlement[]
-  DesignUsage       DesignUsage[]
-  product           Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user              User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, productId])
-  @@unique([guestId, productId])
-  @@index([userId])
-  @@index([guestId])
-  @@index([productId])
-}
-
-model WebhookEvent {
-  id        String   @id
-  createdAt DateTime @default(now())
-}
-
-model PurchasedDesign {
-  id                String              @id @default(cuid())
-  userId            String?
-  guestId           String?
-  orderId           String
-  orderItemId       String              @unique
-  productId         String
-  style             Json
-  defs              Json?
-  previewUrl        String?
-  createdAt         DateTime            @default(now())
-  svg               Json?
-  DesignEntitlement DesignEntitlement[]
-  order             Order               @relation("Order_PurchasedDesigns", fields: [orderId], references: [id], onDelete: Cascade)
-  orderItem         OrderItem           @relation("OrderItem_PurchasedDesign", fields: [orderItemId], references: [id], onDelete: Cascade)
-  product           Product             @relation("Product_PurchasedDesigns", fields: [productId], references: [id], onDelete: Cascade)
-  user              User?               @relation("User_PurchasedDesigns", fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([productId])
-  @@index([orderId])
-}
-
-model DesignEntitlement {
-  id                String            @id @default(cuid())
-  userId            String?
-  guestId           String?
-  productId         String
-  userDesignId      String?
-  purchasedDesignId String?
-  source            EntitlementSource
-  orderId           String?
-  orderItemId       String?
-  exportQuota       Int               @default(0)
-  editQuota         Int               @default(0)
-  exportsUsed       Int               @default(0)
-  editsUsed         Int               @default(0)
-  expiresAt         DateTime?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  product           Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  purchasedDesign   PurchasedDesign?  @relation(fields: [purchasedDesignId], references: [id])
-  userDesign        UserDesign?       @relation(fields: [userDesignId], references: [id])
-  user              User?             @relation(fields: [userId], references: [id])
-  DesignUsage       DesignUsage[]
-
-  @@index([userId])
-  @@index([guestId])
-  @@index([productId])
-  @@index([userDesignId])
-  @@index([purchasedDesignId])
-  @@index([orderItemId])
-}
-
-model DesignUsage {
-  id                String            @id @default(cuid())
-  kind              UsageKind
-  userId            String?
-  guestId           String?
-  productId         String
-  userDesignId      String?
-  purchasedDesignId String?
-  entitlementId     String
-  format            String?
-  width             Int?
-  height            Int?
-  meta              Json?
-  idempotencyKey    String?           @unique
-  createdAt         DateTime          @default(now())
-  entitlement       DesignEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
-  product           Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  userDesign        UserDesign?       @relation(fields: [userDesignId], references: [id])
-
-  @@index([entitlementId])
-  @@index([userId])
-  @@index([guestId])
-  @@index([productId])
-}
-
-enum InventoryStatus {
-  ACTIVE
-  RESERVED
-  SOLD
-}
-
-enum VariantType {
-  DIGITAL
-  PRINT
-  ORIGINAL
-}
-
-enum CldResourceType {
-  image
-  raw
-  video
-}
-
-enum CldDeliveryType {
-  upload
-  authenticated
-  private
-}
-
-enum EntitlementSource {
-  PURCHASE
-  TOPUP
-  GRANT
-}
-
-enum UsageKind {
-  EXPORT
-  EDIT
-}
-
-enum ProductKind {
-  ART // current default
-  STICKER
-  MUG
-  CARD
-  BOOK_DIGITAL
-  OTHER
-}
-
-model Bundle {
-  id     String       @id @default(cuid())
-  title  String
-  active Boolean      @default(true)
-  items  BundleItem[]
-  price  Float? // optional fixed bundle price; else derive from components
-}
-
-model BundleItem {
-  id        String  @id @default(cuid())
-  bundleId  String
-  productId String
-  variantId String?
-  quantity  Int     @default(1)
-
-  bundle Bundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
-
-  // match Product.bundleItems
-  product Product @relation("ProductToBundleItems", fields: [productId], references: [id], onDelete: Cascade)
-
-  // match ProductVariant.bundleItems
-  variant ProductVariant? @relation("VariantToBundleItems", fields: [variantId], references: [id])
-
-  @@index([bundleId])
-  @@index([productId])
-  @@index([variantId])
+  consumedAt       DateTime?
+  createdAt        DateTime @default(now())
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  store            Storefront @relation(fields: [organizationId, storeId], references: [organizationId, id], onDelete: Restrict)
+  order            Order @relation(fields: [organizationId, storeId, orderId], references: [organizationId, storeId, id], onDelete: Restrict)
+  customer         Customer @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  requester        User @relation(fields: [requesterUserId], references: [id], onDelete: Restrict)
+  @@index([requesterUserId, createdAt])
+  @@index([organizationId, storeId, orderId, createdAt])
+  @@index([expiresAt])
 }

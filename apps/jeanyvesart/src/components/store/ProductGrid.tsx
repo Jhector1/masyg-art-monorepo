@@ -17,7 +17,7 @@ export default function ProductGridOriginal({ products }: { products: Product[] 
         <ProductCardOriginal
           key={p.id}
           product={p}
-          href={`/store/${p.id}`}
+          href={`/store/${encodeURIComponent(p.slug ?? p.id)}`}
           busy={busy === p.id}
           onBusyChange={setBusy}   // add this prop (below)
         />

@@ -146,26 +146,18 @@ export interface OrderProductItem {
 }
 
 // File: src/lib/types.ts
-import { PrismaClient } from "@acme/db";
-
-export const prisma = new PrismaClient();
+export { prisma } from "@acme/db";
 
 export const productListSelect = {
   id: true,
+  organizationId: true,
   title: true,
   description: true,
-  kind: true,
-  price: true,
-  
-  thumbnails: true,
-  publicId: true,
-  svgPreview: true,
-  salePercent: true,
-  salePrice: true,
-  saleStartsAt: true,
-  saleEndsAt: true,
-
-  category: { select: { name: true } },
+  status: true,
+  variants: { select: {
+    id: true, name: true, fulfillment: true, priceMinor: true,
+    currency: true, active: true,
+  } },
 } as const;
 
 export type ProductListItem = Prisma.ProductGetPayload<{
@@ -184,12 +176,10 @@ export type CartSelectedItem = ProductListItem & {
 };
 // exactly the return type of
 //   prisma.review.findMany({ include: { user: true } })
-export type ProductReview = Prisma.ReviewGetPayload<{
-  include: { user: true };
-}>;
+export type ProductReview = Prisma.ReviewGetPayload<{}>;
 
 // src/types/product.ts
-import type { ProductKind, Review } from "@acme/db";
+import type { Review } from "@acme/db";
 
 export type VariantWithInCart = ProductVariant & {
   /** true if this variant’s id was found in the user’s cart */
@@ -223,7 +213,7 @@ export interface ProductDetailResult {
   userDesignPreviewUrl: string;
 
   // 👇 NEW
-  kind: ProductKind;
+  availableFulfillment: Array<"PHYSICAL" | "DIGITAL">;
   requiresShipping: boolean;
 
   digitalVariants?: VariantWithInCart[];
@@ -321,8 +311,10 @@ export   type CollectionDigitalAsset = {
     id: string;
     type: "DIGITAL" | "PRINT";
     price: number;
+    currency?: string;
     quantity: number;
     order: {
+      id?: string;
       isUserDesign: boolean
       placedAt: string;
       stripeSessionId?: string | null;

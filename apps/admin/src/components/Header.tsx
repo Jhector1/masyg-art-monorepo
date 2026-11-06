@@ -17,6 +17,8 @@ export type AdminHeaderProps = {
   newLinkHref?: string;
   newLinkLabel?: string;
   sidebarExpanded?: boolean;
+  showSearch?: boolean;
+  showNotifications?: boolean;
 };
 
 function IconMenu(props: React.SVGProps<SVGSVGElement>) {
@@ -92,7 +94,7 @@ export function AuthButtons({
     </form>
   ) : (
     <a
-      href={`/api/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+      href={`${callbackUrl.startsWith("/merchant") ? "/merchant/signin" : "/api/auth/signin"}?callbackUrl=${encodeURIComponent(callbackUrl)}`}
       className={`inline-flex h-9 items-center gap-2 rounded-xl bg-zinc-900 px-3 text-xs font-medium text-white hover:opacity-90 dark:bg-white dark:text-zinc-900 ${className}`}
     >
       <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" aria-hidden="true">
@@ -119,6 +121,8 @@ export default function AdminHeader({
   newLinkHref = "/admin/private/uploader",
   newLinkLabel = "New",
   sidebarExpanded = false,
+  showSearch = true,
+  showNotifications = true,
 }: AdminHeaderProps) {
   const initials = React.useMemo(
     () =>
@@ -199,7 +203,7 @@ export default function AdminHeader({
         </div>
 
         {/* Center: search */}
-        <div className="mx-auto hidden w-full max-w-lg flex-1 items-center md:flex">
+        {showSearch && <div className="mx-auto hidden w-full max-w-lg flex-1 items-center md:flex">
           <div className="relative w-full">
             <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input
@@ -217,11 +221,11 @@ export default function AdminHeader({
               ⌘K
             </kbd>
           </div>
-        </div>
+        </div>}
 
         {/* Right: actions */}
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
-          <button
+          {showNotifications && <button
             type="button"
             className="hidden h-9 w-9 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-100 md:inline-flex dark:text-zinc-300 dark:hover:bg-zinc-900"
             aria-label="Notifications"
@@ -230,7 +234,7 @@ export default function AdminHeader({
               <IconBell className="h-5 w-5" />
               <span className="absolute -right-0.5 -top-0.5 inline-block h-2 w-2 rounded-full bg-zinc-900 dark:bg-zinc-100" />
             </span>
-          </button>
+          </button>}
 
           <Link
             href={newLinkHref}
@@ -302,7 +306,7 @@ export default function AdminHeader({
       </div>
 
       {/* Mobile search */}
-      <div className="mx-auto block w-full max-w-screen-2xl px-3 pb-3 md:hidden">
+      {showSearch && <div className="mx-auto block w-full max-w-screen-2xl px-3 pb-3 md:hidden">
         <div className="relative">
           <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
@@ -317,7 +321,7 @@ export default function AdminHeader({
             }}
           />
         </div>
-      </div>
+      </div>}
 {/* 
       <div className="px-3 pb-3 sm:px-4">
         <AuthButtons signedIn={!!user?.email} />

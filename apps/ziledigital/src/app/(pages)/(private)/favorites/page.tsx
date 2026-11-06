@@ -1,44 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import SEO from "@acme/ui/components/SEO";
-import Gallery from "@acme/ui/components/store/Gallery";
-import { useUser } from "@acme/core/contexts/UserContext";
-import { useFavorites } from "@acme/core/contexts/FavoriteContext";
-import { ProductListItem } from "@acme/core/types";
+import OriginalPublishedGallery from "@acme/ui/components/storefront/OriginalPublishedGallery";
 
 export default function FavoritePage() {
-  const { isLoggedIn, sessionPulse } = useUser();
-  const { favorites, removeFavorite } = useFavorites();
-  const [favoriteProducts, setFavoriteProducts] = useState<ProductListItem[]>([]);
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-
-    const fetchFavorites = async () => {
-      const res = await fetch(`/api/user/favorite`, {
-        credentials: "include",
-        cache: "no-store",
-        headers: { "Cache-Control": "no-store" },
-      });
-      if (!res.ok) {
-        setFavoriteProducts([]);
-        return;
-      }
-      const data = await res.json();
-      setFavoriteProducts(Array.isArray(data) ? data : []);
-    };
-
-    fetchFavorites();
-  }, [isLoggedIn, sessionPulse, favorites]); // re-run on auth pulse and favorites mutation
-
-  const handleLikeToggle = (id: string, liked: boolean) => {
-    if (!liked) {
-      removeFavorite(id);
-      setFavoriteProducts((prev) => prev.filter((item) => String(item.id) !== String(id)));
-    }
-  };
-
   return (
     <>
       <SEO
@@ -51,11 +16,7 @@ export default function FavoritePage() {
           Explore the artworks you’ve liked. Tap any image to view details, or click ❤️ to remove.
         </p>
 
-        <Gallery
-          products={favoriteProducts}
-          showLikeButton
-          onLikeToggle={handleLikeToggle}
-        />
+        <OriginalPublishedGallery favoritesOnly />
       </div>
     </>
   );
