@@ -8,6 +8,7 @@ import { BuyerGrantError, authorizeBuyerGrant, consumeBuyerGrant } from "@acme/c
 import { requireSameOriginJson } from "@acme/server/lib/public-request-guard";
 import { CartSafetyError } from "@acme/core/lib/cart-contract";
 import { parsePrivateDigitalStorageKey, privateDigitalDownloadUrl, downloadFilename } from "@acme/server/lib/private-digital-download";
+import { spoolPrivateDownload, PrivateDownloadSpoolError } from "@acme/server/lib/private-download-spool";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,32 +36,25 @@ export async function POST(req:NextRequest, ctx:{params:Promise<{storeId:string;
       upstream.body?.cancel().catch(()=>{});
       return jsonError(502,"Private file is currently unavailable");
     }
-    const declared=Number(upstream.headers.get("content-length") || "0");
-    if (!Number.isFinite(declared) || declared < 0 || declared > MAX_FILE_BYTES) {
-      await upstream.body.cancel();
-      return jsonError(502,"Private file exceeds delivery limit");
-    }
-    // Bounded buffer: a lying or missing Content-Length cannot exhaust server memory.
-    const reader=upstream.body.getReader();
-    const chunks:Uint8Array[]=[];
-    let received=0;
+    // Spool to a private bounded temporary file: do not allocate two complete
+    // copies of the download in RAM, and do not expose bytes before the grant CAS.
+    let spooled;
     try {
-      while(true) {
-        const {done,value}=await reader.read();
-        if(done) break;
-        received+=value.byteLength;
-        if(received>MAX_FILE_BYTES) {await reader.cancel();return jsonError(502,"Private file exceeds delivery limit");}
-        chunks.push(value);
-      }
-    } finally {reader.releaseLock();}
-    if(received===0) return jsonError(502,"Private file is empty");
-    // A revoked/refunded/exhausted grant cannot win a concurrent handoff race.
-    await consumeBuyerGrant(grant);
-    const body=new Uint8Array(received);let offset=0;
-    for(const chunk of chunks){body.set(chunk,offset);offset+=chunk.byteLength;}
-    return new Response(body,{status:200,headers:{
+      spooled = await spoolPrivateDownload(upstream.body, upstream.headers.get("content-length"), MAX_FILE_BYTES);
+    } catch (error) {
+      if (error instanceof PrivateDownloadSpoolError) return jsonError(502, error.message);
+      throw error;
+    }
+    try {
+      // A revoked/refunded/exhausted grant cannot win a concurrent handoff race.
+      await consumeBuyerGrant(grant);
+    } catch (error) {
+      await spooled.dispose();
+      throw error;
+    }
+    return new Response(spooled.body,{status:200,headers:{
       ...headers,"Content-Type":grant.mimeType || "application/octet-stream",
-      "Content-Length":String(received),
+      "Content-Length":String(spooled.byteLength),
       "Content-Disposition":`attachment; filename="${downloadFilename(grant.label,extension)}"`,
     }});
   } catch(error) {
