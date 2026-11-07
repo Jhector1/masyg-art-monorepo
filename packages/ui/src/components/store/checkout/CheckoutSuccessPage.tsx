@@ -73,8 +73,10 @@ function DetailRow({ k, v }: { k: string; v: string }) {
 
 /** Mirrors the original ZileDigital checkout-success header layout and copy.
  * The old SaveOrderCta is intentionally absent: it references retired private APIs. */
-function OriginalOrderHeader({ hasPrint, hasDigital, paid }: { hasPrint: boolean; hasDigital: boolean; paid: boolean }) {
-  const title = !paid
+function OriginalOrderHeader({ hasPrint, hasDigital, paid, refunded }: { hasPrint: boolean; hasDigital: boolean; paid: boolean; refunded: boolean }) {
+  const title = refunded
+    ? "Your order has been refunded"
+    : !paid
     ? "We’re confirming your order"
     : hasPrint && hasDigital
       ? "Downloads ready — your print is in production"
@@ -83,7 +85,7 @@ function OriginalOrderHeader({ hasPrint, hasDigital, paid }: { hasPrint: boolean
         : hasDigital
           ? "Your downloads are ready"
           : "Thank you for your order";
-  const tone = hasPrint && hasDigital ? "text-teal-700" : hasDigital ? "text-green-700" : "text-indigo-700";
+  const tone = refunded ? "text-gray-700" : hasPrint && hasDigital ? "text-teal-700" : hasDigital ? "text-green-700" : "text-indigo-700";
   return (
     <header className="mb-6 sm:mb-8">
       <h1 className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${tone}`}>{title}</h1>
@@ -103,7 +105,7 @@ function OriginalOrderHeader({ hasPrint, hasDigital, paid }: { hasPrint: boolean
           <p className="text-gray-500 text-xs sm:text-sm mt-1"><span className="font-medium">Kreyòl:</span> Telechaje epi konsève fichye ou yo anba a.</p>
         </>
       ) : (
-        <p role="status" className="text-gray-600 mt-2 text-sm sm:text-base">Your payment is being verified. Please keep this page open.</p>
+        <p role="status" className="text-gray-600 mt-2 text-sm sm:text-base">{refunded ? "This order was fully refunded. Digital download access has ended." : "Your payment is being verified. Please keep this page open."}</p>
       )}
     </header>
   );
@@ -203,7 +205,7 @@ export default function CheckoutSuccessPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-      <OriginalOrderHeader hasPrint={printItems.length > 0} hasDigital={digitalItems.length > 0} paid={paid} />
+      <OriginalOrderHeader hasPrint={printItems.length > 0} hasDigital={digitalItems.length > 0} paid={paid}  refunded={order?.status === "REFUNDED"} />
       {error && <p role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
       {order && (
         <>
@@ -236,13 +238,14 @@ export default function CheckoutSuccessPage() {
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <Badge label={`${downloads.length} file${downloads.length === 1 ? "" : "s"}`} />
                 {anyVector && <Badge label="Includes vector formats" tone="indigo" />}
-                <Badge label="Secure account downloads" tone="emerald" />
+                {order?.status === "REFUNDED" ? <Badge label="Downloads revoked" /> : <Badge label="Secure account downloads" tone="emerald" />}
               </div>
-              <p className="text-xs sm:text-sm text-gray-600 mt-3">Tip: Keep your original downloads safe. You can access active downloads from the signed-in account used at checkout.</p>
+              <p className="text-xs sm:text-sm text-gray-600 mt-3">{order?.status === "REFUNDED" ? "Download access has ended because this order was fully refunded." : "Tip: Keep your original downloads safe. You can access active downloads from the signed-in account used at checkout."}</p>
             </section>
           )}
 
-          {digitalItems.length > 0 && !paid && <div role="status" className="rounded-2xl border bg-white/70 p-6 sm:p-8 text-sm text-gray-600">Files become available after payment is confirmed.</div>}
+          {digitalItems.length > 0 && order?.status === "REFUNDED" && <div role="status" className="rounded-2xl border bg-white/70 p-6 sm:p-8 text-sm text-gray-600">No active downloads are available for this refunded order.</div>}
+          {digitalItems.length > 0 && !paid && order?.status !== "REFUNDED" && <div role="status" className="rounded-2xl border bg-white/70 p-6 sm:p-8 text-sm text-gray-600">Files become available after payment is confirmed.</div>}
           {digitalItems.length > 0 && paid && (downloadsStatus === "loading" || downloadsStatus === "idle") && <p role="status" className="rounded-2xl border bg-white/70 p-6 sm:p-8 text-sm text-gray-600">Loading your downloads…</p>}
           {digitalItems.length > 0 && paid && downloadsStatus === "failed" && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 sm:p-8 text-sm text-amber-900"><p>We couldn't load your downloads. Your paid order remains confirmed.</p><button type="button" className="mt-2 underline underline-offset-4" onClick={() => setTick((n) => n + 1)}>Try again</button></div>}
           {digitalItems.length > 0 && paid && downloadsStatus === "ready" && downloads.length === 0 && <div className="rounded-2xl border bg-white/70 p-6 sm:p-8 text-sm text-gray-600"><p>No downloadable files are showing for this order yet.</p><button type="button" className="mt-2 underline underline-offset-4" onClick={() => setTick((n) => n + 1)}>Refresh downloads</button></div>}

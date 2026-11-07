@@ -64,6 +64,15 @@ enum PaymentStatus {
   REFUNDED
 }
 
+// Provider refund lifecycle is independent of PaymentStatus. A partial refund
+// does not make the entire payment/order REFUNDED.
+enum RefundRecordStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
 enum ShipmentStatus {
   PENDING
   SHIPPED
@@ -700,8 +709,31 @@ model Payment {
   createdAt       DateTime @default(now())
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   order           Order @relation(fields: [organizationId, orderId], references: [organizationId, id], onDelete: Restrict)
+  refunds         PaymentRefund[]
+  @@unique([organizationId, id])
   @@unique([organizationId, provider, providerAccount, providerPaymentId])
   @@index([organizationId, orderId])
+}
+
+// One provider refund object, independent of webhook retries and their event IDs.
+// Success totals are computed from successful refund records only. Recording a
+// partial refund never automatically revokes purchased digital access.
+model PaymentRefund {
+  id                 String @id @default(cuid())
+  organizationId     String
+  paymentId          String
+  provider           String
+  providerAccount    String
+  providerRefundId   String
+  providerChargeId   String
+  amountMinor        Int
+  currency           String @db.VarChar(3)
+  status             RefundRecordStatus
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  payment            Payment @relation(fields: [organizationId, paymentId], references: [organizationId, id], onDelete: Restrict)
+  @@unique([provider, providerAccount, providerRefundId])
+  @@index([organizationId, paymentId, status])
 }
 
 model Shipment {

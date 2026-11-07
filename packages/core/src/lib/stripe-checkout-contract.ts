@@ -74,7 +74,7 @@ export function stripeTestLocalReturnOrigin(args: {
     const db = new URL(args.databaseUrl ?? "");
     if ((db.protocol !== "postgresql:" && db.protocol !== "postgres:") ||
         (db.hostname !== "localhost" && db.hostname !== "127.0.0.1") ||
-        (db.port !== "" && db.port !== "5432") ||
+        (db.port !== "" && db.port !== "5432" && db.port !== "55432") ||
         decodeURIComponent(db.pathname) !== "/haitian_art_store" ||
         db.searchParams.get("schema") !== "ziledigital") return null;
   } catch { return null; }
