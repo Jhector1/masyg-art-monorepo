@@ -1,4 +1,4 @@
-import {timingSafeEqual} from "node:crypto";
+import {authorizedCommerceCron} from "../../../../lib/commerce-cron-auth";
 import type {NextRequest} from "next/server";
 import {expirePreparedCheckouts} from "../../../../payments/expire-prepared-checkouts";
 export const runtime="nodejs";
@@ -8,10 +8,7 @@ const headers={"Cache-Control":"no-store"};
 export async function POST(req:NextRequest) {
   const expected=process.env.ZILEDIGITAL_COMMERCE_CRON_SECRET??"";
   const supplied=req.headers.get("authorization")??"";
-  const expectedBytes=Buffer.from(`Bearer ${expected}`);
-  const suppliedBytes=Buffer.from(supplied);
-  if(expected.length<32 || expectedBytes.length!==suppliedBytes.length ||
-      !timingSafeEqual(expectedBytes,suppliedBytes))
+  if(!authorizedCommerceCron(supplied,expected))
     return Response.json({error:"Unauthorized"},{status:401,headers});
   try {
     const summary=await expirePreparedCheckouts(50);

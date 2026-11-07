@@ -2,11 +2,18 @@ import { prisma } from "@acme/core/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { CommerceInvariantError } from "./commerce-invariants";
 import type { VerifiedPaidEvidence } from "./stripe-paid-evidence";
+import type { VerifiedRecoveredStripePaidEvidence } from "./stripe-recovery-evidence";
+
+type SettlementEvidence = VerifiedPaidEvidence | VerifiedRecoveredStripePaidEvidence;
+function isRecovery(e: SettlementEvidence): e is VerifiedRecoveredStripePaidEvidence {
+  return "source" in e && e.source === "PROVIDER_RETRIEVAL";
+}
 import {issuePurchasedDigitalGrants} from "./digital-entitlements";
 
 /** Internal, server-authoritative settlement. No public route, email or file grant.
  * Must ONLY be called with provider evidence retrieved and validated by the
- * trusted signed-webhook adapter. All DB state changes are a single transaction.
+ * trusted signed-webhook adapter OR verified test-only Stripe API recovery.
+ * Recovery has NO invented webhook event ID. All DB changes share one transaction.
  */
 const attemptSelect = {
   id:true,organizationId:true,storeId:true,orderId:true,connectionId:true,
@@ -19,9 +26,11 @@ const attemptSelect = {
 } satisfies Prisma.CheckoutAttemptSelect;
 type Attempt = Prisma.CheckoutAttemptGetPayload<{select:typeof attemptSelect}>;
 
-function validated(e:VerifiedPaidEvidence) {
+function validated(e:SettlementEvidence) {
   if (!e || e.provider!=="stripe" ||
-      !/^evt_[A-Za-z0-9_]{6,}$/.test(e.providerEventId) ||
+      (isRecovery(e)
+        ? (!e.organizationId || !e.storeId || !e.connectionId || "providerEventId" in e)
+        : !/^evt_[A-Za-z0-9_]{6,}$/.test(e.providerEventId)) ||
       !/^acct_[A-Za-z0-9]{6,}$/.test(e.providerAccount) ||
       !/^cs_test_[A-Za-z0-9_]+$/.test(e.sessionId) ||
       !/^pi_[A-Za-z0-9_]+$/.test(e.providerPaymentId) ||
@@ -31,7 +40,7 @@ function validated(e:VerifiedPaidEvidence) {
     throw new CommerceInvariantError("PAYMENT_EVIDENCE_INVALID","Verified payment evidence required");
   }
 }
-function assertIdentity(a:Attempt,e:VerifiedPaidEvidence) {
+function assertIdentity(a:Attempt,e:SettlementEvidence) {
   if (a.id!==e.attemptId || a.orderId!==e.orderId ||
       a.providerSessionId!==e.sessionId ||
       a.connection.id!==a.connectionId ||
@@ -42,7 +51,9 @@ function assertIdentity(a:Attempt,e:VerifiedPaidEvidence) {
       !a.connection.capabilities.includes("payments") ||
       a.order.id!==e.orderId || a.order.organizationId!==a.organizationId ||
       a.order.storeId!==a.storeId || a.order.totalMinor!==e.amountMinor ||
-      a.order.currency!==e.currency) {
+      a.order.currency!==e.currency ||
+      (isRecovery(e) && (a.organizationId!==e.organizationId ||
+        a.storeId!==e.storeId || a.connectionId!==e.connectionId))) {
     throw new CommerceInvariantError("PAYMENT_MERCHANT_MISMATCH","Payment does not match checkout merchant, amount or order");
   }
 }
@@ -60,14 +71,15 @@ async function transaction<T>(work:(tx:Prisma.TransactionClient)=>Promise<T>):Pr
  * Paid amounts and provider payment IDs must match the immutable order snapshot.
  * A released hold is a fatal reconciliation conflict, never an invitation to oversell.
  */
-export async function settleVerifiedPaidCheckout(evidence:VerifiedPaidEvidence) {
+export async function settleVerifiedPaidCheckout(evidence:SettlementEvidence) {
   validated(evidence);
   return transaction(async tx=>{
     // Global provider event idempotency prevents reuse across merchants.
-    const prior=await tx.providerEvent.findUnique({
-      where:{provider_providerEventId:{provider:"stripe",providerEventId:evidence.providerEventId}},
+    const eventId = isRecovery(evidence) ? null : evidence.providerEventId;
+    const prior = eventId ? await tx.providerEvent.findUnique({
+      where:{provider_providerEventId:{provider:"stripe",providerEventId:eventId}},
       select:{organizationId:true,status:true},
-    });
+    }) : null;
     const a=await tx.checkoutAttempt.findFirst({where:{
       id:evidence.attemptId,providerSessionId:evidence.sessionId,
       connection:{provider:"stripe",accountRef:evidence.providerAccount},
@@ -98,8 +110,8 @@ export async function settleVerifiedPaidCheckout(evidence:VerifiedPaidEvidence) 
       // A distinct signed success event referring to this exact paid intent may
       // arrive after fulfillment or refund; record it without changing money,
       // inventory, fulfillment status, or grant revocations.
-      if(!prior) await tx.providerEvent.create({data:{organizationId:a.organizationId,
-        provider:"stripe",providerEventId:evidence.providerEventId,
+      if(!prior && eventId) await tx.providerEvent.create({data:{organizationId:a.organizationId,
+        provider:"stripe",providerEventId:eventId,
         status:"PROCESSED",attempts:1,processedAt:new Date()}});
       return {status:"PAID" as const,orderId:a.orderId,paymentId:paid.id,replay:true as const};
     }
@@ -141,7 +153,8 @@ export async function settleVerifiedPaidCheckout(evidence:VerifiedPaidEvidence) 
     const payment=await tx.payment.create({data:{organizationId:a.organizationId,orderId:a.orderId,
       provider:"stripe",providerAccount:evidence.providerAccount,providerPaymentId:evidence.providerPaymentId,
       amountMinor:evidence.amountMinor,currency:evidence.currency,status:"SUCCEEDED"},select:{id:true}});
-    await tx.providerEvent.create({data:{organizationId:a.organizationId,provider:"stripe",providerEventId:evidence.providerEventId,
+    if(eventId) await tx.providerEvent.create({data:{organizationId:a.organizationId,
+      provider:"stripe",providerEventId:eventId,
       status:"PROCESSED",attempts:1,processedAt:new Date()}});
     return {status:"PAID" as const,orderId:a.orderId,paymentId:payment.id,grantsIssued,replay:false as const};
   });

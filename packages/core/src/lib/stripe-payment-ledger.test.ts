@@ -150,3 +150,47 @@ test("replay refuses inconsistent settlement status and mismatched recorded paym
   await expect(settleVerifiedPaidCheckout(evidence)).rejects.toThrow("matching payment");
   expect(tx.providerEvent.create).not.toHaveBeenCalled();
 });
+
+const recoveryEvidence={provider:"stripe" as const,source:"PROVIDER_RETRIEVAL" as const,
+  providerAccount:evidence.providerAccount,providerPaymentId:evidence.providerPaymentId,
+  sessionId:evidence.sessionId,attemptId:evidence.attemptId,orderId:evidence.orderId,
+  amountMinor:evidence.amountMinor,currency:evidence.currency,
+  organizationId:"org_001",storeId:"store_001",connectionId:"conn_001"};
+
+test("verified provider recovery uses atomic settlement without creating synthetic Stripe events",async()=>{
+  const tx=makeTx();wire(tx);
+  expect(await settleVerifiedPaidCheckout(recoveryEvidence)).toMatchObject({status:"PAID",replay:false});
+  expect(tx.providerEvent.findUnique).not.toHaveBeenCalled();
+  expect(tx.providerEvent.create).not.toHaveBeenCalled();
+  expect(tx.payment.create).toHaveBeenCalledTimes(1);
+  expect(tx.order.updateMany).toHaveBeenCalledTimes(1);
+  expect(tx.stockHold.updateMany).toHaveBeenCalledTimes(1);
+});
+test("recovered checkout replay cannot reissue inventory or grants",async()=>{
+  const settled={...attempt,status:"PAID",order:{...attempt.order,status:"FULFILLED"}};
+  const tx=makeTx({attempt:settled,payment:{id:"paid_001"}});wire(tx);
+  expect(await settleVerifiedPaidCheckout(recoveryEvidence)).toMatchObject({replay:true});
+  expect(tx.stockHold.findMany).not.toHaveBeenCalled();
+  expect(tx.order.updateMany).not.toHaveBeenCalled();
+  expect(tx.providerEvent.create).not.toHaveBeenCalled();
+});
+test("recovered fully refunded checkout never reinstates access",async()=>{
+  const refunded={...attempt,status:"PAID",order:{...attempt.order,status:"REFUNDED"}};
+  const tx=makeTx({attempt:refunded,payment:{id:"paid_refunded"}});wire(tx);
+  expect(await settleVerifiedPaidCheckout(recoveryEvidence)).toMatchObject({replay:true});
+  expect(tx.payment.findFirst).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({status:"REFUNDED"})}));
+  expect(tx.digitalGrant.create).not.toHaveBeenCalled();
+  expect(tx.stockHold.findMany).not.toHaveBeenCalled();
+  expect(tx.providerEvent.create).not.toHaveBeenCalled();
+});
+test("recovery rejects tenant, connection and forged webhook ID fields",async()=>{
+  for(const bad of [
+    {...recoveryEvidence,organizationId:"another_org"},
+    {...recoveryEvidence,connectionId:"another_connection"},
+    {...recoveryEvidence,providerEventId:"evt_fake_recovery"},
+  ]){
+    const tx=makeTx();wire(tx);
+    await expect(settleVerifiedPaidCheckout(bad)).rejects.toThrow();
+    expect(tx.payment.create).not.toHaveBeenCalled();
+  }
+});
