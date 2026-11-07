@@ -2,9 +2,9 @@
 
 import SEO from "@acme/ui/components/SEO";
 import ProfileHeader from "@acme/ui/components/profile/ProfileHeader";
-import ProfileTabs from "@acme/ui/components/profile/ProfileTabs";
 import ProfileInfo from "@acme/ui/components/profile/ProfileInfo";
 import CollectionGallery from "@acme/ui/components/profile/CollectionGallery";
+import OrderHistory from "@acme/ui/components/profile/OrderHistory";
 import AccountSettings from "@acme/ui/components/profile/AccountSettings";
 import Achievements from "@acme/ui/components/profile/Achievements";
 import StatCard from "@acme/ui/components/profile/StatCard";
@@ -17,7 +17,6 @@ import {
   useUserOrdersData,
   selectFlat,
   selectFiltered,
-  groupByDate,
   type OrdersFilter,
 } from "@acme/core/hooks/useUserOrders";
 import { computeStats } from "@acme/core/lib/achievements";
@@ -27,10 +26,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useProfile } from "@acme/core/hooks/useProfile";
 import type { UserProfile } from "@acme/ui/components/profile/types";
 
-export type Tab = "Profile" | "Collections" | "Settings";
-const TAB_SLUG: Record<Tab, string> = { Profile: "profile", Collections: "collections", Settings: "settings" } as const;
+export type Tab = "Profile" | "Collections" | "Orders" | "Settings";
+const TAB_SLUG: Record<Tab, string> = { Profile: "profile", Collections: "collections", Orders: "orders", Settings: "settings" } as const;
 const fromSlug = (slug?: string): Tab =>
-  slug === "collections" ? "Collections" : slug === "settings" ? "Settings" : "Profile";
+  slug === "collections" ? "Collections" : slug === "orders" ? "Orders" : slug === "settings" ? "Settings" : "Profile";
 
 function toGalleryItem(i: BaseItem): GalleryItem {
   const price = (i as any).price ?? (i as any).unitPrice ?? ((i as any).unitAmountCents ?? 0) / 100;
@@ -72,28 +71,23 @@ export default function ProfilePageClient({ initialTab }: { initialTab: Tab }) {
   );
 
   // Orders
-  const { rawData } = useUserOrdersData();
+  const { rawData, orders, loading: ordersLoading, error: ordersError, refreshOrders } = useUserOrdersData();
   const allFlat = useMemo(() => selectFlat(rawData), [rawData]);
   const filteredFlat = useMemo(() => selectFiltered(allFlat, filter), [allFlat, filter]);
-  const grouped = useMemo(() => groupByDate(filteredFlat), [filteredFlat]);
 
   const baseItems: BaseItem[] = filteredFlat;
   const galleryItems: GalleryItem[] = useMemo(() => baseItems.map(toGalleryItem), [baseItems]);
 
   const stats = useMemo(() => computeStats(allFlat), [allFlat]);
-  const purchasedArtworks = filteredFlat.length;
+  const purchasedArtworks = allFlat.length;
 
-  const ordersPlaced = useMemo(() => {
-    const fromItems = new Set(allFlat.map((i: any) => i?.order?.id).filter(Boolean)).size;
-    const fromGroups = Object.keys(rawData).length;
-    return fromItems || fromGroups;
-  }, [allFlat, rawData]);
+  const recentOrders = orders.length;
 
   // URL ↔ tab sync
   useEffect(() => {
     const next = fromSlug((searchParams?.get("tab") || "").toLowerCase());
-    if (next !== activeTab) setActiveTab(next);
-  }, [searchParams, activeTab]);
+    setActiveTab(current => current === next ? current : next);
+  }, [searchParams]);
 
   const onTabChange = (tab: Tab) => {
     setActiveTab(tab);
@@ -124,21 +118,50 @@ export default function ProfilePageClient({ initialTab }: { initialTab: Tab }) {
         {/* Header & Tabs */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <ProfileHeader user={headerUser} onAvatarUpdated={applyUserPatch} />
-          <ProfileTabs activeTab={activeTab} setActiveTab={onTabChange} />
+          <nav aria-label="Account sections" className="flex flex-wrap items-center gap-1 rounded-2xl bg-gray-100/80 p-1.5">
+            {([
+              ["Profile", "Overview"],
+              ["Collections", "My Art"],
+              ["Orders", "Orders"],
+              ["Settings", "Settings"],
+            ] as const).map(([tab, label]) => (
+              <button
+                key={tab} type="button"
+                aria-current={activeTab === tab ? "page" : undefined}
+                onClick={() => onTabChange(tab)}
+                className={`rounded-xl px-3 py-2 text-sm font-medium transition sm:px-4 ${activeTab === tab
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:bg-white/60 hover:text-gray-900"}`}
+              >{label}</button>
+            ))}
+          </nav>
         </div>
 
-        {/* Stats */}
+        {activeTab === "Profile" && (
         <div className="flex gap-3 overflow-x-auto snap-x md:overflow-visible md:grid md:grid-cols-4 md:gap-4 -mx-2 px-2 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <StatCard icon={<HeartIcon className="h-6 w-6" />} value={favorites.size} label="Favorites" />
           <StatCard icon={<ArrowDownTrayIcon className="h-6 w-6" />} value={user.downloadCount ?? 0} label="Downloads" />
           <StatCard icon={<StarIcon className="h-6 w-6" />} value={purchasedArtworks} label="Purchased Artworks" />
-          <StatCard icon={<ShoppingBagIcon className="h-6 w-6" />} value={ordersPlaced} label="Orders Placed" />
+          <StatCard icon={<ShoppingBagIcon className="h-6 w-6" />} value={recentOrders} label="Recent Orders" />
         </div>
+        )}
 
         {/* Tabs */}
         <div className="space-y-8">
           {activeTab === "Profile" && (
             <>
+              <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Account overview</h2>
+                  <p className="mt-1 text-sm text-gray-600">Your account details and purchase activity in one place.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => onTabChange("Collections")}
+                    className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">My Art</button>
+                  <button type="button" onClick={() => onTabChange("Orders")}
+                    className="rounded-full border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Order history</button>
+                </div>
+              </section>
               <Achievements metric="artworks" uniqueArtworks={stats.uniqueArtworks} ordersPlaced={stats.ordersPlaced} />
               <ProfileInfo user={headerUser} onUpdated={applyUserPatch} />
             </>
@@ -149,6 +172,16 @@ export default function ProfilePageClient({ initialTab }: { initialTab: Tab }) {
               filter={filter as VariantType}
               setFilter={(val: VariantType) => setFilter(val as any)}
               items={galleryItems}
+            />
+          )}
+
+          {activeTab === "Orders" && (
+            <OrderHistory
+              orders={orders}
+              loading={ordersLoading}
+              error={ordersError?.message ?? null}
+              onRefresh={refreshOrders}
+              onViewCollections={() => onTabChange("Collections")}
             />
           )}
 

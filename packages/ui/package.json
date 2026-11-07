@@ -80,6 +80,7 @@
     "./components/profile/AccountSettings": "./src/components/profile/AccountSettings.tsx",
     "./components/profile/Achievements": "./src/components/profile/Achievements.tsx",
     "./components/profile/CollectionGallery": "./src/components/profile/CollectionGallery.tsx",
+    "./components/profile/OrderHistory": "./src/components/profile/OrderHistory.tsx",
     "./components/profile/ProfileHeader": "./src/components/profile/ProfileHeader.tsx",
     "./components/profile/ProfileInfo": "./src/components/profile/ProfileInfo.tsx",
     "./components/profile/ProfileTabs": "./src/components/profile/ProfileTabs.tsx",

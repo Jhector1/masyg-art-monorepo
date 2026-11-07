@@ -37,6 +37,8 @@ function currencyDigits(currency:string){
 }
 export function useUserOrdersData(){
   const [rawData,setRawData]=useState<OrdersByGroup>({});
+  const [orders,setOrders]=useState<BuyerOrder[]>([]);
+  const [refreshKey,setRefreshKey]=useState(0);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState<Error|null>(null);
   useEffect(()=>{
@@ -46,13 +48,14 @@ export function useUserOrdersData(){
       try{
         const context=await getCurrentStorefront();
         const response=await listStoreOrders(context.store.id);
-        if(active)setRawData(ordersToCollection(response.orders,context.store.id));
-      }catch(e){if(active){setRawData({});setError(e instanceof Error?e:new Error("Could not load purchases"));}}
+        if(active){setOrders(response.orders);setRawData(ordersToCollection(response.orders,context.store.id));}
+      }catch(e){if(active){setOrders([]);setRawData({});setError(e instanceof Error?e:new Error("Could not load purchases"));}}
       finally{if(active)setLoading(false);}
     })();
     return()=>{active=false;};
-  },[]);
-  return {rawData,loading,error};
+  },[refreshKey]);
+  const refreshOrders=()=>setRefreshKey(n=>n+1);
+  return {rawData,orders,loading,error,refreshOrders};
 }
 export function selectFlat(raw:OrdersByGroup){return Object.values(raw).flat();}
 export function selectFiltered(items:CollectionItem[],filter:OrdersFilter){return filter==="ALL"?items:items.filter(i=>i.type===filter);}

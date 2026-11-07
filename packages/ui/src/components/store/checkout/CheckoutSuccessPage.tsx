@@ -8,6 +8,10 @@ import {
   getCurrentStorefront,
   saveStoreGrantDownload,
 } from "@acme/core/lib/client/storefront-commerce";
+import {
+  CHECKOUT_STATUS_POLL_INTERVAL_MS,
+  shouldAutoPollCheckoutStatus,
+} from "@acme/core/lib/checkout-return-recovery";
 
 /** Current commerce contracts: no old private checkout or caller-supplied download URLs. */
 type OrderStatus = {
@@ -73,9 +77,13 @@ function DetailRow({ k, v }: { k: string; v: string }) {
 
 /** Mirrors the original ZileDigital checkout-success header layout and copy.
  * The old SaveOrderCta is intentionally absent: it references retired private APIs. */
-function OriginalOrderHeader({ hasPrint, hasDigital, paid, refunded }: { hasPrint: boolean; hasDigital: boolean; paid: boolean; refunded: boolean }) {
+function OriginalOrderHeader({ hasPrint, hasDigital, paid, refunded, delayed, unconfirmed }: { hasPrint: boolean; hasDigital: boolean; paid: boolean; refunded: boolean; delayed: boolean; unconfirmed: boolean }) {
   const title = refunded
     ? "Your order has been refunded"
+    : unconfirmed
+    ? "Payment has not been confirmed"
+    : delayed
+    ? "Payment confirmation is taking longer than expected"
     : !paid
     ? "We’re confirming your order"
     : hasPrint && hasDigital
@@ -85,7 +93,7 @@ function OriginalOrderHeader({ hasPrint, hasDigital, paid, refunded }: { hasPrin
         : hasDigital
           ? "Your downloads are ready"
           : "Thank you for your order";
-  const tone = refunded ? "text-gray-700" : hasPrint && hasDigital ? "text-teal-700" : hasDigital ? "text-green-700" : "text-indigo-700";
+  const tone = refunded || delayed || unconfirmed ? "text-gray-700" : hasPrint && hasDigital ? "text-teal-700" : hasDigital ? "text-green-700" : "text-indigo-700";
   return (
     <header className="mb-6 sm:mb-8">
       <h1 className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${tone}`}>{title}</h1>
@@ -105,7 +113,7 @@ function OriginalOrderHeader({ hasPrint, hasDigital, paid, refunded }: { hasPrin
           <p className="text-gray-500 text-xs sm:text-sm mt-1"><span className="font-medium">Kreyòl:</span> Telechaje epi konsève fichye ou yo anba a.</p>
         </>
       ) : (
-        <p role="status" className="text-gray-600 mt-2 text-sm sm:text-base">{refunded ? "This order was fully refunded. Digital download access has ended." : "Your payment is being verified. Please keep this page open."}</p>
+        <p role="status" className="text-gray-600 mt-2 text-sm sm:text-base">{refunded ? "This order was fully refunded. Digital download access has ended." : unconfirmed ? "This order is not marked as paid. If you believe payment was completed, check your account before attempting another checkout." : delayed ? "Your order is still awaiting verified payment confirmation. You can check again here or return to your account later." : "Your payment is being verified automatically. You can return to your account later."}</p>
       )}
     </header>
   );
@@ -124,13 +132,42 @@ export default function CheckoutSuccessPage() {
   const [busyGrant, setBusyGrant] = React.useState<string | null>(null);
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
+  const [checking, setChecking] = React.useState(false);
+  const [pollingPaused, setPollingPaused] = React.useState(false);
+  const scheduledPolls = React.useRef(0);
+  const currentSession = React.useRef(sessionId);
+
+  function checkAgain() {
+    if (checking) return;
+    // A manual check can restart a bounded polling window; it never starts checkout.
+    scheduledPolls.current = 0;
+    setPollingPaused(false);
+    setError(null);
+    setTick((n) => n + 1);
+  }
 
   React.useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    if (currentSession.current !== sessionId) {
+      currentSession.current = sessionId;
+      scheduledPolls.current = 0;
+      setPollingPaused(false);
+      setOrder(null);
+      setDownloads([]);
+      setStoreId(null);
+      setError(null);
+      setLoading(true);
+    }
+    // A missing return URL is not a reason to query Stripe or guess an order.
+    if (!sessionId) {
+      setLoading(false);
+      setChecking(false);
+      return () => { active = false; };
+    }
     async function read() {
+      setChecking(true);
       try {
-        if (!sessionId) throw new Error("Missing checkout session ID");
         const context = await getCurrentStorefront();
         const id = context.store.id;
         const res = await fetch(`/api/public/stores/${encodeURIComponent(id)}/orders/by-session?session_id=${encodeURIComponent(sessionId)}`, {
@@ -169,11 +206,29 @@ export default function CheckoutSuccessPage() {
           setDownloads([]);
           setDownloadsStatus("idle");
         }
-        if (verified.processing && active) timer = setTimeout(() => setTick((n) => n + 1), 3000);
+        if (verified.processing && active) {
+          if (shouldAutoPollCheckoutStatus(verified.processing, scheduledPolls.current)) {
+            scheduledPolls.current += 1;
+            setPollingPaused(false);
+            timer = setTimeout(() => setTick((n) => n + 1), CHECKOUT_STATUS_POLL_INTERVAL_MS);
+          } else {
+            setPollingPaused(true);
+          }
+        } else {
+          setPollingPaused(false);
+        }
       } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : "Order status unavailable");
+        if (active) {
+          setOrder(null);
+          setDownloads([]);
+          setStoreId(null);
+          setError(reason instanceof Error ? reason.message : "Order status unavailable");
+        }
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+          setChecking(false);
+        }
       }
     }
     void read();
@@ -195,17 +250,70 @@ export default function CheckoutSuccessPage() {
   }
 
   const paid = Boolean(order && settledStatuses.has(order.status));
+  const unconfirmed = Boolean(order && !paid && order.status !== "REFUNDED" && !order.processing);
   const digitalItems = order?.items.filter((item) => item.type === "DIGITAL") ?? [];
   const printItems = order?.items.filter((item) => item.type === "PHYSICAL") ?? [];
   const anyVector = downloads.some((file) => /\.(svg|pdf)$/i.test(file.label));
+
+  if (!sessionId) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+        <header className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-700">Looking for your order?</h1>
+          <p className="text-gray-600 mt-2 text-sm sm:text-base">You can recover confirmed purchases from your account without the original checkout link.</p>
+        </header>
+        <section className="rounded-2xl border bg-white/70 backdrop-blur p-4 sm:p-5 shadow-sm text-sm text-gray-700">
+          <p>If you completed checkout, sign in with the account you used to pay and open your purchases. Orders awaiting payment confirmation may not appear yet.</p>
+          <div className="mt-4 flex flex-wrap gap-4">
+            <Link href="/profile?tab=collections" className="text-indigo-700 font-medium underline underline-offset-4">View your purchases</Link>
+            <Link href="/store" className="text-gray-600 underline underline-offset-4">Return to store</Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (loading && !order) {
     return <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16"><div className="animate-pulse space-y-6"><div className="h-8 w-2/3 bg-gray-200 rounded" /><div className="h-5 w-1/2 bg-gray-200 rounded" /><div className="h-40 w-full bg-gray-200 rounded-2xl" /><div className="h-24 w-full bg-gray-200 rounded-2xl" /></div></div>;
   }
 
+  if (error && !order) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+        <header className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-700">We couldn't check your order</h1>
+          <p className="text-gray-600 mt-2 text-sm sm:text-base">An interrupted status check does not mean your payment failed. You can retry or view confirmed purchases in your account.</p>
+        </header>
+        <section className="rounded-2xl border bg-white/70 backdrop-blur p-4 sm:p-5 shadow-sm">
+          <p role="alert" className="text-sm text-red-700">{error}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+            <button type="button" disabled={checking} onClick={checkAgain} className="font-medium text-indigo-700 underline underline-offset-4 disabled:opacity-50">Check status again</button>
+            <Link href="/profile?tab=collections" className="text-gray-700 underline underline-offset-4">View your purchases</Link>
+            <Link href="/authenticate" className="text-gray-600 underline underline-offset-4">Sign in</Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-      <OriginalOrderHeader hasPrint={printItems.length > 0} hasDigital={digitalItems.length > 0} paid={paid}  refunded={order?.status === "REFUNDED"} />
+      <OriginalOrderHeader hasPrint={printItems.length > 0} hasDigital={digitalItems.length > 0} paid={paid} refunded={order?.status === "REFUNDED"} delayed={Boolean(order?.processing && pollingPaused)} unconfirmed={unconfirmed} />
+      {unconfirmed && (
+        <section role="status" className="mb-6 sm:mb-8 rounded-2xl border bg-white/70 p-4 sm:p-5 text-sm text-gray-700">
+          <p>This checkout is not confirmed as paid. You can review purchases in your account; no new payment is started by visiting that page.</p>
+          <Link href="/profile?tab=collections" className="mt-3 inline-block font-medium text-indigo-700 underline underline-offset-4">View your purchases</Link>
+        </section>
+      )}
+      {order?.processing && pollingPaused && (
+        <section role="status" className="mb-6 sm:mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5 text-sm text-amber-900">
+          <p>Payment confirmation is still pending. You can safely return to your account and check later. Avoid starting another checkout while this payment's outcome is uncertain.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-4">
+            <button type="button" disabled={checking} onClick={checkAgain} className="font-medium underline underline-offset-4 disabled:opacity-50">Check status again</button>
+            <Link href="/profile?tab=collections" className="underline underline-offset-4">View your purchases</Link>
+          </div>
+        </section>
+      )}
       {error && <p role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
       {order && (
         <>

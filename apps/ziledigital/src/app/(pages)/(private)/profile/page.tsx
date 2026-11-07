@@ -1,11 +1,13 @@
 import ProfilePageClient from "./ProfilePageClient";
 
-type Tab = "Profile" | "Collections" | "Settings";
+type Tab = "Profile" | "Collections" | "Orders" | "Settings";
 
 function fromSlug(slug?: string): Tab {
   switch ((slug || "").toLowerCase()) {
     case "collections":
       return "Collections";
+    case "orders":
+      return "Orders";
     case "settings":
       return "Settings";
     default:
