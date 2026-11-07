@@ -21,6 +21,33 @@ interface CollectionGalleryProps {
 
 const TABS: VariantType[] = ["ALL", "DIGITAL", "PRINT"];
 
+function CollectionPreview({ src, alt }: { src: string | null; alt: string }) {
+  // Public catalog previews are display-only. Never use the private digital file as an image.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (!src || failedSrc === src) {
+    return (
+      <div className="absolute inset-0 grid place-items-center bg-gray-50 text-sm text-gray-500"
+           role="img" aria-label={`Preview unavailable for ${alt}`}>
+        Preview unavailable
+      </div>
+    );
+  }
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      className="object-cover"
+      sizes="(min-width:1024px) 33vw, 50vw"
+      // This public-media endpoint returns a redirect to the published image.
+      // Let the browser follow it instead of proxying it through Next image optimization.
+      unoptimized={src.startsWith("/api/public/stores/")}
+      onError={() => setFailedSrc(src)}
+    />
+  );
+}
+
+
 export default function CollectionGallery({
   items,
   filter,
@@ -109,7 +136,7 @@ export default function CollectionGallery({
                 const img =
                   item.previewUrl ||
                   item.product.thumbnails?.[0] ||
-                  "/images/placeholder.png";
+                  null;
 
                 const verifiedFiles = grantsByItem[item.id] ?? [];
                 const topMeta =
@@ -133,13 +160,7 @@ export default function CollectionGallery({
                   >
                     {/* ⬇️ image wrapper now handles clipping */}
                     <div className="relative h-56 w-full rounded-t-xl overflow-hidden">
-                      <Image
-                        src={img}
-                        alt={item.product.title}
-                        fill
-                        className="object-cover"
-                        sizes="(min-width:1024px) 33vw, 50vw"
-                      />
+                      <CollectionPreview src={img} alt={item.product.title} />
                       <div className="absolute left-3 top-3">
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white/90 text-gray-800 shadow">
                           {item.type}

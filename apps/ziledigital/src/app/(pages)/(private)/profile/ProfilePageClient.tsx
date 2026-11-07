@@ -13,7 +13,6 @@ import { ArrowDownTrayIcon, HeartIcon, StarIcon, ShoppingBagIcon } from "@heroic
 import { useEffect, useMemo, useState, useCallback } from "react";
 import type { VariantType } from "@acme/core/types";
 import { useFavorites } from "@acme/core/contexts/FavoriteContext";
-import { useDashboard } from "@acme/core/hooks/useDashboard";
 import {
   useUserOrdersData,
   selectFlat,
@@ -54,7 +53,6 @@ export default function ProfilePageClient({ initialTab }: { initialTab: Tab }) {
   const [filter, setFilter] = useState<OrdersFilter>("DIGITAL");
 
   const { favorites } = useFavorites();
-  const { data: dashboard } = useDashboard();
 
   // Profile
   const { user, loading, unauthorized, refresh, mutate } = useProfile({
@@ -132,7 +130,7 @@ export default function ProfilePageClient({ initialTab }: { initialTab: Tab }) {
         {/* Stats */}
         <div className="flex gap-3 overflow-x-auto snap-x md:overflow-visible md:grid md:grid-cols-4 md:gap-4 -mx-2 px-2 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <StatCard icon={<HeartIcon className="h-6 w-6" />} value={favorites.size} label="Favorites" />
-          <StatCard icon={<ArrowDownTrayIcon className="h-6 w-6" />} value={dashboard?.downloadCount ?? 0} label="Downloads" />
+          <StatCard icon={<ArrowDownTrayIcon className="h-6 w-6" />} value={user.downloadCount ?? 0} label="Downloads" />
           <StatCard icon={<StarIcon className="h-6 w-6" />} value={purchasedArtworks} label="Purchased Artworks" />
           <StatCard icon={<ShoppingBagIcon className="h-6 w-6" />} value={ordersPlaced} label="Orders Placed" />
         </div>
