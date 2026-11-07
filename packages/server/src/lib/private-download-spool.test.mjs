@@ -90,3 +90,119 @@ test("pre-handoff grant denial can dispose spool before streaming", async () => 
   await result.dispose();
   assert.deepEqual(await temporaryDirs(), before);
 });
+
+// A dead worker's marked spool can be reclaimed without touching a live peer.
+// Synthetic owners keep tests independent from process scheduling and Stripe.
+const REAPER_PREFIX = "ziledigital-private-download-";
+const ORPHAN_AGE_MS = 2 * 60 * 60 * 1000;
+const STALE_AT = () => new Date(Date.now() - ORPHAN_AGE_MS);
+const FAKE_DEAD_PID = 999999999;
+const OWNER_MARKER = ".ziledigital-spool-owner.json";
+const makeMarkedDirectory = async ({ pid = FAKE_DEAD_PID, host, stale = true, marker = true, symlinkMarker = false } = {}) => {
+  const { mkdtemp, writeFile, utimes, symlink, readlink } = await import("node:fs/promises");
+  const { hostname } = await import("node:os");
+  const { join } = await import("node:path");
+  const directory = await mkdtemp(join(tmpdir(), `${REAPER_PREFIX}${pid}-`));
+  const markerPath = join(directory, OWNER_MARKER);
+  const namespace = process.platform === "linux" ? await readlink("/proc/self/ns/pid") : null;
+  if (symlinkMarker) await symlink("/etc/hosts", markerPath);
+  else if (marker) await writeFile(markerPath, JSON.stringify({
+    version: 1, pid, hostname: host ?? hostname(), pidNamespace: namespace,
+    createdAtMs: stale ? Date.now() - ORPHAN_AGE_MS : Date.now(),
+  }), { flag: "wx", mode: 0o600 });
+  await writeFile(join(directory, "payload"), "private");
+  if (stale) await utimes(directory, STALE_AT(), STALE_AT());
+  return directory;
+};
+
+const exists = async path => {
+  const { lstat } = await import("node:fs/promises");
+  try { await lstat(path); return true; } catch (e) { if (e.code === "ENOENT") return false; throw e; }
+};
+const removeTestDirectory = async path => {
+  const { rm } = await import("node:fs/promises");
+  await rm(path, { recursive: true, force: true });
+};
+
+test("orphan sweeper reclaims only marked, old, dead-process spools", async () => {
+  const { reapOrphanedPrivateDownloadSpools } = await import("./private-download-spool.ts");
+  const dir = await makeMarkedDirectory();
+  try {
+    const result = await reapOrphanedPrivateDownloadSpools();
+    assert.ok(result.removed >= 1);
+    assert.equal(await exists(dir), false);
+  } finally { await removeTestDirectory(dir); }
+});
+
+test("orphan sweeper preserves an old spool owned by this live process", async () => {
+  const { reapOrphanedPrivateDownloadSpools } = await import("./private-download-spool.ts");
+  const dir = await makeMarkedDirectory({ pid: process.pid });
+  try {
+    await reapOrphanedPrivateDownloadSpools();
+    assert.equal(await exists(dir), true);
+  } finally { await removeTestDirectory(dir); }
+});
+
+test("orphan sweeper preserves new directories, even if owner is dead", async () => {
+  const { reapOrphanedPrivateDownloadSpools } = await import("./private-download-spool.ts");
+  const dir = await makeMarkedDirectory({ stale: false });
+  try {
+    await reapOrphanedPrivateDownloadSpools();
+    assert.equal(await exists(dir), true);
+  } finally { await removeTestDirectory(dir); }
+});
+
+test("orphan sweeper refuses foreign-host, unmarked, and symlink markers", async () => {
+  const { reapOrphanedPrivateDownloadSpools } = await import("./private-download-spool.ts");
+  const dirs = [
+    await makeMarkedDirectory({ host: "another-host.example" }),
+    await makeMarkedDirectory({ marker: false }),
+    await makeMarkedDirectory({ symlinkMarker: true }),
+  ];
+  try {
+    await reapOrphanedPrivateDownloadSpools();
+    for (const dir of dirs) assert.equal(await exists(dir), true);
+  } finally { await Promise.all(dirs.map(removeTestDirectory)); }
+});
+
+test("orphan sweeper never deletes unmarked legacy spool folders", async () => {
+  const { mkdtemp, utimes, writeFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const { reapOrphanedPrivateDownloadSpools } = await import("./private-download-spool.ts");
+  const dir = await mkdtemp(join(tmpdir(), REAPER_PREFIX));
+  try {
+    await writeFile(join(dir, "payload"), "not-owned");
+    await utimes(dir, STALE_AT(), STALE_AT());
+    await reapOrphanedPrivateDownloadSpools();
+    assert.equal(await exists(dir), true);
+  } finally { await removeTestDirectory(dir); }
+});
+
+test("a spool abandoned by a terminated worker is safely reclaimable", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const { resolve } = await import("node:path");
+  const { readdir, readFile, utimes } = await import("node:fs/promises");
+  const before = await temporaryDirs();
+  const worker = spawnSync(process.execPath, [
+    "--experimental-strip-types", "--input-type=module", "-e",
+    `import {spoolPrivateDownload} from ${JSON.stringify(new URL("./private-download-spool.ts", import.meta.url).href)};
+     await spoolPrivateDownload(new ReadableStream({start(c){c.enqueue(new Uint8Array([1,2,3]));c.close()}}),null,20);
+     process.exit(0);`,
+  ], { encoding: "utf8", timeout: 10_000 });
+  assert.equal(worker.status, 0, worker.stderr);
+  const after = await temporaryDirs();
+  const created = [...after].filter(name => !before.has(name) && name.startsWith(`${REAPER_PREFIX}${worker.pid}-`));
+  assert.equal(created.length, 1);
+  const dir = resolve(tmpdir(), created[0]);
+  try {
+    const path = resolve(dir, OWNER_MARKER);
+    const { writeFile } = await import("node:fs/promises");
+    const owner = JSON.parse(await readFile(path, "utf8"));
+    owner.createdAtMs = Date.now() - ORPHAN_AGE_MS;
+    await writeFile(path, JSON.stringify(owner));
+    await utimes(dir, STALE_AT(), STALE_AT());
+    const { reapOrphanedPrivateDownloadSpools } = await import("./private-download-spool.ts");
+    await reapOrphanedPrivateDownloadSpools();
+    assert.equal(await exists(dir), false);
+  } finally { await removeTestDirectory(dir); }
+});
