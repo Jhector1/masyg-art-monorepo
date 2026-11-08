@@ -22,8 +22,8 @@ export default function CatalogOptionGroups({ organizationId, storeId, productId
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [name, setName] = useState('Size');
-  const [values, setValues] = useState('8 × 10 in\n11 × 14 in\n16 × 20 in');
+  const [name, setName] = useState('');
+  const [values, setValues] = useState('');
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
   const [selectedOffering, setSelectedOffering] = useState('');
   const [required, setRequired] = useState(true);
@@ -70,9 +70,9 @@ export default function CatalogOptionGroups({ organizationId, storeId, productId
   const target = selectedOffering || data?.offerings[0]?.id || '';
   return <section className="space-y-5 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6" aria-label="Reusable option groups">
     <div>
-      <h3 className="text-lg font-semibold">Reusable product options</h3>
-      <p className="mt-1 text-sm text-zinc-600">Create a shared vocabulary for print sizes, paper, frames, colors, clothing sizes, or coffee grind. Groups belong to this organization and can be attached to its offerings.</p>
-      <p className="mt-2 text-xs text-amber-800">Authoring metadata only: attaching an option here does not create buyer-selectable combinations or set stock. Purchasable choices still come from existing priced editions.</p>
+      <h3 className="text-lg font-semibold">Sizes, colors & other choices</h3>
+      <p className="mt-1 text-sm text-zinc-600">Save a set of choices such as clothing sizes, colors, framing styles, paper types or coffee grind. You can then link the set to a way this product is sold.</p>
+      <p className="mt-2 text-sm text-amber-900"><strong>Important:</strong> Saving these labels does not make them selectable at checkout or create inventory. For choices with different prices or stock, use the <strong>Editions</strong> step to create priced editions.</p>
     </div>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {message && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
@@ -86,7 +86,7 @@ export default function CatalogOptionGroups({ organizationId, storeId, productId
         </label>
         <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" checked={required} onChange={event => setRequired(event.target.checked)} disabled={busy || !canEdit}/> Required (metadata)</label>
       </div>}
-      {!data.offerings.length && <p className="text-sm text-amber-800">Create a way to sell first, then attach option groups to it.</p>}
+      {!data.offerings.length && <p className="text-sm text-amber-800">First add a way to sell this product in step 2. Then you can attach choices to it here.</p>}
       <div className="grid gap-3">
         {data.groups.map(group => {
           const attached = group.offerings.find(link => link.offeringId === target);
@@ -116,14 +116,14 @@ export default function CatalogOptionGroups({ organizationId, storeId, productId
         {!data.groups.length && <p className="text-sm text-zinc-500">No option groups yet for this organization.</p>}
       </div>
       {canEdit && <form className="space-y-3 rounded-xl border border-dashed border-zinc-300 p-4" onSubmit={createGroup}>
-        <h4 className="font-semibold">Create an option group</h4>
+        <h4 className="font-semibold">Add a set of choices</h4>
         <label className="block text-sm font-medium">Name
-          <input className={field} value={name} onChange={event => setName(event.target.value)} maxLength={80} required disabled={busy}/>
+          <input className={field} value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Shirt size, Color, or Coffee grind" maxLength={80} required disabled={busy}/>
         </label>
         <label className="block text-sm font-medium">Choices (one per line, or comma separated)
-          <textarea className={field} rows={4} value={values} onChange={event => setValues(event.target.value)} disabled={busy}/>
+          <textarea className={field} rows={4} value={values} onChange={event => setValues(event.target.value)} placeholder={"e.g. Small\nMedium\nLarge"} disabled={busy}/>
         </label>
-        <button type="submit" className={primary} disabled={busy || !name.trim() || !values.trim()}>Save reusable group</button>
+        <button type="submit" className={primary} disabled={busy || !name.trim() || !values.trim()}>Save choices</button>
       </form>}
     </>}
   </section>;

@@ -154,16 +154,16 @@ export default function AdminHeader({
       <div className="mx-auto flex h-16 max-w-screen-2xl items-center gap-3 px-3 sm:px-4">
         {/* Left: mobile menu + brand */}
         <div className="flex min-w-0 items-center gap-2">
-          <button
+          {onToggleSidebar && <button
             type="button"
             className="md:hidden grid size-9 place-items-center rounded-xl border border-zinc-200 bg-white/80 text-zinc-700 shadow-sm hover:bg-white dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
-            onClick={() => onToggleSidebar?.()}
+            onClick={onToggleSidebar}
             aria-label="Toggle sidebar"
             aria-controls="admin-sidebar"
             aria-expanded={sidebarExpanded}
           >
             <IconMenu className="h-5 w-5" />
-          </button>
+          </button>}
 
           <Link href={brandHref} className="flex items-center gap-2" aria-label="ZileDigital Admin Home" prefetch={false}>
             <div className="grid size-9 place-items-center rounded-xl border bg-white/80 shadow-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">

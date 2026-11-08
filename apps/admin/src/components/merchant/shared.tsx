@@ -26,7 +26,15 @@ export async function callMerchant(path: string, method: "POST" | "PATCH" | "PUT
   const data: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const err = data && typeof data === "object" && "error" in data ? (data as { error: unknown }).error : undefined;
-    throw new Error(typeof err === "string" ? err : `Request failed (${res.status})`);
+    const issues = data && typeof data === "object" && "issues" in data && Array.isArray(data.issues) ? data.issues : [];
+    const details = issues.slice(0, 8).flatMap((issue: unknown) => {
+      if (!issue || typeof issue !== "object") return [];
+      const item = issue as { path?: unknown; message?: unknown };
+      if (typeof item.message !== "string") return [];
+      const path = Array.isArray(item.path) ? item.path.filter(part => typeof part === "string" || typeof part === "number").join(" → ") : "";
+      return [`${path ? `${path}: ` : ""}${item.message}`];
+    });
+    throw new Error(details.length ? details.join("\n") : typeof err === "string" ? err : `Request failed (${res.status})`);
   }
   return data;
 }

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { StoreChoice } from "@/lib/merchant-workspace";
-import { field, money, mutatable, primary, productHref, secondary, Status, storeQuery } from "./shared";
+import { field, money, productHref, secondary, Status } from "./shared";
 
 export type ProductSummary = {
   slug: string; status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -19,7 +19,7 @@ export default function ProductList({ store, listings }: { store: StoreChoice; l
     return text.includes(search.toLowerCase().trim()) && (filter === "ALL" || x.status === filter);
   }), [listings, search, filter]);
   return <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">Product library</h2><p className="mt-1 text-sm text-zinc-500">{listings.length} recent listings in {store.storeName}</p></div>{mutatable(store) && <Link href={`/merchant/products/new${storeQuery(store.storeId)}`} className={primary}>+ Add product</Link>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">Product library</h2><p className="mt-1 text-sm text-zinc-500">{listings.length} recent listings in {store.storeName}</p></div></div>
     <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]"><label className="text-sm font-medium">Search<input className={field} type="search" value={search} placeholder="Search title, description or URL slug" onChange={e => setSearch(e.target.value)} /></label><label className="text-sm font-medium">Listing status<select className={field} value={filter} onChange={e => setFilter(e.target.value)}><option value="ALL">All</option><option value="DRAFT">Draft</option><option value="PUBLISHED">Published</option><option value="ARCHIVED">Archived</option></select></label></div>
     <div className="mt-5 grid gap-3">{shown.map(x => {
       const image = x.product.media[0]?.asset.id;

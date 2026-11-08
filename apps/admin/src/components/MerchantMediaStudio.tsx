@@ -36,18 +36,21 @@ export default function MerchantMediaStudio({ organizationId, productId, media, 
   const digitalVariants = variants.filter(v => v.fulfillment === "DIGITAL");
   const [digitalVariantId, setDigitalVariantId] = useState(digitalVariants[0]?.id ?? "");
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
+  const [uploadErrorFor, setUploadErrorFor] = useState<"preview" | "digital" | null>(null);
   const url = `/api/merchant/organizations/${organizationId}/products/${productId}/media`;
   const cover = ids[0];
   const selectedIndex = Math.max(0, ids.indexOf(selected));
   const image = (id: string, thumb: boolean) => `${url}/${encodeURIComponent(id)}${thumb ? "?size=thumb" : ""}`;
-  async function perform(action: () => Promise<string>) {
+  async function perform(action: () => Promise<string>, uploadKind: "preview" | "digital" | null = null) {
     if (busy || readOnly) return;
+    setUploadErrorFor(uploadKind);
     setBusy(true); setError(""); setNotice("");
     try { setNotice(await action()); router.refresh(); }
     catch (e) { setError(e instanceof Error ? e.message : "Media operation failed"); }
     finally { setBusy(false); }
   }
   async function upload(kind: "preview" | "digital", files: FileList | null, variantId?: string, replaceId?: string) {
+    setUploadErrorFor(kind); setError(""); setNotice("");
     if (!files?.length) { setError("Choose a file before uploading"); return; }
     const maxSize = kind === "preview" ? 12 * 1024 * 1024 : 40 * 1024 * 1024;
     for (const file of Array.from(files)) {
@@ -86,7 +89,7 @@ export default function MerchantMediaStudio({ organizationId, productId, media, 
       if (replaceRef.current) replaceRef.current.value = "";
       setReplacementFile(null);
       return `${files.length} ${kind === "preview" ? "preview image(s)" : "private digital file(s)"} uploaded`;
-    });
+    }, kind);
   }
   async function reorder(next: string[]) {
     if (next.join("|") === ids.join("|")) return;
@@ -128,7 +131,7 @@ export default function MerchantMediaStudio({ organizationId, productId, media, 
     });
   }
   return <div className="mt-5 space-y-6">
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+    {error && !uploadErrorFor && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</p>}
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_270px]">
       <div className="space-y-3"><div className="relative flex min-h-64 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 sm:min-h-96">
@@ -141,7 +144,7 @@ export default function MerchantMediaStudio({ organizationId, productId, media, 
       {!readOnly && !!selected && <div className="flex flex-wrap gap-2"><button type="button" className={secondary} disabled={busy || selected === cover} onClick={() => void reorder([selected, ...ids.filter(x => x !== selected)])}>Set as cover</button><button type="button" className={secondary} disabled={busy || selectedIndex === 0} onClick={() => { const next = [...ids]; [next[selectedIndex - 1], next[selectedIndex]] = [next[selectedIndex]!, next[selectedIndex - 1]!]; void reorder(next); }}>Move left</button><button type="button" className={secondary} disabled={busy || selectedIndex === ids.length - 1} onClick={() => { const next = [...ids]; [next[selectedIndex + 1], next[selectedIndex]] = [next[selectedIndex]!, next[selectedIndex + 1]!]; void reorder(next); }}>Move right</button><button type="button" className="rounded-xl px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50" disabled={busy} onClick={() => void removeImage(selected)}>Remove from gallery</button></div>}
       </div>
       <div className="space-y-5"><section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"><h3 className="text-sm font-semibold">Image information</h3>
-        <label className="mt-3 block text-xs font-medium">Alternative text<textarea className="mt-1 block w-full rounded-lg border p-2 text-sm" rows={3} maxLength={180} disabled={!selected || busy || readOnly} value={altDraft} onChange={e => setAltDraft(e.target.value)} placeholder="Describe the artwork for screen readers" /></label>
+        <label className="mt-3 block text-xs font-medium">Alternative text<textarea className="mt-1 block w-full rounded-lg border p-2 text-sm" rows={3} maxLength={180} disabled={!selected || busy || readOnly} value={altDraft} onChange={e => setAltDraft(e.target.value)} placeholder="Describe the product image for screen readers" /></label>
         {!readOnly && <button type="button" className={`${secondary} mt-2 w-full`} disabled={!selected || busy} onClick={() => void saveAltText()}>Save alt text</button>}
       </section>
       <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"><h3 className="text-sm font-semibold">Edit or replace an image</h3><p className="mt-1 text-xs text-zinc-500">Select a new source file; crop and rotation happen before the permanent PREVIEW stamp. Existing watermarked previews cannot be unwatermarked.</p>
@@ -153,17 +156,19 @@ export default function MerchantMediaStudio({ organizationId, productId, media, 
         <button type="button" className={`${secondary} mt-3 w-full`} disabled={busy || !selected} onClick={() => void upload("preview", replaceRef.current?.files ?? null, undefined, selected)}>Replace selected preview</button></>}
       </section>
       <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"><h3 className="text-sm font-semibold">Upload gallery previews</h3><p className="mt-2 text-xs leading-5 text-zinc-600">JPEG, PNG, WebP · 12 MB each · Up to 8 at once. Cloudinary stores watermarked previews; thumbnails are derived from the protected preview, not the original artwork.</p>
-        {!readOnly && <><input ref={imgRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="mt-3 block w-full text-xs" disabled={busy}/><button type="button" className={`${primary} mt-3 w-full`} disabled={busy} onClick={() => void upload("preview", imgRef.current?.files ?? null)}>{busy ? "Processing…" : "Upload images"}</button></>}
+        {!readOnly && <><input ref={imgRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="mt-3 block w-full text-xs" disabled={busy} onChange={() => { if (uploadErrorFor === "preview") setError(""); }}/><button type="button" className={`${primary} mt-3 w-full`} disabled={busy} onClick={() => void upload("preview", imgRef.current?.files ?? null)}>{busy ? "Processing…" : "Upload images"}</button></>}
+        {error && uploadErrorFor === "preview" && <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">{error}</p>}
       </section><p className="text-xs leading-5 text-zinc-500">The first thumbnail is the catalog cover. Changing order updates the canonical ProductMedia sequence for every storefront listing this product.</p></div>
     </div>
-    <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-5"><h3 className="font-semibold">Private digital originals & downloads</h3><p className="mt-1 text-xs text-zinc-500">PDF, SVG, ZIP, JPEG, PNG or WebP · 40 MB each. Files remain private; uploads do not enable buyer downloads or payments.</p>
+    {digitalVariants.length > 0 && <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-5"><h3 className="font-semibold">Private digital originals & downloads</h3><p className="mt-1 text-xs text-zinc-500">PDF, SVG, ZIP, JPEG, PNG or WebP · 40 MB each. Files remain private; uploads do not enable buyer downloads or payments.</p>
       {!digitalVariants.length ? <p className="mt-4 text-sm text-zinc-600">Add a DIGITAL variant to attach downloadable files.</p> : <div className="mt-4 space-y-3"><label className="block text-xs font-semibold">Digital variant<select className="mt-1 block w-full max-w-lg rounded-xl border bg-white p-2 text-sm" value={digitalVariantId} onChange={e => { setDigitalVariantId(e.target.value); setReplaceDigitalId(""); }}>{digitalVariants.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label>
         <ul className="space-y-2 text-sm">{digitalVariants.find(v => v.id === digitalVariantId)?.digitalFiles?.map(f => <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white p-3"><span>{f.label} <span className="text-xs text-zinc-500">({f.asset.mimeType}) · {f.retiredAt ? "Retired for new purchases" : "Active"}</span></span>{!readOnly && !f.retiredAt && <button type="button" disabled={busy} onClick={() => void retireDigital(f.id)} className="text-xs font-medium text-red-700">Retire</button>}</li>)}
           {!digitalVariants.find(v => v.id === digitalVariantId)?.digitalFiles?.length && <li className="text-xs text-zinc-500">No private files attached yet.</li>}</ul>
         {!readOnly && <><label className="block text-xs font-medium">Replace an active file (optional)<select className="mt-1 block w-full max-w-lg rounded-lg border bg-white p-2 text-sm" value={replaceDigitalId} onChange={e => setReplaceDigitalId(e.target.value)}><option value="">Add a new file</option>{digitalVariants.find(v => v.id === digitalVariantId)?.digitalFiles?.filter(f => !f.retiredAt).map(f => <option key={f.id} value={f.id}>{f.label}</option>)}</select></label>
         <p className="text-xs text-zinc-600">Files upload securely to Cloudinary for <strong>{digitalVariants.find(v=>v.id===digitalVariantId)?.name || "the selected digital edition"}</strong>. A public gallery image is not a buyer download. Do not share Cloudinary API keys here.</p>
-        <input ref={digitalRef} type="file" aria-label="Select private files for the chosen digital edition" multiple={!replaceDigitalId} accept=".png,.jpg,.jpeg,.webp,.svg,.pdf,.zip" className="block w-full text-xs" disabled={busy}/><button type="button" disabled={busy || !digitalVariantId} className={secondary} onClick={() => void upload("digital", digitalRef.current?.files ?? null, digitalVariantId, replaceDigitalId || undefined)}>{replaceDigitalId ? "Upload replacement file" : "Upload private files"}</button></>}
+        <input ref={digitalRef} type="file" aria-label="Select private files for the chosen digital edition" multiple={!replaceDigitalId} accept=".png,.jpg,.jpeg,.webp,.svg,.pdf,.zip" className="block w-full text-xs" disabled={busy} onChange={() => { if (uploadErrorFor === "digital") setError(""); }}/><button type="button" disabled={busy || !digitalVariantId} className={secondary} onClick={() => void upload("digital", digitalRef.current?.files ?? null, digitalVariantId, replaceDigitalId || undefined)}>{replaceDigitalId ? "Upload replacement file" : "Upload private files"}</button>
+        {error && uploadErrorFor === "digital" && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">{error}</p>}</>}
       </div>}
-    </section>
+    </section>}
   </div>;
 }
